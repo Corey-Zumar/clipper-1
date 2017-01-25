@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <math.h>
+#include <time.h>
 
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -402,6 +403,7 @@ void ReservoirSampler::sample(const int64_t value) {
     if (reservoir_.size() != sample_size_) {
       throw std::length_error("Reservoir size exceeds sample size!");
     }
+    srand(time(NULL));
     size_t j = rand() % (n_ + 1);
     if (j < sample_size_) {
       reservoir_[j] = value;
