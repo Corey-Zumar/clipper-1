@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
+#define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
 #define PROVIDES_EXECUTORS
 #include <boost/thread.hpp>
 #include <boost/thread/executors/basic_thread_pool.hpp>
