@@ -8,7 +8,6 @@
 #include <unordered_map>
 
 #define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
-#define BOOST_THREAD_PROVIDES_FUTURE_WHEN_ALL_WHEN_ANY
 #define PROVIDES_EXECUTORS
 #include <boost/thread.hpp>
 #include <boost/thread/executors/basic_thread_pool.hpp>
@@ -140,27 +139,12 @@ boost::future<Response> QueryProcessor::predict(Query query) {
   log_info_formatted(LOGGING_TAG_QUERY_PROCESSOR, "Found {} tasks",
                      tasks.size());
 
-  vector<boost::shared_future<Output>> shared_task_completion_futures =
+  vector<boost::future<Output>> task_futures =
       task_executor_.schedule_predictions(tasks);
   boost::future<void> timer_future =
       timer_system_.set_timer(query.latency_micros_);
 
-  vector<boost::future<Output>> task_completion_futures;
-
-  boost::future<void> all_tasks_completed;
-  auto num_completed = std::make_shared<std::atomic<int>>(0);
-  std::tie(all_tasks_completed, task_completion_futures) = future::when_all(
-      std::move(shared_task_completion_futures), num_completed);
-
-  auto completion_flag = std::make_shared<std::atomic<int>>(0);
-  boost::future<void> response_ready_future;
-  boost::future<void> all_tasks_completed_wrapped;
-  boost::future<void> timer_future_wrapped;
-
-  std::tie(response_ready_future, all_tasks_completed_wrapped,
-           timer_future_wrapped) =
-      future::when_any(std::move(all_tasks_completed), std::move(timer_future),
-                       completion_flag);
+  // vector<boost::future<Output>> task_completion_futures;
 
   boost::future<void> all_tasks_completed;
   auto num_completed = std::make_shared<std::atomic<int>>(0);
@@ -186,12 +170,6 @@ boost::future<Response> QueryProcessor::predict(Query query) {
     query, query_id, response_promise = std::move(response_promise),
     serialized_state = std::move(serialized_state),
     task_futures = std::move(task_futures), num_completed, completed_flag
-  ](auto) mutable {
-
-  response_ready_future.then([
-    query, query_id, p = std::move(promise), s = std::move(serialized_state),
-    task_futures = std::move(task_completion_futures), num_completed,
-    completion_flag
   ](auto) mutable {
 
     vector<Output> outputs;
@@ -229,7 +207,7 @@ boost::future<Response> QueryProcessor::predict(Query query) {
 
     Response response{query, query_id, duration_micros, final_output,
                       query.candidate_models_};
-    p.set_value(response);
+    response_promise.set_value(response);
 
   });
   return response_future;
@@ -290,8 +268,7 @@ boost::future<FeedbackAck> QueryProcessor::update(FeedbackQuery feedback) {
   // 3) Complete select_policy_update_promise
   // 4) Wait for all feedback_tasks to complete (feedback_processed future)
 
-  // copy the vector
-  vector<boost::shared_future<Output>> predict_task_completion_futures =
+  vector<boost::future<Output>> predict_task_futures =
       task_executor_.schedule_predictions({predict_tasks});
 
   vector<boost::future<FeedbackAck>> feedback_task_futures =
