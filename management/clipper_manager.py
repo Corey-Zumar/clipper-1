@@ -162,12 +162,15 @@ class Clipper:
         else:
             append(filename, text, **kwargs)
 
-    # Taken from http://stackoverflow.com/a/12514470
+    # Modified from http://stackoverflow.com/a/12514470
     # Recursively copies a directory from src to dst,
     # where dst may or may not exist. We cannot use
     # shutil.copytree() alone because it stipulates that
     # dst cannot already exist
     def copytree(self, src, dst, symlinks=False, ignore=None):
+        # Appends the final directory in the tree specified by "src" to
+        # the tree specified by "dst". This is consistent with fabric's
+        # put() behavior
         final_dst_char = dst[len(dst) - 1]
         if final_dst_char != "/":
             dst = dst + "/"
