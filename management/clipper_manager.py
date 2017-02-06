@@ -168,10 +168,6 @@ class Clipper:
     # shutil.copytree() alone because it stipulates that
     # dst cannot already exist
     def copytree(self, src, dst, symlinks=False, ignore=None):
-        print("*******")
-        print(src)
-        print(dst)
-        print("*******")
         final_dst_char = dst[len(dst) - 1]
         if final_dst_char != "/":
             dst = dst + "/"
@@ -405,8 +401,6 @@ class Clipper:
                                     vol, os.path.basename(model_data_path))))
                     else:
                         with hide("output", "running"):
-                                print(model_data_path)
-                                print("VOL: {}".format(vol))
                                 self.execute_put(model_data_path, vol)
 
             print("Copied model data to host")
@@ -521,12 +515,6 @@ class Clipper:
             container_name,
             model_data_path,
             output_type="double"):
-        print("-----")
-        print(model_data_path)
-        print(container_name)
-        print(version)
-        print(name)
-        print("-----")
         url = "http://%s:1338/admin/add_model" % self.host
         req_json = json.dumps({
             "model_name": name,
@@ -540,9 +528,7 @@ class Clipper:
         headers = {'Content-type': 'application/json'}
         r = requests.post(url, headers=headers, data=req_json)
 
-        print("TEXT!: {}".format(r.text))
         if r.status_code == requests.codes.ok:
-            print("HYENAS!")
             return True
         else:
             warn("Error publishing model: %s" % r.text)
