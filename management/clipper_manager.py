@@ -7,6 +7,7 @@ import json
 import yaml
 import pprint
 import subprocess32 as subprocess
+import shutil
 from sklearn import base
 from sklearn.externals import joblib
 
@@ -140,6 +141,17 @@ class Clipper:
             result = local(*args, **kwargs)
         return result
 
+    def execute_put(self, local_path, remote_path, *args, **kwargs):
+        if self.host_is_local():
+            # We should only copy data if the paths are different
+            if local_path != remote_path:
+                if os.path.isdir(local_path):
+                    self.copytree(local_path, remote_path)
+                else:
+                    shutil.copy2(local_path, remote_path)
+        else:
+            put(local_path=local_path, remote_path=remote_path, *args, **kwargs)
+
     def execute_append(self, filename, text, **kwargs):
         if self.host_is_local():
             file = open(filename, "a+")
@@ -150,6 +162,33 @@ class Clipper:
         else:
             append(filename, text, **kwargs)
 
+    # Taken from http://stackoverflow.com/a/12514470
+    # Recursively copies a directory from src to dst,
+    # where dst may or may not exist. We cannot use
+    # shutil.copytree() alone because it stipulates that
+    # dst cannot already exist
+    def copytree(self, src, dst, symlinks=False, ignore=None):
+        print("*******")
+        print(src)
+        print(dst)
+        print("*******")
+        final_dst_char = dst[len(dst) - 1]
+        if final_dst_char != "/":
+            dst = dst + "/"
+        nested_dir_names = src.split("/")
+        dst = dst + nested_dir_names[len(nested_dir_names) - 1]
+
+        if not os.path.exists(dst):
+            os.makedirs(dst)
+        for item in os.listdir(src):
+            s = os.path.join(src, item)
+            d = os.path.join(dst, item)
+            if os.path.isdir(s):
+                copytree(s, d, symlinks, ignore)
+            else:
+                if not os.path.exists(d) or os.stat(s).st_mtime - os.stat(d).st_mtime > 1:
+                    shutil.copy2(s, d)
+
 
     def start(self):
         """Start a Clipper instance.
@@ -157,7 +196,6 @@ class Clipper:
         """
         with hide("output", "warnings", "running"):
             self.execute_standard("rm -f docker-compose.yml")
-            print(yaml.dump(DOCKER_COMPOSE_DICT, default_flow_style=False))
             self.execute_append(
                 "docker-compose.yml",
                 yaml.dump(
@@ -367,7 +405,9 @@ class Clipper:
                                     vol, os.path.basename(model_data_path))))
                     else:
                         with hide("output", "running"):
-                            put(model_data_path, ".")
+                                print(model_data_path)
+                                print("VOL: {}".format(vol))
+                                self.execute_put(model_data_path, vol)
 
             print("Copied model data to host")
             if not self._publish_new_model(name, version, labels, input_type,
@@ -443,10 +483,7 @@ class Clipper:
             (not JSON formatted).
         """
         url = "http://%s:1337/metrics" % self.host
-        if clear:
-            r = requests.post(url)
-        else:
-            r = requests.get(url)
+        r = requests.get(url)
         try:
             s = r.json()
         except TypeError:
@@ -484,6 +521,12 @@ class Clipper:
             container_name,
             model_data_path,
             output_type="double"):
+        print("-----")
+        print(model_data_path)
+        print(container_name)
+        print(version)
+        print(name)
+        print("-----")
         url = "http://%s:1338/admin/add_model" % self.host
         req_json = json.dumps({
             "model_name": name,
@@ -496,7 +539,10 @@ class Clipper:
         })
         headers = {'Content-type': 'application/json'}
         r = requests.post(url, headers=headers, data=req_json)
+
+        print("TEXT!: {}".format(r.text))
         if r.status_code == requests.codes.ok:
+            print("HYENAS!")
             return True
         else:
             warn("Error publishing model: %s" % r.text)
@@ -545,7 +591,7 @@ class Clipper:
                     fn=saved_fname,
                     cn=container_name))
                 tar_loc = "/tmp/{fn}.tar".format(fn=saved_fname)
-                put(tar_loc, tar_loc)
+                self.execute_put(tar_loc, tar_loc)
                 self.execute_root("docker load -i {loc}".format(loc=tar_loc))
                 # self.execute_root("docker tag {image_id} {cn}".format(
                 #       image_id=image_id, cn=cn))
