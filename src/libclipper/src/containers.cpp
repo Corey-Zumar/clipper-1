@@ -36,16 +36,17 @@ ActiveContainers::ActiveContainers()
                              decltype(&versioned_model_hash)>(
               100, &versioned_model_hash)) {}
 
-void ActiveContainers::add_container(VersionedModelId model, int id,
-                                     InputType input_type) {
+void ActiveContainers::add_container(VersionedModelId model, int connection_id,
+                                     int replica_id, InputType input_type) {
   log_info_formatted(
       LOGGING_TAG_CLIPPER,
       "Adding new container - model: {}, version: {}, ID: {}, input_type: {}",
-      model.first, model.second, id, get_readable_input_type(input_type));
+      model.first, model.second, connection_id, get_readable_input_type(input_type));
   boost::unique_lock<boost::shared_mutex> l{m_};
-  auto new_container = std::make_shared<ModelContainer>(model, id, input_type);
+  auto new_container = std::make_shared<ModelContainer>(model, connection_id, input_type);
   auto entry = containers_[new_container->model_];
-  entry.emplace(id, new_container);
+  log_info_formatted("DIJKSTRA", "REPLICA ID: {}", replica_id);
+  entry.emplace(replica_id, new_container);
   containers_[new_container->model_] = entry;
   assert(containers_[new_container->model_].size() > 0);
 }
@@ -68,6 +69,7 @@ ActiveContainers::get_model_replicas_snapshot(const VersionedModelId &model) {
 
 std::shared_ptr<ModelContainer>
 ActiveContainers::get_model_replica(const VersionedModelId &model, const int replica_id) {
+  log_info_formatted("DIJKSTRA23", "REPLICA ID: {}", replica_id);
   auto replicas_map_entry = containers_.find(model);
   if (replicas_map_entry == containers_.end()) {
     return nullptr;

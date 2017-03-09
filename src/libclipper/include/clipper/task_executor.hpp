@@ -16,6 +16,7 @@
 #include <clipper/redis.hpp>
 #include <clipper/rpc_service.hpp>
 #include <clipper/util.hpp>
+#include <clipper/threadpool.hpp>
 
 namespace clipper {
 
@@ -97,13 +98,15 @@ class TaskExecutor {
             VersionedModelId vm =
                 std::make_pair(container_info["model_name"],
                                std::stoi(container_info["model_version"]));
+            int replica_id = std::stoi(container_info["model_replica_id"]);
             active_containers_->add_container(
                 vm, std::stoi(container_info["zmq_connection_id"]),
-                parse_input_type(container_info["input_type"]));
-            int replica_id = std::stoi(container_info["model_replica_id"]);
+                replica_id, parse_input_type(container_info["input_type"]));
             // TODO: This callback should be submitted to a thread pool
             // for execution on a separate thread
-            on_container_ready(vm, replica_id);
+            DefaultThreadPool::get_thread_pool().submit([=]() {
+              on_container_ready(vm, replica_id);
+            });
             // TODO: Create a new model queue if this is the first connected container
             // hosting the specified model (i.e. replica_id == 0)
           }
@@ -180,7 +183,6 @@ class TaskExecutor {
     if(!container) {
       throw std::runtime_error("TaskExecutor failed to find previously registered active container!");
     }
-    
     while(true) {
       auto batch = container->dequeue_predictions(max_batch_size_);
       if (batch.size() > 0) {
