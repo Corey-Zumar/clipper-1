@@ -6,10 +6,6 @@ import sys
 import base64
 import time
 
-cur_dir = os.path.dirname(os.path.abspath(__file__))
-
-sys.path.insert(0, os.path.abspath('../../containers/python'))
-
 import rpc
 
 # Change this to the relative path of tf slim within your docker container
@@ -94,7 +90,7 @@ if __name__ == "__main__":
             file=sys.stdout)
         sys.exit(1)
     try:
-        gpu_mem_frac = os.environ["CLIPPER_GPU_MEM_FRAC"]
+        gpu_mem_frac = float(os.environ["CLIPPER_GPU_MEM_FRAC"])
     except KeyError:
         print(
             "ERROR: CLIPPER_GPU_MEM_FRAC environment variable must be set",

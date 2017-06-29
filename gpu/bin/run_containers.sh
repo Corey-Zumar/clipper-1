@@ -19,4 +19,4 @@ model_name=$1
 clipper_ip=$2
 num_containers=$3
 
-python run_containers.py $model_name $clipper_ip $tf_slim_path $checkpoint_path $num_containers
+python run_containers.py $model_name $clipper_ip $checkpoint_path $tf_slim_path $num_containers
