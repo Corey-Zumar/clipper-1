@@ -108,5 +108,3 @@ if __name__ == "__main__":
     container = TfInceptionContainer(model_checkpoint_path, gpu_mem_frac)
     rpc_service = rpc.RPCService()
     rpc_service.start(container, ip, port, model_name, model_version, input_type)
-                                                                                                                                                 1,1           Top
-

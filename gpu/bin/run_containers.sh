@@ -12,8 +12,8 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 cd $DIR
 
-tf_slim_path="../tf_models/slim"
-checkpoint_path="../inception_v3.ckpt"
+tf_slim_path="/../tf_models/slim"
+checkpoint_path="/../inception_v3.ckpt"
 
 model_name=$1
 clipper_ip=$2

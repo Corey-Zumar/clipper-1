@@ -8,21 +8,19 @@ from clipper_admin import Clipper
 
 CLIPPER_DOCKER_LABEL = "ai.clipper.container.label"
 CLIPPER_MODEL_CONTAINER_LABEL = "ai.clipper.model_container.model_version"
-CLIPPER_NW = "CLIPPER_NW"
 
 def launch_container(clipper, model_name, model_version, model_input_type, clipper_ip, gpu_mem_frac, checkpoint_path, tf_slim_path):
         docker_checkpoint_path = "/model_checkpoint"
         docker_tf_slim_path = "/tfslim"
-        image_name = "clipper/tf_inception_container"
+        image_name = "clipper/tf_gpu_inception_container"
         add_container_cmd = (
-                "nvidia-docker run -d --network={nw} --restart={restart_policy} -v {ckptpath}:{dcp} -v {tfspath}:{dtfsp} "
+                "nvidia-docker run -d --restart={restart_policy} -v {ckptpath}:{dcp} -v {tfspath}:{dtfsp} "
                 "-e \"CLIPPER_MODEL_NAME={mn}\" -e \"CLIPPER_MODEL_VERSION={mv}\" "
                 "-e \"CLIPPER_MODEL_CHECKPOINT_PATH={dcp}\" -e \"CLIPPER_GPU_MEM_FRAC={mf}\" "
                 "-e \"CLIPPER_IP={ip}\" -e \"CLIPPER_INPUT_TYPE={mip}\" -l \"{clipper_label}\" -l \"{mv_label}\" "
                 "{image}".format(
                         ckptpath=checkpoint_path,
                         tfspath=tf_slim_path,
-                        nw=CLIPPER_NW,
                         image=image_name,
                         mn=model_name,
                         dcp=docker_checkpoint_path,
