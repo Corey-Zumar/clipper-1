@@ -1,0 +1,18 @@
+FROM tf_zmq_gpu
+
+MAINTAINER Dan Crankshaw <dscrankshaw@gmail.com>
+
+RUN mkdir -p /model \
+      && apt-get update \
+      && apt-get install -y libzmq-dev \
+      && apt-get install -y python-pip \
+      && pip install pyzmq
+
+WORKDIR /container
+
+COPY containers/__init__.py containers/rpc.py /container/
+
+ENV CLIPPER_MODEL_PATH=/model
+
+# vim: set filetype=dockerfile:
+

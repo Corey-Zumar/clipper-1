@@ -1,0 +1,9 @@
+FROM clipper/py-rpc-gpu:latest
+
+MAINTAINER Dan Crankshaw <dscrankshaw@gmail.com>
+
+COPY /containers/tf_gpu_inception_container.py /container/
+
+CMD ["python", "/container/tf_gpu_inception_container.py"]
+
+# vim: set filetype=dockerfile:
