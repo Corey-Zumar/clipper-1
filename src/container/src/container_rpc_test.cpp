@@ -33,7 +33,9 @@ class RPCTestModel : public Model<DoubleVector> {
     return outputs;
   }
 
-  container::InputType get_input_type() const override { return container::InputType::Doubles; }
+  container::InputType get_input_type() const override {
+    return container::InputType::Doubles;
+  }
 
  private:
   RPC& container_rpc_;
@@ -85,7 +87,7 @@ int main(int argc, char* argv[]) {
   int clipper_port = 7000;
 
   container_rpc.start_async(test_model, model_name, model_version, clipper_ip,
-                      clipper_port);
+                            clipper_port);
 
   std::this_thread::sleep_for(std::chrono::seconds(test_length));
 
