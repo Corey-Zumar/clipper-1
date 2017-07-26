@@ -77,22 +77,22 @@ double ModelContainer::get_average_throughput_per_millisecond() {
 }
 
 size_t ModelContainer::get_batch_size(Deadline deadline) {
-  double current_time_millis =
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::system_clock::now().time_since_epoch())
-          .count();
-  double deadline_millis =
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          deadline.time_since_epoch())
-          .count();
-  double remaining_time_millis = deadline_millis - current_time_millis;
-  boost::shared_lock<boost::shared_mutex> lock(throughput_mutex_);
-  int batch_size =
-      static_cast<int>(avg_throughput_per_milli_ * remaining_time_millis);
-  if (batch_size < 1) {
-    batch_size = 1;
-  }
-  return batch_size;
+//  double current_time_millis =
+//      std::chrono::duration_cast<std::chrono::milliseconds>(
+//          std::chrono::system_clock::now().time_since_epoch())
+//          .count();
+//  double deadline_millis =
+//      std::chrono::duration_cast<std::chrono::milliseconds>(
+//          deadline.time_since_epoch())
+//          .count();
+//  double remaining_time_millis = deadline_millis - current_time_millis;
+//  boost::shared_lock<boost::shared_mutex> lock(throughput_mutex_);
+//  int batch_size =
+//      static_cast<int>(avg_throughput_per_milli_ * remaining_time_millis);
+//  if (batch_size < 1) {
+//    batch_size = 1;
+//  }
+  return 1;
 }
 
 ActiveContainers::ActiveContainers()
