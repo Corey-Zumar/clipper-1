@@ -1,0 +1,413 @@
+---Configuration---
+prevent_cache_hits: true
+num_threads: 5
+request_batch_delay_micros: 0
+num_batches: 100
+cifar_data_path: /home/ubuntu/clipper/bench/cifar-10-batches-bin/data_batch_1.bin
+benchmark_report_path: /home/ubuntu/clipper/bench/report.txt
+request_batch_size: 100000
+model_version: 1
+report_delay_seconds: 20
+model_name: bench_noop
+latency_objective: 1000000000
+poisson_delay: false
+-------------------
+0s - 20s: {
+    "counters": [
+        {
+            "internal:prediction_cache_lookups": {
+                "count": "347685"
+            }
+        },
+        {
+            "internal:aggregate_num_predictions": {
+                "count": "347690"
+            }
+        },
+        {
+            "model:bench_noop:1:num_predictions": {
+                "count": "246783"
+            }
+        },
+        {
+            "bench:cifar_bench:num_predictions": {
+                "count": "245238"
+            }
+        }
+    ],
+    "ratio_counters": [
+        {
+            "internal:prediction_cache_hit_ratio": {
+                "ratio": "0"
+            }
+        },
+        {
+            "model:bench_noop:1:cache_hit_ratio": {
+                "ratio": "0"
+            }
+        },
+        {
+            "bench:cifar_bench:default_prediction_ratio": {
+                "ratio": "0"
+            }
+        }
+    ],
+    "meters": [
+        {
+            "internal:aggregate_model_throughput": {
+                "unit": "events per second",
+                "rate": "10511.609910285662",
+                "rate_1min": "5061.5619518100957",
+                "rate_5min": "3404.9345694871754",
+                "rate_15min": "3095.0632736795069"
+            }
+        },
+        {
+            "model:bench_noop:1:prediction_throughput": {
+                "unit": "events per second",
+                "rate": "10567.292447911927",
+                "rate_1min": "5061.5619518100957",
+                "rate_5min": "3404.9345694871754",
+                "rate_15min": "3095.0632736795069"
+            }
+        },
+        {
+            "bench:cifar_bench:prediction_throughput": {
+                "unit": "events per second",
+                "rate": "12224.771417351494",
+                "rate_1min": "11342.670880538775",
+                "rate_5min": "11083.454488833117",
+                "rate_15min": "11034.652505589924"
+            }
+        },
+        {
+            "bench:cifar_bench:request_throughput": {
+                "unit": "events per second",
+                "rate": "17331.164642699412",
+                "rate_1min": "17633.59380024199",
+                "rate_5min": "17718.091377303324",
+                "rate_15min": "17733.774446018459"
+            }
+        }
+    ],
+    "histograms": [
+        {
+            "internal:rpc_request_queueing_delay": {
+                "unit": "microseconds",
+                "size": "82",
+                "min": "17",
+                "max": "1131",
+                "mean": "615.98780487804879",
+                "std_dev": "295.71519315218671",
+                "p50": "600",
+                "p95": "1080.4499999999998",
+                "p99": "1131"
+            }
+        },
+        {
+            "model:bench_noop:1:prediction_latency": {
+                "unit": "microseconds",
+                "size": "4096",
+                "min": "6818",
+                "max": "254763",
+                "mean": "219786.9814453125",
+                "std_dev": "31806.625729748455",
+                "p50": "227697",
+                "p95": "250591",
+                "p99": "254763"
+            }
+        },
+        {
+            "model:bench_noop:1:batch_size": {
+                "unit": "queries",
+                "size": "82",
+                "min": "1",
+                "max": "5178",
+                "mean": "3009.5487804878048",
+                "std_dev": "2034.2179905276419",
+                "p50": "4209",
+                "p95": "4895.3000000000002",
+                "p99": "5178"
+            }
+        },
+        {
+            "bench:cifar_bench:prediction_latency": {
+                "unit": "microseconds",
+                "size": "4096",
+                "min": "6036",
+                "max": "6159706",
+                "mean": "88444.94482421875",
+                "std_dev": "3559041.7086623646",
+                "p50": "3291124",
+                "p95": "5853675.2000000002",
+                "p99": "6023536.8300000001"
+            }
+        }
+    ]
+}
+20s - 40s: {
+    "counters": [
+        {
+            "internal:prediction_cache_lookups": {
+                "count": "314665"
+            }
+        },
+        {
+            "internal:aggregate_num_predictions": {
+                "count": "314661"
+            }
+        },
+        {
+            "model:bench_noop:1:num_predictions": {
+                "count": "243727"
+            }
+        },
+        {
+            "bench:cifar_bench:num_predictions": {
+                "count": "245272"
+            }
+        }
+    ],
+    "ratio_counters": [
+        {
+            "internal:prediction_cache_hit_ratio": {
+                "ratio": "0"
+            }
+        },
+        {
+            "model:bench_noop:1:cache_hit_ratio": {
+                "ratio": "0"
+            }
+        },
+        {
+            "bench:cifar_bench:default_prediction_ratio": {
+                "ratio": "0"
+            }
+        }
+    ],
+    "meters": [
+        {
+            "internal:aggregate_model_throughput": {
+                "unit": "events per second",
+                "rate": "12185.48117519221",
+                "rate_1min": "5670.0729397197338",
+                "rate_5min": "4023.3274886370095",
+                "rate_15min": "3716.917540097601"
+            }
+        },
+        {
+            "model:bench_noop:1:prediction_throughput": {
+                "unit": "events per second",
+                "rate": "12185.478738270214",
+                "rate_1min": "5670.0729397197338",
+                "rate_5min": "4023.3274886370095",
+                "rate_15min": "3716.917540097601"
+            }
+        },
+        {
+            "bench:cifar_bench:prediction_throughput": {
+                "unit": "events per second",
+                "rate": "12262.374466463096",
+                "rate_1min": "12634.073040539033",
+                "rate_5min": "12776.519068611173",
+                "rate_15min": "12800.802038212989"
+            }
+        },
+        {
+            "bench:cifar_bench:request_throughput": {
+                "unit": "events per second",
+                "rate": "15732.229865233598",
+                "rate_1min": "17071.468911162297",
+                "rate_5min": "17490.124004674344",
+                "rate_15min": "17572.892574479774"
+            }
+        }
+    ],
+    "histograms": [
+        {
+            "internal:rpc_request_queueing_delay": {
+                "unit": "microseconds",
+                "size": "39",
+                "min": "49",
+                "max": "1107",
+                "mean": "600.89743589743591",
+                "std_dev": "307.9960701440761",
+                "p50": "688",
+                "p95": "1078",
+                "p99": "1107"
+            }
+        },
+        {
+            "model:bench_noop:1:prediction_latency": {
+                "unit": "microseconds",
+                "size": "4096",
+                "min": "22829",
+                "max": "1446878",
+                "mean": "-455084.5869140625",
+                "std_dev": "1126927.61519035",
+                "p50": "543850",
+                "p95": "1446878",
+                "p99": "1446878"
+            }
+        },
+        {
+            "model:bench_noop:1:batch_size": {
+                "unit": "queries",
+                "size": "38",
+                "min": "684",
+                "max": "29485",
+                "mean": "6413.8684210526317",
+                "std_dev": "6087.7787850182731",
+                "p50": "4479.5",
+                "p95": "20471.399999999972",
+                "p99": "29485"
+            }
+        },
+        {
+            "bench:cifar_bench:prediction_latency": {
+                "unit": "microseconds",
+                "size": "4096",
+                "min": "5999261",
+                "max": "10880861",
+                "mean": "75574.5439453125",
+                "std_dev": "8501630.9873196241",
+                "p50": "8597647.5",
+                "p95": "10570981.550000001",
+                "p99": "10858864.890000001"
+            }
+        }
+    ]
+}
+40s - 60s: {
+    "counters": [
+        {
+            "internal:prediction_cache_lookups": {
+                "count": "353340"
+            }
+        },
+        {
+            "internal:aggregate_num_predictions": {
+                "count": "353342"
+            }
+        },
+        {
+            "model:bench_noop:1:num_predictions": {
+                "count": "255523"
+            }
+        },
+        {
+            "bench:cifar_bench:num_predictions": {
+                "count": "255523"
+            }
+        }
+    ],
+    "ratio_counters": [
+        {
+            "internal:prediction_cache_hit_ratio": {
+                "ratio": "0"
+            }
+        },
+        {
+            "model:bench_noop:1:cache_hit_ratio": {
+                "ratio": "0"
+            }
+        },
+        {
+            "bench:cifar_bench:default_prediction_ratio": {
+                "ratio": "0"
+            }
+        }
+    ],
+    "meters": [
+        {
+            "internal:aggregate_model_throughput": {
+                "unit": "events per second",
+                "rate": "12775.290222967995",
+                "rate_1min": "9120.4001773737818",
+                "rate_5min": "8774.21210636463",
+                "rate_15min": "8709.1730005005029"
+            }
+        },
+        {
+            "model:bench_noop:1:prediction_throughput": {
+                "unit": "events per second",
+                "rate": "12775.288306803706",
+                "rate_1min": "9940.9683589159631",
+                "rate_5min": "8943.8412700841345",
+                "rate_15min": "8766.0304723958488"
+            }
+        },
+        {
+            "bench:cifar_bench:prediction_throughput": {
+                "unit": "events per second",
+                "rate": "12775.2895842465",
+                "rate_1min": "12287.083315773229",
+                "rate_5min": "12186.967895685444",
+                "rate_15min": "12161.804988919203"
+            }
+        },
+        {
+            "bench:cifar_bench:request_throughput": {
+                "unit": "events per second",
+                "rate": "17665.86285401621",
+                "rate_1min": "17020.3273443217",
+                "rate_5min": "16798.005020304201",
+                "rate_15min": "16759.686195817343"
+            }
+        }
+    ],
+    "histograms": [
+        {
+            "internal:rpc_request_queueing_delay": {
+                "unit": "microseconds",
+                "size": "10",
+                "min": "177",
+                "max": "1037",
+                "mean": "543.79999999999995",
+                "std_dev": "227.38284895743567",
+                "p50": "504.5",
+                "p95": "1037",
+                "p99": "1037"
+            }
+        },
+        {
+            "model:bench_noop:1:prediction_latency": {
+                "unit": "microseconds",
+                "size": "4096",
+                "min": "17894",
+                "max": "2650110",
+                "mean": "340730.10009765625",
+                "std_dev": "2117293.3688936778",
+                "p50": "2484093",
+                "p95": "2650110",
+                "p99": "2650110"
+            }
+        },
+        {
+            "model:bench_noop:1:batch_size": {
+                "unit": "queries",
+                "size": "10",
+                "min": "373",
+                "max": "55347",
+                "mean": "25552.299999999999",
+                "std_dev": "25300.930931687079",
+                "p50": "21925.5",
+                "p95": "55347",
+                "p99": "55347"
+            }
+        },
+        {
+            "bench:cifar_bench:prediction_latency": {
+                "unit": "microseconds",
+                "size": "4096",
+                "min": "9512267",
+                "max": "14214934",
+                "mean": "452256.01220703125",
+                "std_dev": "11602307.439770898",
+                "p50": "11865241",
+                "p95": "13997040.899999999",
+                "p99": "14180045.66"
+            }
+        }
+    ]
+}
