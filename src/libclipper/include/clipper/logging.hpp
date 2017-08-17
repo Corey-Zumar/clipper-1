@@ -193,30 +193,30 @@ void Logger::concatenate_messages(std::stringstream &ss, LogLevel log_level,
 
 template <class... Strings>
 static void log_info(const std::string tag, Strings... messages) {
-  Logger::get().log_info(tag, messages...);
+  //Logger::get().log_info(tag, messages...);
 }
 template <class... Args>
 static void log_info_formatted(const std::string tag, const char *message,
                                Args... args) {
-  Logger::get().log_info_formatted(tag, message, args...);
+  //Logger::get().log_info_formatted(tag, message, args...);
 }
 template <class... Strings>
 static void log_debug(const std::string tag, Strings... messages) {
-  Logger::get().log_debug(tag, messages...);
+  //Logger::get().log_debug(tag, messages...);
 }
 template <class... Args>
 static void log_debug_formatted(const std::string tag, const char *message,
                                 Args... args) {
-  Logger::get().log_debug_formatted(tag, message, args...);
+  //Logger::get().log_debug_formatted(tag, message, args...);
 }
 template <class... Strings>
 static void log_error(const std::string tag, Strings... messages) {
-  Logger::get().log_error(tag, messages...);
+  //Logger::get().log_error(tag, messages...);
 }
 template <class... Args>
 static void log_error_formatted(const std::string tag, const char *message,
                                 Args... args) {
-  Logger::get().log_error_formatted(tag, message, args...);
+  //Logger::get().log_error_formatted(tag, message, args...);
 }
 
 }  // namespace clipper
