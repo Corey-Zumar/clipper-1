@@ -291,12 +291,12 @@ void RPCService::receive_message(
       socket.recv(&msg_content_size, 0);
 
       uint32_t content_size = static_cast<uint32_t*>(msg_content_size.data())[0];
-      std::shared_ptr<char> msg_content_buffer(static_cast<char*>(malloc(content_size)), free);
+      std::shared_ptr<uint8_t> msg_content_buffer(static_cast<uint8_t*>(malloc(content_size)), free);
 
       socket.recv(msg_content_buffer.get(), content_size, 0);
       if (!new_connection) {
         int id = static_cast<int *>(msg_id.data())[0];
-        RPCResponse response(id, msg_content_buffer);
+        RPCResponse response(id, std::make_pair(msg_content_buffer, msg_content.size()));
 
         auto container_info_entry =
             connections_containers_map.find(connection_id);

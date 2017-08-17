@@ -27,7 +27,7 @@ namespace rpc {
 
 const std::string LOGGING_TAG_RPC = "RPC";
 
-using RPCResponse = std::pair<const int, std::shared_ptr<char>>;
+using RPCResponse = std::pair<const int, ByteBuffer>;
 /// Tuple of zmq_connection_id, message_id, vector of messages, creation time
 using RPCRequest =
     std::tuple<const int, const int, const std::vector<ByteBuffer>,

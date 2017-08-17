@@ -182,9 +182,7 @@ void run_benchmark(std::unordered_map<std::string, std::string> &config) {
   std::this_thread::sleep_for(std::chrono::seconds(3));
 
   clipper::DefaultOutputSelectionPolicy p;
-  std::shared_ptr<char> default_output_content(static_cast<char*>(malloc(DEFAULT_OUTPUT.size())), free);
-  memcpy(default_output_content.get(), DEFAULT_OUTPUT.data(), DEFAULT_OUTPUT.size());
-  clipper::Output parsed_default_output(std::make_tuple(default_output_content, 0, DEFAULT_OUTPUT.size()), {});
+  clipper::Output parsed_default_output(DEFAULT_OUTPUT, {});
   auto init_state = p.init_state(parsed_default_output);
   clipper::StateKey state_key{TEST_APPLICATION_LABEL, clipper::DEFAULT_USER_ID,
                               0};

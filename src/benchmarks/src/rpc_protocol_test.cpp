@@ -195,9 +195,7 @@ class Tester {
       rpc::PredictionResponse prediction_response =
           rpc::PredictionResponse::deserialize_prediction_response(
               response.second);
-      std::string event_history_str = std::string(
-          std::get<0>(prediction_response.outputs_[0]).get() + std::get<1>(prediction_response.outputs_[0]),
-          std::get<0>(prediction_response.outputs_[0]).get() + std::get<2>(prediction_response.outputs_[0]));
+      std::string event_history_str = prediction_response.outputs_[0];
       rapidjson::Document d;
       json::parse_json(event_history_str, d);
       auto events = d.GetArray();

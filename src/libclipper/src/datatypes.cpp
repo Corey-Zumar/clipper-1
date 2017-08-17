@@ -83,24 +83,16 @@ bool VersionedModelId::operator!=(const VersionedModelId &rhs) const {
   return !(name_ == rhs.name_ && id_ == rhs.id_);
 }
 
-Output::Output(const rpc::PredictionOutput y_hat,
+Output::Output(const std::string y_hat,
                const std::vector<VersionedModelId> models_used)
     : y_hat_(y_hat), models_used_(models_used) {}
 
 bool Output::operator==(const Output &rhs) const {
-  size_t rhs_hash = boost::hash_range(std::get<0>(rhs.y_hat_).get() + std::get<1>(rhs.y_hat_),
-                           std::get<0>(rhs.y_hat_).get() + std::get<2>(rhs.y_hat_));
-  size_t lhs_hash = boost::hash_range(std::get<0>(y_hat_).get() + std::get<1>(y_hat_),
-                                      std::get<0>(y_hat_).get() + std::get<2>(y_hat_));
-  return (lhs_hash == rhs_hash && models_used_ == rhs.models_used_);
+  return (y_hat_ == rhs.y_hat_ && models_used_ == rhs.models_used_);
 }
 
 bool Output::operator!=(const Output &rhs) const {
-  size_t rhs_hash = boost::hash_range(std::get<0>(rhs.y_hat_).get() + std::get<1>(rhs.y_hat_),
-                                      std::get<0>(rhs.y_hat_).get() + std::get<2>(rhs.y_hat_));
-  size_t lhs_hash = boost::hash_range(std::get<0>(y_hat_).get() + std::get<1>(y_hat_),
-                                      std::get<0>(y_hat_).get() + std::get<2>(y_hat_));
-  return !(lhs_hash == rhs_hash && models_used_ == rhs.models_used_);
+  return !(y_hat_ == rhs.y_hat_ && models_used_ == rhs.models_used_);
 }
 
 ByteVector::ByteVector(std::shared_ptr<uint8_t> data, size_t size) : data_(data), size_(size) {}
@@ -291,22 +283,22 @@ std::vector<ByteBuffer> rpc::PredictionRequest::serialize() {
 }
 
 rpc::PredictionResponse::PredictionResponse(
-    const std::vector<PredictionOutput> outputs)
+    const std::vector<std::string> outputs)
     : outputs_(outputs) {}
 
 rpc::PredictionResponse
-rpc::PredictionResponse::deserialize_prediction_response(std::shared_ptr<char>& response_data) {
-  std::vector<PredictionOutput> outputs;
-  uint32_t *output_lengths_data = reinterpret_cast<uint32_t *>(response_data.get());
+rpc::PredictionResponse::deserialize_prediction_response(ByteBuffer bytes) {
+  std::vector<std::string> outputs;
+  uint32_t *output_lengths_data = reinterpret_cast<uint32_t *>(bytes.first.get());
   uint32_t num_outputs = output_lengths_data[0];
   output_lengths_data++;
-  size_t curr_output_index = sizeof(uint32_t) + (num_outputs * sizeof(uint32_t));
+  char *output_string_data = reinterpret_cast<char *>(
+      bytes.first.get() + sizeof(uint32_t) + (num_outputs * sizeof(uint32_t)));
   for (uint32_t i = 0; i < num_outputs; i++) {
     uint32_t output_length = output_lengths_data[i];
-    PredictionOutput output(response_data, curr_output_index, curr_output_index + output_length);
-    std::string test_str(response_data.get() + curr_output_index, response_data.get() + curr_output_index + output_length);
+    std::string output(output_string_data, output_length);
     outputs.push_back(std::move(output));
-    curr_output_index += output_length;
+    output_string_data += output_length;
   }
   return PredictionResponse(outputs);
 }
@@ -330,16 +322,14 @@ Response::Response(Query query, QueryId query_id, const long duration_micros,
       duration_micros_(duration_micros),
       output_(std::move(output)),
       output_is_default_(output_is_default),
-      default_explanation_(std::move(default_explanation)) {}
+      default_explanation_(default_explanation) {}
 
 std::string Response::debug_string() const noexcept {
   std::string debug;
   debug.append("Query id: ");
   debug.append(std::to_string(query_id_));
   debug.append(" Output: ");
-  std::string output_str(std::get<0>(output_.y_hat_).get() + std::get<1>(output_.y_hat_),
-                         std::get<0>(output_.y_hat_).get() + std::get<2>(output_.y_hat_));
-  debug.append(output_str);
+  debug.append(output_.y_hat_);
   return debug;
 }
 
