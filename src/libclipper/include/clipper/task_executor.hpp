@@ -12,6 +12,7 @@
 #include <redox.hpp>
 
 #include <folly/futures/Future.h>
+#include <cds/container/mspriority_queue.h>
 
 #include <clipper/config.hpp>
 #include <clipper/containers.hpp>
@@ -118,10 +119,34 @@ struct DeadlineCompare {
   }
 };
 
+template<>
+struct std::less<std::pair<Deadline, PredictTask>>
+{
+  bool operator()(const std::pair<Deadline, PredictTask> &lhs,
+                  const std::pair<Deadline, PredictTask> &rhs) const
+  {
+    return lhs.first > rhs.first;
+  }
+};
+
+
+struct traits_MSPriorityQueue_dyn_mutex : public
+                                          cc::mspriority_queue::make_traits <
+                                              co::buffer< co::v::initialized_dynamic_buffer< char > >
+, co::lock_type < std::mutex >
+> ::type
+{};
+
+struct traits_MSPriorityQueue_model_task_cmp : public
+  cds::container::mspriority_queue::make_traits<
+      cds::opt::buffer<cds::opt::v::initialized_dynamic_buffer<
+          std::pair<Deadline, PredictTask>>>,
+      cds::opt::v::less_comparator<std::pair<Deadline, PredictTask>>>::type {};
+
 // thread safe model queue
 class ModelQueue {
  public:
-  ModelQueue() : queue_(ModelPQueue{}) {}
+  ModelQueue() : queue_(ModelPQueue(1000000)) {}
 
   // Disallow copy and assign
   ModelQueue(const ModelQueue &) = delete;
@@ -164,10 +189,10 @@ class ModelQueue {
  private:
   // Min PriorityQueue so that the task with the earliest
   // deadline is at the front of the queue
-  using ModelPQueue =
-      std::priority_queue<std::pair<Deadline, PredictTask>,
-                          std::vector<std::pair<Deadline, PredictTask>>,
-                          DeadlineCompare>;
+  using ModelPQueue = cds::container::MSPriorityQueue<
+      std::pair<Deadline, PredictTask>,
+      traits_MSPriorityQueue_model_task_cmp>;
+
   ModelPQueue queue_;
   std::mutex queue_mutex_;
   std::condition_variable queue_not_empty_condition_;

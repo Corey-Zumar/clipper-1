@@ -63,3 +63,5 @@ add_subdirectory(redox)
 add_subdirectory(rapidjson)
 
 add_subdirectory(grpc)
+
+add_subdirectory(libcds)

@@ -13,3 +13,6 @@
 [submodule "src/libs/grpc"]
 	path = src/libs/grpc
 	url = https://github.com/grpc/grpc.git
+[submodule "src/libs/libcds"]
+	path = src/libs/libcds
+	url = https://github.com/khizmax/libcds
