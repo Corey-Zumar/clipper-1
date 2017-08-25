@@ -206,7 +206,7 @@ class ModelQueue {
     std::chrono::time_point<std::chrono::system_clock> current_time =
         std::chrono::system_clock::now();
     ModelQueueEntry entry;
-    while(queue_.read(entry)) {
+    while(!queue_.isEmpty() && queue_.read(entry)) {
       if(entry.deadline_ > current_time) {
         return entry;
       }
