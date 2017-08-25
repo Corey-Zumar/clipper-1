@@ -10,7 +10,7 @@
 #include <boost/optional.hpp>
 #include <boost/thread.hpp>
 #include <redox.hpp>
-#include <blockingconcurrentqueue.h>
+#include <concurrentqueue.h>
 
 #include <folly/futures/Future.h>
 
@@ -167,24 +167,29 @@ class ModelQueue {
 
   std::vector<PredictTask> get_batch(
       std::function<int(Deadline)> &&get_batch_size) {
-    ModelQueueEntry entry;
-    queue_.wait_dequeue(entry);
-    int max_batch_size = get_batch_size(entry.deadline_) - 1;
-    std::vector<PredictTask> batch(1);
-    batch.push_back(entry.task_);
+    while(true) {
+      ModelQueueEntry entry;
+      if(queue_.try_dequeue(entry)) {
+        int max_batch_size = get_batch_size(entry.deadline_) - 1;
+        std::vector<PredictTask> batch(1);
+        batch.push_back(entry.task_);
 
-    boost::optional<ModelQueueEntry> removed_entry = remove_tasks_with_elapsed_deadlines();
-    if(removed_entry) {
-      max_batch_size--;
-      batch.push_back(removed_entry.get().task_);
+        boost::optional<ModelQueueEntry> removed_entry = remove_tasks_with_elapsed_deadlines();
+        if (removed_entry) {
+          max_batch_size--;
+          batch.push_back(removed_entry.get().task_);
+        }
+        std::vector<ModelQueueEntry> batch_rest(max_batch_size);
+        long num_dequeued = queue_.try_dequeue_bulk(batch_rest.begin(), max_batch_size);
+        batch_rest.resize(num_dequeued);
+        for (auto const &entry : batch_rest) {
+          batch.push_back(entry.task_);
+        }
+        return batch;
+      } else {
+        std::this_thread::sleep_for(std::chrono::microseconds(500));
+      }
     }
-    std::vector<ModelQueueEntry> batch_rest(max_batch_size);
-    long num_dequeued = queue_.try_dequeue_bulk(batch_rest.begin(), max_batch_size);
-    batch_rest.resize(num_dequeued);
-    for(auto const& entry : batch_rest) {
-      batch.push_back(entry.task_);
-    }
-    return batch;
   }
 
  private:
@@ -194,7 +199,7 @@ class ModelQueue {
 //      std::priority_queue<std::pair<Deadline, PredictTask>,
 //                          std::vector<std::pair<Deadline, PredictTask>>,
 //                          DeadlineCompare>;
-  using ModelPQueue = moodycamel::BlockingConcurrentQueue<ModelQueueEntry>;
+  using ModelPQueue = moodycamel::ConcurrentQueue<ModelQueueEntry>;
 
   ModelPQueue queue_;
   std::mutex queue_mutex_;
