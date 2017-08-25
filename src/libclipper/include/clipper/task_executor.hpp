@@ -10,9 +10,9 @@
 #include <boost/optional.hpp>
 #include <boost/thread.hpp>
 #include <redox.hpp>
-#include <concurrentqueue.h>
 
 #include <folly/futures/Future.h>
+#include <folly/MPMCQueue.h>
 
 #include <clipper/config.hpp>
 #include <clipper/containers.hpp>
@@ -140,7 +140,7 @@ struct ModelQueueEntry {
 // thread safe model queue
 class ModelQueue {
  public:
-  ModelQueue() : queue_(ModelPQueue{}) {}
+  ModelQueue() : queue_(ModelPQueue(1000000)) {}
 
   // Disallow copy and assign
   ModelQueue(const ModelQueue &) = delete;
@@ -154,7 +154,7 @@ class ModelQueue {
   void add_task(PredictTask task) {
     Deadline deadline = std::chrono::system_clock::now() +
                         std::chrono::microseconds(task.latency_slo_micros_);
-    bool result = queue_.enqueue(ModelQueueEntry(task, deadline));
+    bool result = queue_.write(ModelQueueEntry(task, deadline));
     if(!result) {
       log_error(LOGGING_TAG_TASK_EXECUTOR, "Failed to enqueue predict task!");
     }
@@ -162,35 +162,29 @@ class ModelQueue {
 
   int get_size() {
     std::unique_lock<std::mutex> l(queue_mutex_);
-    return queue_.size_approx();
+    return queue_.size();
   }
 
   std::vector<PredictTask> get_batch(
       std::function<int(Deadline)> &&get_batch_size) {
-    while(true) {
-      ModelQueueEntry entry;
-      if(queue_.try_dequeue(entry)) {
-        int max_batch_size = get_batch_size(entry.deadline_) - 1;
-        std::vector<PredictTask> batch(1);
-        batch.push_back(entry.task_);
+    ModelQueueEntry entry;
+    queue_.blockingRead(entry);
+    int max_batch_size = get_batch_size(entry.deadline_) - 1;
+    std::vector<PredictTask> batch(1);
+    batch.push_back(std::move(entry.task_));
 
-        boost::optional<ModelQueueEntry> removed_entry = remove_tasks_with_elapsed_deadlines();
-        if (removed_entry) {
-          max_batch_size--;
-          batch.push_back(removed_entry.get().task_);
-        }
-        std::vector<ModelQueueEntry> batch_rest(max_batch_size);
-        long num_dequeued = queue_.try_dequeue_bulk(batch_rest.begin(), max_batch_size);
-        batch_rest.resize(num_dequeued);
-        for (auto const &entry : batch_rest) {
-          batch.push_back(entry.task_);
-        }
-        return batch;
-      } else {
-        std::this_thread::sleep_for(std::chrono::microseconds(500));
-      }
+    boost::optional<ModelQueueEntry> removed_entry = remove_tasks_with_elapsed_deadlines();
+    if (removed_entry) {
+      max_batch_size--;
+      batch.push_back(std::move(removed_entry.get().task_));
     }
-  }
+
+    while(max_batch_size > 0 && queue_.read(entry)) {
+      batch.push_back(std::move(entry.task_));
+      max_batch_size--;
+    }
+    return batch;
+    }
 
  private:
   // Min PriorityQueue so that the task with the earliest
@@ -199,7 +193,7 @@ class ModelQueue {
 //      std::priority_queue<std::pair<Deadline, PredictTask>,
 //                          std::vector<std::pair<Deadline, PredictTask>>,
 //                          DeadlineCompare>;
-  using ModelPQueue = moodycamel::ConcurrentQueue<ModelQueueEntry>;
+  using ModelPQueue = folly::MPMCQueue<ModelQueueEntry>;
 
   ModelPQueue queue_;
   std::mutex queue_mutex_;
@@ -212,7 +206,7 @@ class ModelQueue {
     std::chrono::time_point<std::chrono::system_clock> current_time =
         std::chrono::system_clock::now();
     ModelQueueEntry entry;
-    while(queue_.try_dequeue(entry)) {
+    while(queue_.read(entry)) {
       if(entry.deadline_ > current_time) {
         return entry;
       }
