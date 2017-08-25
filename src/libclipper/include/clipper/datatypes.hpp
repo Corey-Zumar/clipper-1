@@ -38,6 +38,10 @@ class VersionedModelId {
  public:
   VersionedModelId(const std::string name, const std::string id);
 
+  VersionedModelId() {
+
+  }
+
   std::string get_name() const;
   std::string get_id() const;
   std::string serialize() const;
@@ -303,6 +307,10 @@ class FeedbackQuery {
 class PredictTask {
  public:
   ~PredictTask() = default;
+
+  PredictTask() {
+
+  }
 
   PredictTask(std::shared_ptr<Input> input, VersionedModelId model,
               float utility, QueryId query_id, long latency_slo_micros);
