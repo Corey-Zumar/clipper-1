@@ -148,7 +148,7 @@ class ModelQueue {
     Deadline deadline = std::chrono::system_clock::now() +
                         std::chrono::microseconds(task.latency_slo_micros_);
     queue_->push(ModelQueueEntry(task, deadline));
-    queue_not_empty_condition_.notify_one();
+    //queue_not_empty_condition_.notify_one();
   }
 
   int get_size() {
@@ -157,29 +157,30 @@ class ModelQueue {
 
   std::vector<PredictTask> get_batch(
       std::function<int(Deadline)> &&get_batch_size) {
-    std::unique_lock<std::mutex> lock(queue_mutex_);
-    //remove_tasks_with_elapsed_deadlines();
-    queue_not_empty_condition_.wait(lock, [this]() { return !queue_->empty(); });
-    lock.unlock();
-    ModelQueueEntry top_entry;
-    boost::optional<ModelQueueEntry> removed_entry = remove_tasks_with_elapsed_deadlines();
-    if(removed_entry) {
-      top_entry = removed_entry.get();
-    }
-    std::vector<PredictTask> batch;
-    if(removed_entry || queue_->pop(top_entry)) {
-      batch.push_back(top_entry.task_);
-      int max_batch_size = get_batch_size(top_entry.deadline_) - 1;
-      while (batch.size() < (size_t)max_batch_size) {
-        ModelQueueEntry new_entry;
-        if(queue_->pop(new_entry)) {
-          batch.push_back(std::move(new_entry.task_));
-        } else {
-          break;
+    //std::unique_lock<std::mutex> lock(queue_mutex_);
+    while(true) {
+      ModelQueueEntry top_entry;
+      boost::optional<ModelQueueEntry> removed_entry = remove_tasks_with_elapsed_deadlines();
+      if (removed_entry) {
+        top_entry = removed_entry.get();
+      }
+      std::vector<PredictTask> batch;
+      if (removed_entry || queue_->pop(top_entry)) {
+        batch.push_back(top_entry.task_);
+        int max_batch_size = get_batch_size(top_entry.deadline_) - 1;
+        while (batch.size() < (size_t) max_batch_size) {
+          ModelQueueEntry new_entry;
+          if (queue_->pop(new_entry)) {
+            batch.push_back(std::move(new_entry.task_));
+          } else {
+            break;
+          }
         }
+        return batch;
+      } else {
+        std::this_thread::sleep_for(std::chrono::microseconds(500));
       }
     }
-    return batch;
   }
 
  private:
