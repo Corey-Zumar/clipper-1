@@ -186,7 +186,7 @@ class ModelQueue {
   void remove_tasks_with_elapsed_deadlines() {
     std::chrono::time_point<std::chrono::system_clock> current_time =
         std::chrono::system_clock::now();
-    while(true) {
+    while(!queue_->empty()) {
       if(queue_->front().deadline_ <= current_time) {
         queue_->pop();
       } else {
