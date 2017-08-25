@@ -10,6 +10,7 @@
 #include <boost/optional.hpp>
 #include <boost/thread.hpp>
 #include <redox.hpp>
+#include <blockingconcurrentqueue.h>
 
 #include <folly/futures/Future.h>
 
@@ -118,6 +119,24 @@ struct DeadlineCompare {
   }
 };
 
+struct ModelQueueEntry {
+  PredictTask task_;
+  Deadline deadline_;
+
+  ModelQueueEntry(PredictTask task, Deadline deadline)
+      : task_(std::move(task)), deadline_(std::move(deadline)) {
+
+  }
+
+  ModelQueueEntry() {
+
+  }
+
+  bool operator<(const ModelQueueEntry& rhs) const {
+    return deadline_ < rhs.deadline_;
+  }
+};
+
 // thread safe model queue
 class ModelQueue {
  public:
@@ -133,30 +152,37 @@ class ModelQueue {
   ~ModelQueue() = default;
 
   void add_task(PredictTask task) {
-    std::lock_guard<std::mutex> lock(queue_mutex_);
     Deadline deadline = std::chrono::system_clock::now() +
                         std::chrono::microseconds(task.latency_slo_micros_);
-    queue_.emplace(deadline, std::move(task));
-    queue_not_empty_condition_.notify_one();
+    bool result = queue_.enqueue(ModelQueueEntry(task, deadline));
+    if(!result) {
+      log_error(LOGGING_TAG_TASK_EXECUTOR, "Failed to enqueue predict task!");
+    }
   }
 
   int get_size() {
     std::unique_lock<std::mutex> l(queue_mutex_);
-    return queue_.size();
+    return queue_.size_approx();
   }
 
   std::vector<PredictTask> get_batch(
       std::function<int(Deadline)> &&get_batch_size) {
-    std::unique_lock<std::mutex> lock(queue_mutex_);
-    remove_tasks_with_elapsed_deadlines();
-    queue_not_empty_condition_.wait(lock, [this]() { return !queue_.empty(); });
-    remove_tasks_with_elapsed_deadlines();
-    Deadline deadline = queue_.top().first;
-    int max_batch_size = get_batch_size(deadline);
-    std::vector<PredictTask> batch;
-    while (batch.size() < (size_t)max_batch_size && queue_.size() > 0) {
-      batch.push_back(queue_.top().second);
-      queue_.pop();
+    ModelQueueEntry entry;
+    queue_.wait_dequeue(entry);
+    int max_batch_size = get_batch_size(entry.deadline_) - 1;
+    std::vector<PredictTask> batch(1);
+    batch.push_back(entry.task_);
+
+    boost::optional<ModelQueueEntry> removed_entry = remove_tasks_with_elapsed_deadlines();
+    if(removed_entry) {
+      max_batch_size--;
+      batch.push_back(removed_entry.get().task_);
+    }
+    std::vector<ModelQueueEntry> batch_rest(max_batch_size);
+    long num_dequeued = queue_.try_dequeue_bulk(batch_rest.begin(), max_batch_size);
+    batch_rest.resize(num_dequeued);
+    for(auto const& entry : batch_rest) {
+      batch.push_back(entry.task_);
     }
     return batch;
   }
@@ -164,10 +190,12 @@ class ModelQueue {
  private:
   // Min PriorityQueue so that the task with the earliest
   // deadline is at the front of the queue
-  using ModelPQueue =
-      std::priority_queue<std::pair<Deadline, PredictTask>,
-                          std::vector<std::pair<Deadline, PredictTask>>,
-                          DeadlineCompare>;
+//  using ModelPQueue =
+//      std::priority_queue<std::pair<Deadline, PredictTask>,
+//                          std::vector<std::pair<Deadline, PredictTask>>,
+//                          DeadlineCompare>;
+  using ModelPQueue = moodycamel::BlockingConcurrentQueue<ModelQueueEntry>;
+
   ModelPQueue queue_;
   std::mutex queue_mutex_;
   std::condition_variable queue_not_empty_condition_;
@@ -175,19 +203,16 @@ class ModelQueue {
   // Deletes tasks with deadlines prior or equivalent to the
   // current system time. This method should only be called
   // when a unique lock on the queue_mutex is held.
-  void remove_tasks_with_elapsed_deadlines() {
+  boost::optional<ModelQueueEntry> remove_tasks_with_elapsed_deadlines() {
     std::chrono::time_point<std::chrono::system_clock> current_time =
         std::chrono::system_clock::now();
-    while (!queue_.empty()) {
-      Deadline first_deadline = queue_.top().first;
-      if (first_deadline <= current_time) {
-        // If a task's deadline has already elapsed,
-        // we should not process it
-        queue_.pop();
-      } else {
-        break;
+    ModelQueueEntry entry;
+    while(queue_.try_dequeue(entry)) {
+      if(entry.deadline_ > current_time) {
+        return entry;
       }
     }
+    return boost::none;
   }
 };
 
