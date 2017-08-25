@@ -171,16 +171,16 @@ class ModelQueue {
     queue_.blockingRead(entry);
     int max_batch_size = get_batch_size(entry.deadline_) - 1;
     std::vector<PredictTask> batch(1);
-    batch.push_back(std::move(entry.task_));
+    batch.push_back(entry.task_);
 
     boost::optional<ModelQueueEntry> removed_entry = remove_tasks_with_elapsed_deadlines();
     if (removed_entry) {
       max_batch_size--;
-      batch.push_back(std::move(removed_entry.get().task_));
+      batch.push_back(removed_entry.get().task_);
     }
 
     while(max_batch_size > 0 && queue_.read(entry)) {
-      batch.push_back(std::move(entry.task_));
+      batch.push_back(entry.task_);
       max_batch_size--;
     }
     return batch;
@@ -206,7 +206,7 @@ class ModelQueue {
     std::chrono::time_point<std::chrono::system_clock> current_time =
         std::chrono::system_clock::now();
     ModelQueueEntry entry;
-    while(!queue_.isEmpty() && queue_.read(entry)) {
+    while(queue_.read(entry)) {
       if(entry.deadline_ > current_time) {
         return entry;
       }
