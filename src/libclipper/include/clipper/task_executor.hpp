@@ -133,7 +133,7 @@ struct ModelQueueEntry {
 // thread safe model queue
 class ModelQueue {
  public:
-  ModelQueue() : queue_(std::make_shared<ModelPQueue>(1000000)) {}
+  ModelQueue() : queue_(std::make_shared<ModelPQueue>()) {}
 
   // Disallow copy and assign
   ModelQueue(const ModelQueue &) = delete;
@@ -145,10 +145,11 @@ class ModelQueue {
   ~ModelQueue() = default;
 
   void add_task(PredictTask task) {
+    std::lock_guard<std::mutex> lock(queue_mutex_);
     Deadline deadline = std::chrono::system_clock::now() +
-                        std::chrono::microseconds(task.latency_slo_micros_);
-    queue_->push(ModelQueueEntry(task, deadline));
-    //queue_not_empty_condition_.notify_one();
+        std::chrono::microseconds(task.latency_slo_micros_);
+    queue_->push(ModelQueueEntry(std::move(task), std::move(deadline)));
+    queue_not_empty_condition_.notify_one();
   }
 
   int get_size() {
@@ -157,36 +158,23 @@ class ModelQueue {
 
   std::vector<PredictTask> get_batch(
       std::function<int(Deadline)> &&get_batch_size) {
-    //std::unique_lock<std::mutex> lock(queue_mutex_);
-    while(true) {
-      ModelQueueEntry top_entry;
-      boost::optional<ModelQueueEntry> removed_entry = remove_tasks_with_elapsed_deadlines();
-      if (removed_entry) {
-        top_entry = removed_entry.get();
-      }
-      std::vector<PredictTask> batch;
-      if (removed_entry || queue_->pop(top_entry)) {
-        batch.push_back(top_entry.task_);
-        int max_batch_size = get_batch_size(top_entry.deadline_) - 1;
-        while (batch.size() < (size_t) max_batch_size) {
-          ModelQueueEntry new_entry;
-          if (queue_->pop(new_entry)) {
-            batch.push_back(std::move(new_entry.task_));
-          } else {
-            break;
-          }
-        }
-        return batch;
-      } else {
-        std::this_thread::sleep_for(std::chrono::microseconds(500));
-      }
+    std::unique_lock<std::mutex> lock(queue_mutex_);
+    remove_tasks_with_elapsed_deadlines();
+    queue_not_empty_condition_.wait(lock, [this]() { return !queue_->empty(); });
+    remove_tasks_with_elapsed_deadlines();
+    int max_batch_size = get_batch_size(queue_->front().deadline_);
+    std::vector<PredictTask> batch;
+    while (batch.size() < (size_t)max_batch_size && !queue_->empty()) {
+      batch.push_back(queue_->front().task_);
+      queue_->pop();
     }
+    return batch;
   }
 
  private:
   // Min PriorityQueue so that the task with the earliest
   // deadline is at the front of the queue
-  using ModelPQueue = cds::container::MSPriorityQueue<ModelQueueEntry>;
+  using ModelPQueue = std::queue<ModelQueueEntry>;
 
   std::shared_ptr<ModelPQueue> queue_;
   std::mutex queue_mutex_;
@@ -195,16 +183,16 @@ class ModelQueue {
   // Deletes tasks with deadlines prior or equivalent to the
   // current system time. This method should only be called
   // when a unique lock on the queue_mutex is held.
-  boost::optional<ModelQueueEntry> remove_tasks_with_elapsed_deadlines() {
+  void remove_tasks_with_elapsed_deadlines() {
     std::chrono::time_point<std::chrono::system_clock> current_time =
         std::chrono::system_clock::now();
-    ModelQueueEntry entry;
-    while (queue_->pop(entry)) {
-      if (entry.deadline_ > current_time) {
-        return entry;
+    while(true) {
+      if(queue_->front().deadline_ <= current_time) {
+        queue_->pop();
+      } else {
+        break;
       }
     }
-    return boost::none;
   }
 };
 
