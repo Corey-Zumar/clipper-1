@@ -170,8 +170,8 @@ class ModelQueue {
     ModelQueueEntry entry;
     queue_.blockingRead(entry);
     int max_batch_size = get_batch_size(entry.deadline_) - 1;
-    std::vector<PredictTask> batch(1);
-    batch.push_back(entry.task_);
+    std::vector<PredictTask> batch;
+    batch.push_back(std::move(entry.task_));
 
     boost::optional<ModelQueueEntry> removed_entry = remove_tasks_with_elapsed_deadlines();
     if (removed_entry) {
@@ -180,7 +180,7 @@ class ModelQueue {
     }
 
     while(max_batch_size > 0 && queue_.read(entry)) {
-      batch.push_back(entry.task_);
+      batch.push_back(std::move(entry.task_));
       max_batch_size--;
     }
     return batch;
