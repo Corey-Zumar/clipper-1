@@ -122,7 +122,7 @@ class DockerContainerManager(ContainerManager):
             },
             labels=mgmt_labels,
             **self.extra_container_kwargs)
-        query_cmd = "--rpc_recv_max=10 --rpc_send_max=10 --redis_ip={redis_ip} --redis_port={redis_port} --prediction_cache_size={cache_size}".format(
+        query_cmd = "--rpc_recv_max=10 --rpc_send_max=10 --redis_ip={redis_ip} --redis_port={redis_port}".format(
             redis_ip=self.redis_ip,
             redis_port=self.redis_port,
             cache_size=cache_size)
