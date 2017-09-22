@@ -6,6 +6,7 @@ from datetime import datetime
 import socket
 import sys
 
+from concurrent.futures import ThreadPoolExecutor
 from threading import Lock, Thread
 from Queue import Queue
 
@@ -39,6 +40,7 @@ class Client:
 		self.outstanding_requests = {}
 		self.request_lock = Lock()
 		self.request_queue = Queue()
+		self.callback_executor = ThreadPoolExecutor(max_workers=8)
 
 	def start(self):
 		global active
@@ -123,10 +125,12 @@ class Client:
 			output = np.frombuffer(output_data, dtype=self._clipper_type_to_dtype(data_type))
 
 		self.request_lock.acquire()
-		if request_id in self.outstanding_requests.keys() and self.outstanding_requests[request_id] is not None:
-			self.outstanding_requests[request_id](output)
-			del self.outstanding_requests[request_id]
+		callback = None
+		if request_id in self.outstanding_requests.keys():
+			callback = self.outstanding_requests[request_id]
+		del self.outstanding_requests[request_id]
 		self.request_lock.release()
+		self.callback_executor.submit(callback, output)
 
 	def _send_requests(self, socket):
 		if self.request_queue.empty():
