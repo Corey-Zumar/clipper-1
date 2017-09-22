@@ -1,9 +1,8 @@
-import sys
-if sys.version_info >= (3, 0):
-    sys.stdout.write(
-        "Sorry, clipper_admin requires Python 2.x, but you are running Python 3.x\n"
-    )
-    sys.exit(1)
+from __future__ import absolute_import
 
-from clipper_manager import Clipper
-from version import version as __version__
+from .docker.docker_container_manager import DockerContainerManager
+from .kubernetes.kubernetes_container_manager import KubernetesContainerManager
+from .clipper_admin import *
+from . import deployers
+from .version import __version__
+from .exceptions import ClipperException, UnconnectedException
