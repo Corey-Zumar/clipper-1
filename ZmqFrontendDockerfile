@@ -1,0 +1,9 @@
+ARG CODE_VERSION=0.2-rc1
+FROM clipper/clipper-base:${CODE_VERSION}
+
+RUN cd /clipper/release \
+    && make -j8 clipper_zmq_frontend
+
+ENTRYPOINT ["/clipper/release/src/zmq_frontend/clipper_zmq_frontend"]
+
+# vim: set filetype=dockerfile:
