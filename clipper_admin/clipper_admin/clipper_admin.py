@@ -99,16 +99,8 @@ class ClipperConnection(object):
         try:
             self.cm.start_clipper(query_frontend_image, mgmt_frontend_image,
                                   cache_size)
-            while True:
-                try:
-                    url = "http://{host}/metrics".format(
-                        host=self.cm.get_query_addr())
-                    requests.get(url, timeout=5)
-                    break
-                except RequestException as e:
-                    logger.info("Clipper still initializing.")
-                    time.sleep(1)
-            logger.info("Clipper is running")
+            time.sleep(5)
+            logger.info("Clipper is running (hopefully)")
             self.connected = True
         except ClipperException as e:
             logger.warning("Error starting Clipper: {}".format(e.msg))
@@ -119,8 +111,6 @@ class ClipperConnection(object):
 
         self.cm.connect()
         self.connected = True
-        logger.info("Successfully connected to Clipper cluster at {}".format(
-            self.cm.get_query_addr()))
 
     def register_application(self, name, input_type, default_output,
                              slo_micros):

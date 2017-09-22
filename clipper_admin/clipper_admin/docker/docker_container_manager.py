@@ -267,5 +267,4 @@ class DockerContainerManager(ContainerManager):
             host=self.public_hostname, port=self.clipper_management_port)
 
     def get_query_addr(self):
-        return "{host}:{port}".format(
-            host=self.public_hostname, port=self.clipper_query_port)
+        return "disabled"
