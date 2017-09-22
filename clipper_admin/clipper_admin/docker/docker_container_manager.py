@@ -114,8 +114,7 @@ class DockerContainerManager(ContainerManager):
         self.docker_client.containers.run(
             mgmt_frontend_image,
             mgmt_cmd,
-            name="mgmt_frontend-{}".format(
-                random.randint(0, 100000)),  # generate a random name
+            name="mgmt_frontend",
             ports={
                 '%s/tcp' % CLIPPER_INTERNAL_MANAGEMENT_PORT:
                 self.clipper_management_port
@@ -131,8 +130,7 @@ class DockerContainerManager(ContainerManager):
         self.docker_client.containers.run(
             query_frontend_image,
             query_cmd,
-            name="query_frontend-{}".format(
-                random.randint(0, 100000)),  # generate a random name
+            name="query_frontend",
             ports={
                 '%s/tcp' % CLIPPER_INTERNAL_QUERY_SEND_PORT:
                 self.clipper_query_send_port,
