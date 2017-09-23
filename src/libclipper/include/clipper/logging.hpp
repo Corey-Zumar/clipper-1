@@ -211,12 +211,12 @@ static void log_debug_formatted(const std::string tag, const char *message,
 }
 template <class... Strings>
 static void log_error(const std::string tag, Strings... messages) {
-   Logger::get().log_error(tag, messages...);
+//   Logger::get().log_error(tag, messages...);
 }
 template <class... Args>
 static void log_error_formatted(const std::string tag, const char *message,
                                 Args... args) {
-   Logger::get().log_error_formatted(tag, message, args...);
+//   Logger::get().log_error_formatted(tag, message, args...);
 }
 
 }  // namespace clipper
