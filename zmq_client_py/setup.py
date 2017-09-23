@@ -13,5 +13,6 @@ setup(
 	],
 	install_requires=[
 		'numpy',
-		'zmq'
+		'zmq',
+		'futures_then'
 	])
