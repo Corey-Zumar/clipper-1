@@ -143,6 +143,7 @@ class Client:
 			if input_type == np.ndarray:
 				input_type = input_item.dtype
 			clipper_input_type = self._dtype_to_clipper_type(input_type)
+			print("INPUT TYPE: {}".format(clipper_input_type))
 			if clipper_input_type == DATA_TYPE_INVALID:
 				print("Encountered input with invalid type \
 					corresponding to python data type: {}".format(input_type))
