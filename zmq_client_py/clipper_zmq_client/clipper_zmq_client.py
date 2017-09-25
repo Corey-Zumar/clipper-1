@@ -41,7 +41,7 @@ class Client:
 		self.outstanding_requests = {}
 		self.request_lock = Lock()
 		self.request_queue = Queue()
-		self.futures_executor = ThreadPoolExecutor(max_workers=8)
+		self.futures_executor = ThreadPoolExecutor(max_workers=1)
 
 	def start(self):
 		global active
