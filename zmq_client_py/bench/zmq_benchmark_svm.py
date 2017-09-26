@@ -19,8 +19,8 @@ DATA_TYPE_STRINGS = 4
 
 VGG_FEATURE_VEC_SIZE = 4096
 
-input_type = "doubles"
-app_name = "app1"
+input_type = "floats"
+app_name = "vgg_svm_app"
 model_name = "m1"
 
 def run(proc_num):
