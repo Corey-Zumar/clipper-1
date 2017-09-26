@@ -34,7 +34,7 @@ def run(proc_num):
 	begin = datetime.now()
 	while True:
 		future = client.send_request(app_name, np.array(np.random.rand(VGG_FEATURE_VEC_SIZE), dtype=np.float32))
-		future.get()
+		future.result()
 		num_events += 1
 
 		if num_events % 20 == 0:
