@@ -131,8 +131,7 @@ class Client:
 		future = self.outstanding_requests[request_id]
 		del self.outstanding_requests[request_id]
 		self.request_lock.release()
-		if output != "ERROR":
-			self.futures_executor.submit(lambda future, output : future.set_result(output), future, output)
+		self.futures_executor.submit(lambda future, output : future.set_result(output), future, output)
 
 	def _send_requests(self, socket):
 		if self.request_queue.empty():
