@@ -41,7 +41,7 @@ class Client:
 		self.outstanding_requests = {}
 		self.request_lock = Lock()
 		self.request_queue = Queue()
-		self.futures_executor = ThreadPoolExecutor(max_workers=1)
+		self.futures_executor = ThreadPoolExecutor(max_workers=8)
 
 	def start(self):
 		global active
@@ -131,7 +131,8 @@ class Client:
 		future = self.outstanding_requests[request_id]
 		del self.outstanding_requests[request_id]
 		self.request_lock.release()
-		self.futures_executor.submit(lambda future, output : future.set_result(output), future, output)
+		if output != "ERROR":
+			self.futures_executor.submit(lambda future, output : future.set_result(output), future, output)
 
 	def _send_requests(self, socket):
 		if self.request_queue.empty():
