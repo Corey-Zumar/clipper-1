@@ -30,9 +30,18 @@ def run(proc_num):
 	"""
 	client = Client("localhost", 4456, 4455)
 	client.start()
+	num_events = 0
+	begin = datetime.now()
 	while True:
-		client.send_request(app_name, np.array(np.random.rand(VGG_FEATURE_VEC_SIZE), dtype=np.float32))
-		time.sleep(.001)
+		future = client.send_request(app_name, np.array(np.random.rand(VGG_FEATURE_VEC_SIZE), dtype=np.float32))
+		future.get()
+		num_events += 1
+
+		if num_events % 20 == 0:
+			end = datetime.now()
+			print("THROUGHPUT: {} qps".format(num_events / (end - begin).total_seconds()))
+			begin = end
+			num_events = 0
 
 if __name__ == "__main__":
 	if len(sys.argv) < 2:
