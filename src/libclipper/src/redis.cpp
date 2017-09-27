@@ -285,7 +285,7 @@ unordered_map<string, string> get_model(Redox& redis,
 std::unordered_map<std::string, std::string> get_model_by_key(
     redox::Redox& redis, const std::string& key) {
   if (send_cmd_no_reply<string>(
-      redis, {"SELECT", std::to_string(REDIS_CONTAINER_DB_NUM)})) {
+      redis, {"SELECT", std::to_string(REDIS_MODEL_DB_NUM)})) {
     std::vector<std::string> model_data;
     auto result = send_cmd_with_reply<vector<string>>(redis, {"HGETALL", key});
     if (result) {

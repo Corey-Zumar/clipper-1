@@ -291,9 +291,6 @@ class TaskExecutor {
                                                const std::string &event_type) {
           if (event_type == "hset" && *task_executor_valid) {
             auto model_info = redis::get_model_by_key(redis_connection_, key);
-            for (auto& entry : model_info) {
-              std::cout << entry.first << " : " << entry.second << std::endl;
-            }
             VersionedModelId model_id = VersionedModelId(model_info["model_name"], model_info["model_version"]);
             int batch_size = std::stoi(model_info["batch_size"]);
             active_containers_->register_batch_size(model_id, batch_size);
