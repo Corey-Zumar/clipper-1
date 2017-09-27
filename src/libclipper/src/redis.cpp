@@ -282,7 +282,7 @@ unordered_map<string, string> get_model(Redox& redis,
   }
 }
 
-std::unordered_map<std::string, std::string> get_application_by_key(
+std::unordered_map<std::string, std::string> get_model_by_key(
     redox::Redox& redis, const std::string& key) {
   if (send_cmd_no_reply<string>(
       redis, {"SELECT", std::to_string(REDIS_CONTAINER_DB_NUM)})) {
