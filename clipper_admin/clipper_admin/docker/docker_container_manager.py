@@ -104,6 +104,7 @@ class DockerContainerManager(ContainerManager):
                     random.randint(0, 100000)),  # generate a random name
                 ports={'%s/tcp' % self.redis_port: self.redis_port},
                 labels=self.common_labels.copy(),
+                cpuset_cpus="0",
                 **self.extra_container_kwargs)
             self.redis_ip = redis_container.name
 
@@ -120,6 +121,7 @@ class DockerContainerManager(ContainerManager):
                 self.clipper_management_port
             },
             labels=mgmt_labels,
+            cpuset_cpus="1",
             **self.extra_container_kwargs)
         query_cmd = "--rpc_recv_max=10 --rpc_send_max=10 --redis_ip={redis_ip} --redis_port={redis_port}".format(
             redis_ip=self.redis_ip,
@@ -139,6 +141,7 @@ class DockerContainerManager(ContainerManager):
                 '%s/tcp' % CLIPPER_INTERNAL_RPC_PORT: self.clipper_rpc_port
             },
             labels=query_labels,
+            cpuset_cpus="2-11",
             **self.extra_container_kwargs)
         self.connect()
 
