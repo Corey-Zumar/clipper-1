@@ -231,7 +231,8 @@ std::vector<std::string> get_linked_models(redox::Redox& redis,
 bool add_model(Redox& redis, const VersionedModelId& model_id,
                const DataType& input_type, const vector<string>& labels,
                const std::string& container_name,
-               const std::string& model_data_path) {
+               const std::string& model_data_path,
+               int batch_size) {
   if (send_cmd_no_reply<string>(
           redis, {"SELECT", std::to_string(REDIS_MODEL_DB_NUM)})) {
     std::string model_id_key = gen_versioned_model_key(model_id);
@@ -244,7 +245,8 @@ bool add_model(Redox& redis, const VersionedModelId& model_id,
       "input_type",       get_readable_input_type(input_type),
       "labels",           labels_to_str(labels),
       "container_name",   container_name,
-      "model_data_path",  model_data_path};
+      "model_data_path",  model_data_path,
+      "batch_size",       std::to_string(batch_size)};
     // clang-format on
     return send_cmd_no_reply<string>(redis, cmd_vec);
   } else {
@@ -271,6 +273,21 @@ unordered_map<string, string> get_model(Redox& redis,
     std::vector<std::string> model_data;
     auto result =
         send_cmd_with_reply<vector<string>>(redis, {"HGETALL", model_id_key});
+    if (result) {
+      model_data = *result;
+    }
+    return parse_redis_map(model_data);
+  } else {
+    return unordered_map<string, string>{};
+  }
+}
+
+std::unordered_map<std::string, std::string> get_application_by_key(
+    redox::Redox& redis, const std::string& key) {
+  if (send_cmd_no_reply<string>(
+      redis, {"SELECT", std::to_string(REDIS_CONTAINER_DB_NUM)})) {
+    std::vector<std::string> model_data;
+    auto result = send_cmd_with_reply<vector<string>>(redis, {"HGETALL", key});
     if (result) {
       model_data = *result;
     }

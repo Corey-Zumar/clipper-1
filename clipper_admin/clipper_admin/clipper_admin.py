@@ -231,6 +231,7 @@ class ClipperConnection(object):
                                name,
                                version,
                                input_type,
+                               batch_size,
                                model_data_path,
                                base_image,
                                labels=None,
@@ -290,7 +291,7 @@ class ClipperConnection(object):
             raise UnconnectedException()
         image = self.build_model(name, version, model_data_path, base_image,
                                  container_registry)
-        self.deploy_model(name, version, input_type, image, labels,
+        self.deploy_model(name, version, input_type, batch_size, image, labels,
                           num_replicas, **kwargs)
 
     def build_model(self,
@@ -391,6 +392,7 @@ class ClipperConnection(object):
                      name,
                      version,
                      input_type,
+                     batch_size,
                      image,
                      labels=None,
                      num_replicas=1,
@@ -458,7 +460,7 @@ class ClipperConnection(object):
         self.cm.deploy_model(
             name, version, input_type, image, num_replicas=num_replicas, **kwargs)
         self.register_model(
-            name, version, input_type, image=image, labels=labels)
+            name, version, input_type, batch_size=batch_size, image=image, labels=labels)
         logger.info("Done deploying model {name}:{version}.".format(
             name=name, version=version))
 
@@ -466,6 +468,7 @@ class ClipperConnection(object):
                        name,
                        version,
                        input_type,
+                       batch_size,
                        image=None,
                        labels=None):
         """Registers a new model version with Clipper.
@@ -519,6 +522,7 @@ class ClipperConnection(object):
             "labels": labels,
             "input_type": input_type,
             "container_name": image,
+            "batch_size": batch_size,
             "model_data_path": "DEPRECATED",
         })
         headers = {'Content-type': 'application/json'}
