@@ -3,13 +3,14 @@ import rpc
 import os
 import sys
 import numpy as np
-
+import time
 
 class NoopContainer(rpc.ModelContainerBase):
     def __init__(self, prediction="1.0"):
         self.prediction = prediction
 
     def _predict(self, inputs):
+        time.sleep(1)
         print("INPUT LEN: {}".format(len(inputs)))
         return [self.prediction] * len(inputs)
 
