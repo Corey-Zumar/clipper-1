@@ -633,6 +633,8 @@ class RequestHandler {
     std::string container_name = get_string(d, "container_name");
     std::string model_data_path = get_string(d, "model_data_path");
 
+    int batch_size = get_int(d, "batch_size");
+
     // Validate strings that will be grouped before supplying to redis
     validate_group_str_for_redis(model_name, "model name");
     validate_group_str_for_redis(model_id.get_id(), "model version");
@@ -654,7 +656,7 @@ class RequestHandler {
     check_updated_model_consistent_with_app_links(model_name, input_type);
 
     if (clipper::redis::add_model(redis_connection_, model_id, input_type,
-                                  labels, container_name, model_data_path)) {
+                                  labels, container_name, model_data_path, batch_size)) {
       attempt_model_version_update(model_id.get_name(), model_id.get_id());
       return "Success!";
     }

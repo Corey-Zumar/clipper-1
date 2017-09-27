@@ -152,6 +152,9 @@ bool delete_model(redox::Redox& redis, const VersionedModelId& model_id);
 std::unordered_map<std::string, std::string> get_model(
     redox::Redox& redis, const VersionedModelId& model_id);
 
+std::unordered_map<std::string, std::string> get_model_by_key(
+    redox::Redox& redis, const std::string& key);
+
 /**
  * Looks up all available versions for a model.
  *

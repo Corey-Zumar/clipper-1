@@ -285,6 +285,20 @@ class TaskExecutor {
                 "Retrying in 1 second...");
       std::this_thread::sleep_for(std::chrono::seconds(1));
     }
+    redis::subscribe_to_model_changes(
+        redis_subscriber_,
+        [ this, task_executor_valid = active_ ](const std::string &key,
+                                               const std::string &event_type) {
+          if (event_type == "hset" && *task_executor_valid) {
+            auto model_info = redis::get_model_by_key(redis_connection_, key);
+            VersionedModelId model_id = VersionedModelId(model_info["model_name"], model_info["model_version"]);
+            int batch_size = std::stoi(model_info["batch_size"]);
+            active_containers_->register_batch_size(model_id, batch_size);
+          }
+        }
+    );
+
+
     redis::send_cmd_no_reply<std::string>(
         redis_connection_, {"CONFIG", "SET", "notify-keyspace-events", "AKE"});
     redis::subscribe_to_container_changes(
@@ -299,6 +313,7 @@ class TaskExecutor {
             VersionedModelId vm = VersionedModelId(
                 container_info["model_name"], container_info["model_version"]);
             int replica_id = std::stoi(container_info["model_replica_id"]);
+
             active_containers_->add_container(
                 vm, std::stoi(container_info["zmq_connection_id"]), replica_id,
                 parse_input_type(container_info["input_type"]));

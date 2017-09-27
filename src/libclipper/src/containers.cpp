@@ -21,7 +21,7 @@ namespace clipper {
 const std::string LOGGING_TAG_CONTAINERS = "CONTAINERS";
 
 ModelContainer::ModelContainer(VersionedModelId model, int container_id,
-                               int replica_id, DataType input_type)
+                               int replica_id, DataType input_type, int batch_size)
     : model_(model),
       container_id_(container_id),
       replica_id_(replica_id),
@@ -29,6 +29,7 @@ ModelContainer::ModelContainer(VersionedModelId model, int container_id,
       latency_hist_("container:" + model.serialize() + ":" +
                         std::to_string(replica_id) + ":prediction_latency",
                     "microseconds", HISTOGRAM_SAMPLE_SIZE),
+      batch_size_(batch_size),
       avg_throughput_per_milli_(0),
       throughput_buffer_(THROUGHPUT_BUFFER_CAPACITY) {
   std::string model_str = model.serialize();
@@ -77,29 +78,19 @@ double ModelContainer::get_average_throughput_per_millisecond() {
 }
 
 size_t ModelContainer::get_batch_size(Deadline deadline) {
-  double current_time_millis =
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::system_clock::now().time_since_epoch())
-          .count();
-  double deadline_millis =
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          deadline.time_since_epoch())
-          .count();
-  double remaining_time_millis = deadline_millis - current_time_millis;
-  boost::shared_lock<boost::shared_mutex> lock(throughput_mutex_);
-  int batch_size =
-      static_cast<int>(avg_throughput_per_milli_ * remaining_time_millis);
-  if (batch_size < 1) {
-    batch_size = 1;
-  }
-  return batch_size;
+  return batch_size_;
+}
+
+void ModelContainer::set_batch_size(int batch_size) {
+  batch_size_ = batch_size;
 }
 
 ActiveContainers::ActiveContainers()
     : containers_(
           std::unordered_map<VersionedModelId,
                              std::map<int, std::shared_ptr<ModelContainer>>>(
-              {})) {}
+              {})),
+      batch_sizes_(std::unordered_map<VersionedModelId, int>()){}
 
 void ActiveContainers::add_container(VersionedModelId model, int connection_id,
                                      int replica_id, DataType input_type) {
@@ -109,8 +100,16 @@ void ActiveContainers::add_container(VersionedModelId model, int connection_id,
                      model.get_name(), model.get_id(), connection_id,
                      replica_id, get_readable_input_type(input_type));
   boost::unique_lock<boost::shared_mutex> l{m_};
+
+  // Set a default batch size of 1
+  int batch_size = 1;
+  auto batch_size_search = batch_sizes_.find(model);
+  if(batch_size_search != batch_sizes_.end()) {
+    batch_size = batch_size_search->second;
+  }
+
   auto new_container = std::make_shared<ModelContainer>(model, connection_id,
-                                                        replica_id, input_type);
+                                                        replica_id, input_type, batch_size);
   auto entry = containers_[new_container->model_];
   entry.emplace(replica_id, new_container);
   containers_[new_container->model_] = entry;
@@ -160,4 +159,19 @@ std::vector<VersionedModelId> ActiveContainers::get_known_models() {
   }
   return keys;
 }
+
+void ActiveContainers::register_batch_size(VersionedModelId model, int batch_size) {
+  auto batch_size_entry = batch_sizes_.find(model);
+  if(batch_size_entry != batch_sizes_.end()) {
+    batch_sizes_.erase(model);
+  }
+  batch_sizes_.emplace(model, batch_size);
+  auto matching_containers_entry = containers_.find(model);
+  if(matching_containers_entry != containers_.end()) {
+    for(auto &container : matching_containers_entry->second) {
+      container.second->set_batch_size(batch_size);
+    }
+  }
+}
+
 }
