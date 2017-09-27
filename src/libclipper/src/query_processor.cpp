@@ -89,8 +89,8 @@ folly::Future<Response> QueryProcessor::predict(Query query) {
 
   size_t num_tasks = task_futures.size();
 
-  folly::Future<folly::Unit> timer_future =
-      timer_system_.set_timer(query.latency_budget_micros_);
+//  folly::Future<folly::Unit> timer_future =
+//      timer_system_.set_timer(query.latency_budget_micros_);
 
   std::shared_ptr<std::mutex> outputs_mutex = std::make_shared<std::mutex>();
   std::vector<Output> outputs;
@@ -121,7 +121,7 @@ folly::Future<Response> QueryProcessor::predict(Query query) {
 
   std::vector<folly::Future<folly::Unit>> when_either_futures;
   when_either_futures.push_back(std::move(all_tasks_completed_future));
-  when_either_futures.push_back(std::move(timer_future));
+  //when_either_futures.push_back(std::move(timer_future));
 
   folly::Future<std::pair<size_t, folly::Try<folly::Unit>>>
       response_ready_future = folly::collectAny(when_either_futures);
