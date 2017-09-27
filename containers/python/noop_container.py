@@ -10,6 +10,7 @@ class NoopContainer(rpc.ModelContainerBase):
         self.prediction = prediction
 
     def _predict(self, inputs):
+        print("INPUT LEN: {}".format(len(inputs)))
         return [self.prediction] * len(inputs)
 
     def predict_ints(self, inputs):
