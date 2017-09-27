@@ -232,7 +232,7 @@ bool add_model(Redox& redis, const VersionedModelId& model_id,
                const DataType& input_type, const vector<string>& labels,
                const std::string& container_name,
                const std::string& model_data_path,
-               int batch_size) {
+               const int batch_size) {
   if (send_cmd_no_reply<string>(
           redis, {"SELECT", std::to_string(REDIS_MODEL_DB_NUM)})) {
     std::string model_id_key = gen_versioned_model_key(model_id);

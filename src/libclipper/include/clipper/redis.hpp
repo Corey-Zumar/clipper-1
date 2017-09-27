@@ -126,7 +126,8 @@ bool add_model(redox::Redox& redis, const VersionedModelId& model_id,
                const DataType& input_type,
                const std::vector<std::string>& labels,
                const std::string& container_name,
-               const std::string& model_data_path);
+               const std::string& model_data_path,
+               const int batch_size)
 
 /**
  * Deletes a model from the model table if it exists.
