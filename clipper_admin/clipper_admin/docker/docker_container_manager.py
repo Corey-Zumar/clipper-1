@@ -121,7 +121,7 @@ class DockerContainerManager(ContainerManager):
                 self.clipper_management_port
             },
             labels=mgmt_labels,
-            cpuset_cpus="1",
+            cpuset_cpus="16",
             **self.extra_container_kwargs)
         query_cmd = "--rpc_recv_max=10 --rpc_send_max=10 --redis_ip={redis_ip} --redis_port={redis_port}".format(
             redis_ip=self.redis_ip,
@@ -141,7 +141,7 @@ class DockerContainerManager(ContainerManager):
                 '%s/tcp' % CLIPPER_INTERNAL_RPC_PORT: self.clipper_rpc_port
             },
             labels=query_labels,
-            cpuset_cpus="2-11",
+            cpuset_cpus="1-5,17-21",
             **self.extra_container_kwargs)
         self.connect()
 
