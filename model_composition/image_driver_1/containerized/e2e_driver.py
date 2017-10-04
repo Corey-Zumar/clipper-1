@@ -256,12 +256,12 @@ class Predictor(object):
                 classifications_lock.release()
 
         self.client.send_request(VGG_FEATS_MODEL_APP_NAME, vgg_input) \
-        	.then(vgg_feats_continuation) \
-        	.then(svm_continuation)
+            .then(vgg_feats_continuation) \
+            .then(svm_continuation)
 
         self.client.send_request(INCEPTION_FEATS_MODEL_APP_NAME, inception_input) \
-        	.then(inception_feats_continuation) \
-        	.then(lgbm_continuation)
+            .then(inception_feats_continuation) \
+            .then(lgbm_continuation)
 
 class DriverBenchmarker(object):
     def __init__(self, config):
@@ -304,9 +304,9 @@ class DriverBenchmarker(object):
         return base64.b64encode(inception_input)
 
 class RequestDelayConfig:
-	def __init__(self, request_delay):
-		self.request_delay = request_delay
-
+    def __init__(self, request_delay):
+        self.request_delay = request_delay
+        
     def to_json(self):
         return json.dumps(self.__dict__)
 
