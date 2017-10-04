@@ -312,28 +312,28 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     vgg_feats_config = get_heavy_node_config(model_name=VGG_FEATS_MODEL_APP_NAME, 
-                                             batch_size=32, 
+                                             batch_size=10, 
                                              num_replicas=1, 
                                              cpus_per_replica=1, 
                                              allocated_cpus=[14], 
                                              allocated_gpus=[0])
 
     vgg_svm_config = get_heavy_node_config(model_name=VGG_KERNEL_SVM_MODEL_APP_NAME, 
-                                           batch_size=32, 
+                                           batch_size=10, 
                                            num_replicas=1, 
                                            cpus_per_replica=1, 
                                            allocated_cpus=[15], 
                                            allocated_gpus=[])
 
     inception_feats_config = get_heavy_node_config(model_name=INCEPTION_FEATS_MODEL_APP_NAME, 
-                                                   batch_size=32, 
+                                                   batch_size=10, 
                                                    num_replicas=1, 
                                                    cpus_per_replica=1, 
                                                    allocated_cpus=[16], 
                                                    allocated_gpus=[1])
 
     lgbm_config = get_heavy_node_config(model_name=LGBM_MODEL_APP_NAME, 
-                                        batch_size=32, 
+                                        batch_size=10, 
                                         num_replicas=1, 
                                         cpus_per_replica=1, 
                                         allocated_cpus=[17], 
