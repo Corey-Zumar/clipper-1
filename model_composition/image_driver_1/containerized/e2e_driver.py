@@ -5,6 +5,7 @@ import numpy as np
 import time
 import base64
 import logging
+import json
 
 from clipper_admin import ClipperConnection, DockerContainerManager
 from threading import Lock
@@ -268,7 +269,7 @@ class DriverBenchmarker(object):
 
     def run(self, duration_seconds=120, request_delay=.01):
         logger.info("Generating random inputs")
-        inputs = [(self._get_vgg_feats_input(), self._get_inception_input()) for _ in range(1000)]
+        inputs = [(self._get_vgg_feats_input(), self._get_inception_input()) for _ in range(3000)]
         logger.info("Starting predictions")
         start_time = datetime.now()
         predictor = Predictor()
@@ -277,7 +278,7 @@ class DriverBenchmarker(object):
             time.sleep(request_delay)
         while True:
             curr_time = datetime.now()
-            if ((curr_time - start_time).total_seconds() > duration_seconds) or (predictor.total_num_complete == 10000):
+            if ((curr_time - start_time).total_seconds() > duration_seconds) or (predictor.total_num_complete == 3000):
                 break
             time.sleep(1)
 
@@ -301,6 +302,13 @@ class DriverBenchmarker(object):
         inmem_inception_jpeg.seek(0)
         inception_input = inmem_inception_jpeg.read()
         return base64.b64encode(inception_input)
+
+class RequestDelayConfig:
+	def __init__(self, request_delay):
+		self.request_delay = request_delay
+
+    def to_json(self):
+        return json.dumps(self.__dict__)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Clipper image driver 1')
@@ -343,9 +351,9 @@ if __name__ == "__main__":
 
 
     #for request_delay in range(.01, .1, .01):
-    request_delay = .01
+    request_delay = .03125
     setup_clipper(model_configs)
-    output_config = {"request_delay" : request_delay}
+    output_config = RequestDelayConfig(request_delay)
     benchmarker = DriverBenchmarker(output_config)
     p = Process(target=benchmarker.run, args=(args.duration, request_delay))
     p.start()
