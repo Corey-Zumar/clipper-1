@@ -326,7 +326,7 @@ if __name__ == "__main__":
                                                    allocated_cpus=[16], 
                                                    allocated_gpus=[1])
 
-    lgbm_config = get_heavy_node_config(model_name=INCEPTION_FEATS_MODEL_APP_NAME, 
+    lgbm_config = get_heavy_node_config(model_name=LGBM_MODEL_APP_NAME, 
                                         batch_size=32, 
                                         num_replicas=1, 
                                         cpus_per_replica=1, 
