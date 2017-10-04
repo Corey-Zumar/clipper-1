@@ -238,7 +238,7 @@ class Predictor(object):
                     update_perf_stats()
                 classifications_lock.release()
 
-        def inception_feats_continuation(inception_features);
+        def inception_feats_continuation(inception_features):
             if inception_features == DEFAULT_OUTPUT:
                 return
             return self.client.send_request(LGBM_MODEL_APP_NAME, inception_features)
