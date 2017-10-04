@@ -337,9 +337,11 @@ if __name__ == "__main__":
 
 
     #for request_delay in range(.01, .1, .01):
-    setup_clipper(configs)
-    benchmarker = DriverBenchmarker(model_configs)
-    p = Process(target=benchmarker.run, args=(args.duration, .01))
+    request_delay = .01
+    setup_clipper(model_configs)
+    output_config = {"request_delay" : request_delay}
+    benchmarker = DriverBenchmarker(output_config)
+    p = Process(target=benchmarker.run, args=(args.duration, request_delay))
     p.start()
     p.join()
 
