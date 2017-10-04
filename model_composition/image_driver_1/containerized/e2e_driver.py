@@ -264,8 +264,8 @@ class Predictor(object):
             .then(lgbm_continuation)
 
 class DriverBenchmarker(object):
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, configs):
+        self.configs = configs
 
     def run(self, duration_seconds=120, request_delay=.01):
         logger.info("Generating random inputs")
@@ -284,7 +284,7 @@ class DriverBenchmarker(object):
 
         cl = ClipperConnection(DockerContainerManager(redis_port=6380))
         cl.connect()
-        driver_utils.save_results([self.config], cl, predictor.stats, "gpu_and_batch_size_experiments")
+        driver_utils.save_results(self.configs, cl, predictor.stats, "gpu_and_batch_size_experiments")
 
     def _get_vgg_feats_input(self):
         input_img = np.array(np.random.rand(299, 299, 3) * 255, dtype=np.float32)
@@ -354,7 +354,7 @@ if __name__ == "__main__":
     request_delay = .03125
     setup_clipper(model_configs)
     output_config = RequestDelayConfig(request_delay)
-    benchmarker = DriverBenchmarker(output_config)
+    benchmarker = DriverBenchmarker([output_config] + model_configs)
     p = Process(target=benchmarker.run, args=(args.duration, request_delay))
     p.start()
     p.join()
