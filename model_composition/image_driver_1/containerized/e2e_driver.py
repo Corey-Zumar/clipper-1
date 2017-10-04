@@ -254,12 +254,12 @@ class Predictor(object):
                     update_perf_stats()
                 classifications_lock.release()
 
-        self.client.send_request(VGG_FEATS_MODEL_APP_NAME, vgg_input)
-        	.then(vgg_feats_continuation)
+        self.client.send_request(VGG_FEATS_MODEL_APP_NAME, vgg_input) \
+        	.then(vgg_feats_continuation) \
         	.then(svm_continuation)
 
-        self.client.send_request(INCEPTION_FEATS_MODEL_APP_NAME, inception_input)
-        	.then(inception_feats_continuation)
+        self.client.send_request(INCEPTION_FEATS_MODEL_APP_NAME, inception_input) \
+        	.then(inception_feats_continuation) \
         	.then(lgbm_continuation)
 
 class DriverBenchmarker(object):
