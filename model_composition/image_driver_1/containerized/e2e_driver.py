@@ -254,7 +254,13 @@ class Predictor(object):
                     update_perf_stats()
                 classifications_lock.release()
 
-        return self.client.send_request(model_app_name, input_item).then(continuation)
+        self.client.send_request(VGG_FEATS_MODEL_APP_NAME, vgg_input)
+        	.then(vgg_feats_continuation)
+        	.then(svm_continuation)
+
+        self.client.send_request(INCEPTION_FEATS_MODEL_APP_NAME, inception_input)
+        	.then(inception_feats_continuation)
+        	.then(lgbm_continuation)
 
 class DriverBenchmarker(object):
     def __init__(self, config):
@@ -262,7 +268,7 @@ class DriverBenchmarker(object):
 
     def run(self, duration_seconds=120, request_delay=.01):
         logger.info("Generating random inputs")
-        inputs = [(self._get_vgg_feats_input(), self._get_inception_input()) for _ in range(10000)]
+        inputs = [(self._get_vgg_feats_input(), self._get_inception_input()) for _ in range(1000)]
         logger.info("Starting predictions")
         start_time = datetime.now()
         predictor = Predictor()
