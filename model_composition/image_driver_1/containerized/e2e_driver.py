@@ -269,7 +269,7 @@ class DriverBenchmarker(object):
 
     def run(self, duration_seconds=120, request_delay=.01):
         logger.info("Generating random inputs")
-        inputs = [(self._get_vgg_feats_input(), self._get_inception_input()) for _ in range(3000)]
+        inputs = [(self._get_vgg_feats_input(), self._get_inception_input()) for _ in range(5000)]
         logger.info("Starting predictions")
         start_time = datetime.now()
         predictor = Predictor()
@@ -278,7 +278,7 @@ class DriverBenchmarker(object):
             time.sleep(request_delay)
         while True:
             curr_time = datetime.now()
-            if ((curr_time - start_time).total_seconds() > duration_seconds) or (predictor.total_num_complete == 3000):
+            if ((curr_time - start_time).total_seconds() > duration_seconds) or (predictor.total_num_complete == 5000):
                 break
             time.sleep(1)
 
