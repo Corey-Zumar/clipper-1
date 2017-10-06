@@ -196,6 +196,8 @@ class DockerContainerManager(ContainerManager):
             # we may still need to launch it using nvidia-docker because
             # the model framework may still depend on libcuda
             env = os.environ.copy()
+            cmd = ["nvidia-docker", "run", "-d",
+                   "--network=%s" % self.docker_network]
             if gpu_num:
                 logger.info("Starting {name}:{version} on GPU {gpu_num}".format(
                     name=name, version=version, gpu_num=gpu_num))
@@ -203,9 +205,8 @@ class DockerContainerManager(ContainerManager):
             else:
                 # We're not running on a GPU, so we should mask all available
                 # GPU resources
-                env["CUDA_VISIBLE_DEVICES"] = ""
-            cmd = ["nvidia-docker", "run", "-d",
-                   "--network=%s" % self.docker_network]
+                cmd.append("-e")
+                cmd.append("CUDA_VISIBLE_DEVICES=''")
             for k, v in labels.iteritems():
                 cmd.append("-l")
                 cmd.append("%s=%s" % (k, v))
