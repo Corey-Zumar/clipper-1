@@ -84,7 +84,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             cpus_per_replica=cpus_per_replica,
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
-                                            num_replicas=num_replicas)
+                                            num_replicas=num_replicas,
+                                            use_nvidia_docker=True)
 
     elif model_name == INCEPTION_FEATS_MODEL_APP_NAME:
         if not cpus_per_replica:
@@ -101,7 +102,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             cpus_per_replica=cpus_per_replica,
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
-                                            num_replicas=num_replicas)
+                                            num_replicas=num_replicas,
+                                            use_nvidia_docker=True)
 
     elif model_name == VGG_KPCA_SVM_MODEL_APP_NAME:
         if not cpus_per_replica:

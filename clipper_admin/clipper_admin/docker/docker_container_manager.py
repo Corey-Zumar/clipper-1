@@ -191,14 +191,10 @@ class DockerContainerManager(ContainerManager):
         labels = self.common_labels.copy()
         labels[CLIPPER_MODEL_CONTAINER_LABEL] = create_model_container_label(
             name, version)
-        if not use_nvidia_docker:
-            self.docker_client.containers.run(
-                image,
-                environment=env_vars,
-                labels=labels,
-                cpuset_cpus=cpu_str,
-                **self.extra_container_kwargs)
-        else:
+        if use_nvidia_docker:
+            # Even if a GPU-supported model isn't being deployed on a GPU,
+            # we may still need to launch it using nvidia-docker because
+            # the model framework may still depend on libcuda
             env = os.environ.copy()
             if gpu_num:
                 logger.info("Starting {name}:{version} on GPU {gpu_num}".format(
@@ -217,6 +213,13 @@ class DockerContainerManager(ContainerManager):
             cmd.append(image)
             logger.info("Docker command: \"%s\"" % cmd)
             subprocess.check_call(cmd, env=env)
+        else:
+            self.docker_client.containers.run(
+                image,
+                environment=env_vars,
+                labels=labels,
+                cpuset_cpus=cpu_str,
+                **self.extra_container_kwargs)
 
     def set_num_replicas(self, name, version, input_type, image, num_replicas, **kwargs):
         current_replicas = self._get_replicas(name, version)
