@@ -172,8 +172,7 @@ class DockerContainerManager(ContainerManager):
     def get_num_replicas(self, name, version):
         return len(self._get_replicas(name, version))
 
-    def _add_replica(self, name, version, input_type, image, gpu_num=None, cpu_str=None):
-
+    def _add_replica(self, name, version, input_type, image, gpu_num=None, cpu_str=None, use_nvidia_docker=False):
         containers = self.docker_client.containers.list(
             filters={"label": CLIPPER_QUERY_FRONTEND_CONTAINER_LABEL})
         if len(containers) < 1:
@@ -192,7 +191,7 @@ class DockerContainerManager(ContainerManager):
         labels = self.common_labels.copy()
         labels[CLIPPER_MODEL_CONTAINER_LABEL] = create_model_container_label(
             name, version)
-        if gpu_num is None:
+        if not use_nvidia_docker:
             self.docker_client.containers.run(
                 image,
                 environment=env_vars,
@@ -200,10 +199,11 @@ class DockerContainerManager(ContainerManager):
                 cpuset_cpus=cpu_str,
                 **self.extra_container_kwargs)
         else:
-            logger.info("Starting {name}:{version} on GPU {gpu_num}".format(
-                name=name, version=version, gpu_num=gpu_num))
             env = os.environ.copy()
-            env["NV_GPU"] = str(gpu_num)
+            if gpu_num:
+                logger.info("Starting {name}:{version} on GPU {gpu_num}".format(
+                    name=name, version=version, gpu_num=gpu_num))
+                env["NV_GPU"] = str(gpu_num)
             cmd = ["nvidia-docker", "run", "-d",
                    "--network=%s" % self.docker_network]
             for k, v in labels.iteritems():
@@ -231,6 +231,10 @@ class DockerContainerManager(ContainerManager):
                     missing=(num_missing)))
             if "gpus" in kwargs:
                 available_gpus = list(kwargs["gpus"])
+            if "use_nvidia_docker" in kwargs:
+                use_nvidia_docker = kwargs["use_nvidia_docker"]
+            else:
+                use_nvidia_docker = False
 
             # Enumerated list of cpus that can be allocated (e.g [1, 2, 3, 8, 9])
             if "allocated_cpus" in kwargs:
@@ -247,13 +251,15 @@ class DockerContainerManager(ContainerManager):
             for i in range(num_missing):
                 if len(available_gpus) > 0:
                     gpu_num = available_gpus.pop()
+                    use_nvidia_docker = True
                 else:
                     gpu_num = None
                 cpus = allocated_cpus[i*cpus_per_replica: (i+1)*cpus_per_replica]
                 cpus = [str(c) for c in cpus]
                 cpu_str = ",".join(cpus)
+
                 self._add_replica(name, version, input_type, image, gpu_num=gpu_num,
-                                  cpu_str=cpu_str)
+                                  cpu_str=cpu_str, use_nvidia_docker=use_nvidia_docker)
         elif len(current_replicas) > num_replicas:
             num_extra = len(current_replicas) - num_replicas
             logger.info(
