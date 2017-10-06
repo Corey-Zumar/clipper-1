@@ -18,7 +18,7 @@ class HeavyNodeConfig(object):
                  num_replicas=1,
                  gpus=None,
                  batch_size=1,
-                 use_nvidia_docker=False)
+                 use_nvidia_docker=False):
         self.name = name
         self.input_type = input_type
         self.model_image = model_image
