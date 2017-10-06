@@ -200,6 +200,10 @@ class DockerContainerManager(ContainerManager):
                 logger.info("Starting {name}:{version} on GPU {gpu_num}".format(
                     name=name, version=version, gpu_num=gpu_num))
                 env["NV_GPU"] = str(gpu_num)
+            else:
+                # We're not running on a GPU, so we should mask all available
+                # GPU resources
+                env["CUDA_VISIBLE_DEVICES"] = ""
             cmd = ["nvidia-docker", "run", "-d",
                    "--network=%s" % self.docker_network]
             for k, v in labels.iteritems():
