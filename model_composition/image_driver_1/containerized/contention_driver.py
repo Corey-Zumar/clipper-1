@@ -219,7 +219,7 @@ class Predictor(object):
             self.latencies.append(latency)
             self.total_num_complete += 1
             self.batch_num_complete += 1
-            if self.batch_num_complete % 50 == 0:
+            if self.batch_num_complete % 20 == 0:
                 self.print_stats()
                 self.init_stats()
 
@@ -229,7 +229,7 @@ class Predictor(object):
             else:
                 results_lock.acquire()
                 if VGG_KPCA_SVM_MODEL_APP_NAME not in results:
-                    results[VGG_KPCA_SVM_MODEL_APP_NAME] = vgg_features
+                    results[VGG_FEATS_MODEL_APP_NAME] = vgg_features
                 else:
                     update_perf_stats()
                 results_lock.release()
