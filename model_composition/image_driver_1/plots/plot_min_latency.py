@@ -51,7 +51,7 @@ def process_results_data(json_data):
     # list of dicts mapping model image names to tuples of (num_cpus, num_gpus)
     resource_configs = []
     for results_json in json_data:
-        relevant_thrus = np.array(results_json["client_metrics"]["thrus"][20:-2], dtype=np.float32)
+        relevant_thrus = np.array(results_json["client_metrics"]["thrus"][3:-2], dtype=np.float32)
         avg_thru = np.mean(relevant_thrus)
         p99_lats = np.array(results_json["client_metrics"]["p99_lats"], dtype=np.float32)
         p99_lats = [lat for lat in p99_lats if lat < min(p99_lats) + LATENCY_THRESHOLD]
@@ -75,7 +75,14 @@ def process_results_data(json_data):
         max_p99_lats.append(max_p99_lat)
         resource_configs.append(resource_config)
 
-    return costs, avg_thrus, max_p99_lats, resource_configs
+
+    bundle = sorted(zip(costs, avg_thrus, max_p99_lats, resource_configs))
+    sorted_costs = [item[0] for item in bundle]
+    sorted_thrus = [item[1] for item in bundle]
+    sorted_lats = [item[2] for item in bundle]
+    sorted_configs = [item[3] for item in bundle]
+
+    return sorted_costs, sorted_thrus, sorted_lats, sorted_configs
 
 def get_resource_config_str(resource_config):
     config_str = ""
@@ -96,6 +103,7 @@ def create_plot(thrus, p99_lats, costs, resource_configs):
     ax.set_ylabel("Cost (Dollars)")
     ax.set_title("Latency minimization:\nCost as a function of throughput for Image Driver 1")
     ax.set_xlim(left=0, right=100)
+    ax.set_ylim(bottom=0)
 
     cpu_label, = ax.plot([], [], label="CPU COST: $1")
     gpu_label, = ax.plot([], [], label="GPU COST: $10")
