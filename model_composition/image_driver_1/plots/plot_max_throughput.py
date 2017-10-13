@@ -7,7 +7,7 @@ import pandas as pd
 
 from matplotlib import pyplot as plt
 
-GPU_COST = 10
+GPU_COST = 14
 CPU_COST = 1
 
 VGG_FEATS_IMAGE_NAME = "model-comp/vgg-feats"
@@ -87,18 +87,16 @@ def create_plot(costs, thrus, resource_configs):
     thrus = [0] + thrus
     costs = [costs[0]] + costs
 
-    print(thrus)
-
     fig, ax = plt.subplots()
     step_plot = ax.step(thrus, costs, where="pre")
     ax.set_xlabel("Throughput (qps)")
     ax.set_ylabel("Cost (Dollars)")
     ax.set_title("Throughput maximization:\nCost as a function of throughput for Image Driver 1")
-    ax.set_xlim(left=0, right=200)
+    ax.set_xlim(left=0, right=250)
     ax.set_ylim(bottom=0)
 
-    cpu_label, = ax.plot([], [], label="CPU COST: $1")
-    gpu_label, = ax.plot([], [], label="GPU COST: $10")
+    cpu_label, = ax.plot([], [], label="CPU COST: ${}".format(CPU_COST))
+    gpu_label, = ax.plot([], [], label="GPU COST: ${}".format(GPU_COST))
     label_legend = plt.legend(handles=[cpu_label, gpu_label], loc="upper left", 
         handlelength=0, handletextpad=0, fancybox=True)
     plt.gca().add_artist(label_legend)

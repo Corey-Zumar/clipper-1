@@ -208,10 +208,10 @@ class Predictor(object):
                                                                        mean=mean,
                                                                        thru=thru))
 
-    def predict(self, vgg_input, inception_input):
+    def predict(self, vgg_input, svm_input):
         begin_time = datetime.now()
-        classifications_lock = Lock()
-        classifications = {}
+        results_lock = Lock()
+        results = {}
 
         def update_perf_stats():
             end_time = datetime.now()
@@ -226,42 +226,30 @@ class Predictor(object):
         def vgg_feats_continuation(vgg_features):
             if vgg_features == DEFAULT_OUTPUT:
                 return
-            return self.client.send_request(VGG_KERNEL_SVM_MODEL_APP_NAME, vgg_features)
+            else:
+                results_lock.acquire()
+                if VGG_KPCA_SVM_MODEL_APP_NAME not in results:
+                    results[VGG_KPCA_SVM_MODEL_APP_NAME] = vgg_features
+                else:
+                    update_perf_stats()
+                results_lock.release()
 
         def svm_continuation(svm_classification):
             if svm_classification == DEFAULT_OUTPUT:
                 return
             else:
-                classifications_lock.acquire()
-                if LGBM_MODEL_APP_NAME not in classifications:
-                    classifications[VGG_KERNEL_SVM_MODEL_APP_NAME] = svm_classification
+                results_lock.acquire()
+                if VGG_FEATS_MODEL_APP_NAME not in results:
+                    results[VGG_KPCA_SVM_MODEL_APP_NAME] = svm_classification
                 else:
                     update_perf_stats()
-                classifications_lock.release()
-
-        def inception_feats_continuation(inception_features):
-            if inception_features == DEFAULT_OUTPUT:
-                return
-            return self.client.send_request(LGBM_MODEL_APP_NAME, inception_features)
-
-        def lgbm_continuation(lgbm_classification):
-            if lgbm_classification == DEFAULT_OUTPUT:
-                return
-            else:
-                classifications_lock.acquire()
-                if VGG_KERNEL_SVM_MODEL_APP_NAME not in classifications:
-                    classifications[LGBM_MODEL_APP_NAME] = lgbm_classification
-                else:
-                    update_perf_stats()
-                classifications_lock.release()
+                results_lock.release()
 
         self.client.send_request(VGG_FEATS_MODEL_APP_NAME, vgg_input) \
-            .then(vgg_feats_continuation) \
-            .then(svm_continuation)
+            .then(vgg_feats_continuation)
 
-        self.client.send_request(INCEPTION_FEATS_MODEL_APP_NAME, inception_input) \
-            .then(inception_feats_continuation) \
-            .then(lgbm_continuation)
+        self.client.send_request(VGG_KPCA_SVM_MODEL_APP_NAME, svm_input) \
+            .then(svm_continuation)
 
 class DriverBenchmarker(object):
     def __init__(self, configs):
@@ -269,12 +257,12 @@ class DriverBenchmarker(object):
 
     def run(self, duration_seconds=120, request_delay=.01):
         logger.info("Generating random inputs")
-        inputs = [(self._get_vgg_feats_input(), self._get_inception_input()) for _ in range(5000)]
+        inputs = [(self._get_vgg_feats_input(), self._get_svm_input()) for _ in range(5000)]
         logger.info("Starting predictions")
         start_time = datetime.now()
         predictor = Predictor()
-        for vgg_feats_input, inception_input in inputs:
-            predictor.predict(vgg_feats_input, inception_input)
+        for vgg_feats_input, svm_input in inputs:
+            predictor.predict(vgg_feats_input, svm_input)
             time.sleep(request_delay)
         while True:
             curr_time = datetime.now()
@@ -293,9 +281,8 @@ class DriverBenchmarker(object):
         vgg_input = np.array(vgg_img, dtype=np.float32)
         return vgg_input.flatten()
 
-    def _get_inception_input(self):
-        inception_input = np.array(np.random.rand(299, 299, 3) * 255, dtype=np.float32)
-        return inception_input.flatten()
+    def _get_svm_input(self):
+        return np.array(np.random.rand(4096), dtype=np.float32)
 
 class RequestDelayConfig:
     def __init__(self, request_delay):
@@ -320,28 +307,14 @@ if __name__ == "__main__":
                                              allocated_cpus=[14], 
                                              allocated_gpus=[0])
 
-    vgg_svm_config = get_heavy_node_config(model_name=VGG_KERNEL_SVM_MODEL_APP_NAME, 
+    vgg_svm_config = get_heavy_node_config(model_name=VGG_KPCA_SVM_MODEL_APP_NAME, 
                                            batch_size=10, 
                                            num_replicas=1, 
                                            cpus_per_replica=1, 
                                            allocated_cpus=[15], 
                                            allocated_gpus=[])
 
-    inception_feats_config = get_heavy_node_config(model_name=INCEPTION_FEATS_MODEL_APP_NAME, 
-                                                   batch_size=10, 
-                                                   num_replicas=1, 
-                                                   cpus_per_replica=1, 
-                                                   allocated_cpus=[16], 
-                                                   allocated_gpus=[1])
-
-    lgbm_config = get_heavy_node_config(model_name=LGBM_MODEL_APP_NAME, 
-                                        batch_size=10, 
-                                        num_replicas=1, 
-                                        cpus_per_replica=1, 
-                                        allocated_cpus=[17], 
-                                        allocated_gpus=[])
-
-    model_configs = [vgg_feats_config, vgg_svm_config, inception_feats_config, lgbm_config]
+    model_configs = [vgg_feats_config, vgg_svm_config]
 
 
     #for request_delay in range(.01, .1, .01):

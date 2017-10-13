@@ -44,7 +44,7 @@ def load_results_data(dir_path):
         json_data.append(results_json)
     return json_data
 
-def process_results_data(json_data):
+def process_data(json_data):
     costs = []
     avg_thrus = []
     max_p99_lats = []
@@ -84,53 +84,54 @@ def process_results_data(json_data):
 
     return sorted_costs, sorted_thrus, sorted_lats, sorted_configs
 
-def get_resource_config_str(resource_config):
-    config_str = ""
-    for image_name in resource_config:
-        num_cpus, num_gpus = resource_config[image_name]
-        config_str = config_str + " {} - C:{} G:{}\n".format(IMG_ABBREV_MAP[image_name], num_cpus, num_gpus)
-    return config_str
+def plot_max_thrus(fig, ax, costs, thrus):
+    return ax.scatter(thrus, costs, label="Maximize Throughput")
 
-def create_plot(thrus, p99_lats, costs, resource_configs):
+def plot_min_lats(fig, ax, costs, p99_lats, thrus):
     max_p99_lat = np.max(p99_lats)
+    return ax.scatter(thrus, costs, label="Minimize Latency - SLO: {0:.2f} ms".format(max_p99_lat * 1000))
 
-    thrus = [0] + thrus
-    costs = [costs[0]] + costs
+def plot_expert(fig, ax, costs, p99_lats, thrus):
+    max_p99_lat = np.max(p99_lats)
+    return ax.scatter(thrus, costs, label="Expert - SLO: {0:.2f} ms".format(max_p99_lat * 1000))
 
-    fig, ax = plt.subplots()
-    step_plot = ax.step(thrus, costs, where="pre")
+def annotate(fig, ax):
     ax.set_xlabel("Throughput (qps)")
     ax.set_ylabel("Cost (Dollars)")
-    ax.set_title("Latency minimization:\nCost as a function of throughput for Image Driver 1")
-    ax.set_xlim(left=0, right=100)
+    ax.set_title("Image Driver 1:\nCost as a function of throughput for varying greedy approaches")
+    ax.set_xlim(left=0, right=250)
     ax.set_ylim(bottom=0)
 
-    cpu_label, = ax.plot([], [], label="CPU COST: ${}".format(CPU_COST))
-    gpu_label, = ax.plot([], [], label="GPU COST: ${}".format(GPU_COST))
-    p99_label, = ax.plot([], [], label="Maximum p99 latency: {0:.2f} ms".format(max_p99_lat * 1000))
-    label_legend = plt.legend(handles=[cpu_label, gpu_label, p99_label], loc="upper left", 
+    cpu_label, = ax.plot([], [], label="CPU COST: $1")
+    gpu_label, = ax.plot([], [], label="GPU COST: $14")
+    label_legend = plt.legend(handles=[cpu_label, gpu_label], loc="upper left", 
         handlelength=0, handletextpad=0, fancybox=True)
     plt.gca().add_artist(label_legend)
 
-    point_plots = []
-    for i in range(0, len(resource_configs)):
-        point_plot, = ax.plot(
-            [thrus[i + 1]], [costs[i + 1]], 
-            marker="o", markeredgewidth=1.5, markeredgecolor="black", 
-            label=get_resource_config_str(resource_configs[i]))
-        point_plots.append(point_plot)
-
-    legend = plt.legend(handles=point_plots, loc='center left', bbox_to_anchor=(1, 0.5), ncol=2)
-
-    plt.savefig("min_latency.png", bbox_extra_artists=[legend], bbox_inches='tight')
-
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         raise
 
-    data_path = sys.argv[1]
+    mt_path = sys.argv[1]
+    ml_path = sys.argv[2]
+    expert_path = sys.argv[3]
 
-    json_data = load_results_data(data_path)
-    costs, thrus, p99_lats, resource_configs = process_results_data(json_data)
-    create_plot(thrus, p99_lats, costs, resource_configs)
+    mt_data = load_results_data(mt_path)
+    ml_data = load_results_data(ml_path)
+    expert_data = load_results_data(expert_path)
 
+    mt_costs, mt_thrus, mt_p99_lats, _ = process_data(mt_data)
+    ml_costs, ml_thrus, ml_p99_lats, _ = process_data(ml_data)
+    exp_costs, exp_thrus, exp_p99_lats, _ = process_data(expert_data)
+
+    fig, ax = plt.subplots()
+
+    mt_plot = plot_max_thrus(fig, ax, mt_costs, mt_thrus)
+    ml_plot = plot_min_lats(fig, ax, ml_costs, ml_p99_lats, ml_thrus)
+    expert_plot = plot_expert(fig, ax, exp_costs, exp_p99_lats, exp_thrus)
+
+    annotate(fig, ax)
+
+    legend = plt.legend(handles=[mt_plot, ml_plot, expert_plot], loc='lower right')
+
+    plt.savefig("test.png", bbox_extra_artists=[legend], bbox_inches='tight')
