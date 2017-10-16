@@ -27,7 +27,7 @@ if __name__ == "__main__":
 		print("Usage is 'python kernel_svm_trainer.py <training_data_size> <model_output_path>")
 		raise
 
-	training_data_size = sys.argv[1]
+	training_data_size = int(sys.argv[1])
 	model_output_path = sys.argv[2]
 
 	train_svm_model(training_data_size, model_output_path)
