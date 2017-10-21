@@ -2,7 +2,6 @@ from __future__ import print_function
 import sys
 import os
 import rpc
-import pickle
 import numpy as np
 import tensorflow as tf
 
@@ -29,7 +28,7 @@ class TFKernelSvmContainer(rpc.ModelContainerBase):
 			self.t_weights : self.weights,
 			self.t_labels : self.labels,
 			self.t_bias : self.bias,
-			self.t_inputs : self.inputs
+			self.t_inputs : inputs
 		}
 
 		outputs = sess.run(self.t_predictions, feed_dict=feed_dict)
@@ -40,8 +39,8 @@ class TFKernelSvmContainer(rpc.ModelContainerBase):
 		with tf.device("/gpu:0"):
 			self.t_kernel = tf.placeholder(tf.float32, [None, INPUT_VECTOR_SIZE])
 			self.t_inputs = tf.placeholder(tf.float32, [None, INPUT_VECTOR_SIZE])
-			self.t_weights = tf.placeholder(tf.float32, [INPUT_VECTOR_SIZE])
-			self.t_labels = tf.placeholder(tf.float32, [None])
+			self.t_weights = tf.placeholder(tf.float32, [None, 1])
+			self.t_labels = tf.placeholder(tf.float32, [None, 1])
 			self.t_bias = tf.placeholder(tf.float32)
 			gamma = tf.constant(-50.0)
 
@@ -51,16 +50,16 @@ class TFKernelSvmContainer(rpc.ModelContainerBase):
 			pred_sq_dist = tf.add(tf.subtract(rA, tf.multiply(2.0, tf.matmul(self.t_inputs, tf.transpose(self.t_kernel)))), tf.transpose(rB))
 			pred_kernel = tf.exp(tf.multiply(gamma, tf.abs(pred_sq_dist)))
 
-			self.t_predictions = tf.matmul(tf.multiply(tf.transpose(self.t_labels), self.t_bias), pred_kernel)
+			self.t_predictions = tf.matmul(tf.multiply(tf.transpose(tf.multiply(self.t_labels, self.t_weights)), self.t_bias), pred_kernel)
 
 	def _generate_bias(self):
 		return np.random.uniform(-1,1) * 100
 
-	def _generate_weights(self):
-		return np.random.rand(INPUT_VECTOR_SIZE)
+	def _generate_weights(self, kernel_size):
+		return np.random.uniform(-1,1, size=(kernel_size, 1))
 
 	def _generate_labels(self, kernel_size):
-		return np.array(np.random.choice([-1,1], kernel_size), dtype=np.float32)
+		return np.array(np.random.choice([-1,1], size=(kernel_size, 1)), dtype=np.float32)
 
 	def _generate_kernel_data(self, kernel_size):
 		return np.random.rand(kernel_size, INPUT_VECTOR_SIZE) * 10
