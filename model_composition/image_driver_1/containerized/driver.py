@@ -311,7 +311,8 @@ class ModelBenchmarker(object):
             # time.sleep(0.005)
             time.sleep(0)
 
-
+            if len(predictor.stats["thrus"]) > num_trials:
+                break
 
         self.queue.put(predictor.stats)
 
