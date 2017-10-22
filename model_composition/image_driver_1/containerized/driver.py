@@ -244,7 +244,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
 
 class Predictor(object):
 
-    def __init__(self):
+    def __init__(self, trial_length):
+        self.trial_length = trial_length
         self.outstanding_reqs = {}
         self.client = Client(CLIPPER_ADDRESS, CLIPPER_SEND_PORT, CLIPPER_RECV_PORT)
         self.client.start()
@@ -287,7 +288,7 @@ class Predictor(object):
             self.latencies.append(latency)
             self.total_num_complete += 1
             self.batch_num_complete += 1
-            if self.batch_num_complete % 50 == 0:
+            if self.batch_num_complete % self.trial_length == 0:
                 self.print_stats()
                 self.init_stats()
 
@@ -299,21 +300,18 @@ class ModelBenchmarker(object):
         self.queue = queue
         self.input_generator_fn = self._get_input_generator_fn(model_app_name=self.config.name)
 
-    def run(self, duration_seconds=120):
+    def run(self, num_trials=15, trial_length=500):
         logger.info("Generating random inputs")
-        inputs = [self.input_generator_fn() for _ in range(10000)]
+        inputs = [self.input_generator_fn() for _ in range(1000)]
+        inputs = [i for _ in range(100) for i in base_inputs]
         logger.info("Starting predictions")
-        start_time = datetime.now()
-        predictor = Predictor()
+        predictor = Predictor(trial_length=trial_length)
         for input_item in inputs:
             predictor.predict(model_app_name=self.config.name, input_item=input_item)
             # time.sleep(0.005)
             time.sleep(0)
-        while True:
-            curr_time = datetime.now()
-            if ((curr_time - start_time).total_seconds() > duration_seconds) or (predictor.total_num_complete == 10000):
-                break
-            time.sleep(1)
+
+
 
         self.queue.put(predictor.stats)
 
@@ -359,7 +357,6 @@ class ModelBenchmarker(object):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Clipper image driver 1')
-    parser.add_argument('-d', '--duration', type=int, default=120, help='The maximum duration of the benchmarking process in seconds, per iteration')
     parser.add_argument('-m', '--model_name', type=str, help="The name of the model to benchmark. One of: 'vgg', 'kpca-svm', 'kernel-svm', 'elastic-net', 'inception', 'lgbm', 'tf-kernel-svm', 'tf-log-reg', 'tf-resnet-feats'")
     parser.add_argument('-b', '--batch_sizes', type=int, nargs='+', help="The batch size configurations to benchmark for the model. Each configuration will be benchmarked separately.")
     parser.add_argument('-r', '--num_replicas', type=int, nargs='+', help="The replica number configurations to benchmark for the model. Each configuration will be benchmarked separately.")
@@ -367,7 +364,9 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--cpus_per_replica_nums', type=int, nargs='+', help="Configurations for the number of cpu cores allocated to each replica of the model")
     parser.add_argument('-g', '--model_gpus', type=int, nargs='+', help="The set of gpus on which to run replicas of the provided model. Each replica of a gpu model must have its own gpu!")
     parser.add_argument('-n', '--num_clients', type=int, default=1, help="The number of concurrent client processes. This can help increase the request rate in order to saturate high throughput models.")
-    
+    parser.add_argument('-t', '--num_trials', type=int, default=30, help='The number of trials to complete for the benchmarking process')
+    parser.add_argument('-l', '--trial_length', type=float, default=.015, help="The length of each trial, in number of requests")
+
     args = parser.parse_args()
 
     if args.model_name not in VALID_MODEL_NAMES:
@@ -398,7 +397,7 @@ if __name__ == "__main__":
                 processes = []
                 all_stats = []
                 for _ in range(args.num_clients):
-                    p = Process(target=benchmarker.run, args=(args.duration,))
+                    p = Process(target=benchmarker.run, args=(args.num_trials, args.trial_length))
                     p.start()
                     processes.append(p)
                 for p in processes:
