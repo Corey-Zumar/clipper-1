@@ -191,7 +191,7 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
         if not allocated_cpus:
             allocated_cpus = [20]
         if not allocated_gpus:
-            allocated_gpus = [1]
+            allocated_gpus = []
 
         return driver_utils.HeavyNodeConfig(name=TF_KERNEL_SVM_MODEL_APP_NAME,
                                             input_type="floats",
@@ -209,7 +209,7 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
         if not allocated_cpus:
             allocated_cpus = [20]
         if not allocated_gpus:
-            allocated_gpus = [1]
+            allocated_gpus = []
 
         return driver_utils.HeavyNodeConfig(name=TF_LOG_REG_MODEL_APP_NAME,
                                             input_type="floats",
@@ -308,8 +308,7 @@ class ModelBenchmarker(object):
         predictor = Predictor(trial_length=trial_length)
         for input_item in inputs:
             predictor.predict(model_app_name=self.config.name, input_item=input_item)
-            # time.sleep(0.005)
-            time.sleep(0)
+            time.sleep(0.001)
 
             if len(predictor.stats["thrus"]) > num_trials:
                 break
