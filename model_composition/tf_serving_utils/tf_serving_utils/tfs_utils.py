@@ -88,7 +88,7 @@ def create_predict_request(model_name, data, signature_name="predict_images"):
 
 def setup_heavy_node(config):
     for _ in range(config.num_replicas):
-        node_gpy = None
+        node_gpu = None
         if len(config.gpus) > 0:
             node_gpu = config.gpus.pop()
 
@@ -132,12 +132,13 @@ def _start_serving(config, port_number, cpus, gpu_number=None):
 
     full_cmd = "({cf};{cs}) &".format(cf=cmd_filter_gpus, cs=cmd_serve)
 
-    subprocess.call(full_cmd, shell=True)
+    print("Starting node! model name: {mn} port: {pn} gpu_num: {gpu} cpus: {cpus} \n\n\n"
+        .format(mn=config.name, 
+                pn=port_number,
+                gpu=gpu_number,
+                cpus=cpus_str))
 
-    print("Started node! model name: {mn} port: {pn} gpu_num: {gpu} cpus: {cpus}".format(mn=config.name, 
-                                                                                           pn=port_number,
-                                                                                           gpu=gpu_number,
-                                                                                           cpus=cpus_str))
+    subprocess.call(full_cmd, shell=True)
 
 
 def _get_batching_params(max_batch_size, batch_timeout_micros=5000, max_enqueued_batches=4):
