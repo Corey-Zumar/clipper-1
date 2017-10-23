@@ -190,7 +190,7 @@ class Predictor(object):
                 update_perf_stats()
             classifications_lock.release()
 
-        def inception_feats_continution(inception_features):
+        def inception_feats_continuation(inception_features):
             request = tfs_utils.create_predict_request(LOG_REG_MODEL_NAME, inception_features)
             self.log_reg_client.predict(request, log_reg_continuation)
 
