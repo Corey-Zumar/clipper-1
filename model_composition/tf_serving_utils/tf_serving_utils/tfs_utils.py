@@ -142,6 +142,7 @@ def _get_batching_params(max_batch_size, batch_timeout_micros=5000, max_enqueued
 
     print(batching_params_text)
     print(type(batching_params_text))
+    print(str(batching_params_text))
 
     num_batch_threads = max_batch_size * 2
 
