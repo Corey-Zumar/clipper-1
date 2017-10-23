@@ -82,7 +82,10 @@ class GRPCClient:
 
             else:
                 input_item, callback = self.request_queue.get(block=True)
+                print("HERE!")
                 response = self.clients[replica_num].predict(input_item, REQUEST_TIME_OUT_SECONDS)
+                print("GOT RESPONSE!")
+                print(response)
                 callback(response)
 
 
