@@ -286,7 +286,7 @@ class DriverBenchmarker(object):
         inputs = [i for _ in range(40) for i in base_inputs]
         logger.info("Starting predictions")
         start_time = datetime.now()
-        predictor = Predictor(clipper_metrics=self.clipper_metrics, trial_length=self.trial_length)
+        predictor = Predictor(trial_length=self.trial_length, clients=self.clients)
         for resnet_input, inception_input in inputs:
             predictor.predict(resnet_input, inception_input)
             time.sleep(request_delay)
