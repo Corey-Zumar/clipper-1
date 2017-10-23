@@ -99,7 +99,7 @@ def setup_heavy_node(config):
 
         port_number = config.ports.pop()
 
-        _start_serving(config, port_number, node_gpu, node_cpus)
+        _start_serving(config, port_number, node_cpus, node_gpu)
 
 def _start_serving(config, port_number, cpus, gpu_number=None):
     model_server_path = os.path.join(TFS_BASE_PATH, MODEL_SERVER_RELATIVE_PATH)
