@@ -86,15 +86,19 @@ def create_predict_request(model_name, data, signature_name="predict_images"):
     request.model_spec.signature_name = signature_name
     request.inputs['inputs'].CopyFrom(tf.contrib.util.make_tensor_proto(data, shape=data.shape))
 
-def setup_heavy_node(cpus, gpus, num_replicas, cpus_per_replica, ports):
-    for _ in range(num_replicas):
+def setup_heavy_node(config):
+    gpus = list(config.gpus)
+    cpus = list(config.allocated_cpus)
+    ports = list(config.ports)
+
+    for _ in range(config.num_replicas):
         node_gpu = None
         if len(gpus) > 0:
-            node_gpu = config.gpus.pop()
+            node_gpu = gpus.pop()
 
 
         node_cpus = []
-        for _ in range(cpus_per_replica):
+        for _ in range(config.cpus_per_replica):
             node_cpus.append(cpus.pop())
 
         port_number = ports.pop()

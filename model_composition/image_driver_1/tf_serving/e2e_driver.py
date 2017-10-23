@@ -56,11 +56,7 @@ def setup_heavy_nodes(configs):
     """
 
     for config in configs.values():
-        tfs_utils.setup_heavy_node(cpus=list(config.allocated_cpus), 
-                                   gpus=list(config.gpus),
-                                   num_replicas=config.num_replicas,
-                                   cpus_per_replica=config.cpus_per_replica,
-                                   ports=list(config.ports))
+        tfs_utils.setup_heavy_node(config)
         time.sleep(5)
 
 def create_clients(configs):
