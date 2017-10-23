@@ -301,11 +301,11 @@ class DriverBenchmarker(object):
 
     def _get_resnet_input(self):
         resnet_input = np.array(np.random.rand(224, 224, 3) * 255, dtype=np.float32)
-        return resnet_input.flatten()
+        return resnet_input
 
     def _get_inception_input(self):
         inception_input = np.array(np.random.rand(299, 299, 3) * 255, dtype=np.float32)
-        return inception_input.flatten()
+        return inception_input
 
 class RequestDelayConfig:
     def __init__(self, request_delay):
