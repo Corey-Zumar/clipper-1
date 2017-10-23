@@ -79,7 +79,6 @@ class GRPCClient:
     def _run(self, replica_num):
         while self.active:
             input_item, callback = self.request_queue.get(block=True)
-            print("HERE!")
             response = self.clients[replica_num].predict(input_item, REQUEST_TIME_OUT_SECONDS)
             callback(response)
 
