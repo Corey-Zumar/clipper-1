@@ -78,7 +78,7 @@ def create_clients(configs):
 
 def get_heavy_node_config(model_name, batch_size, num_replicas, allocated_cpus, cpus_per_replica=2, allocated_gpus=[]):
     if model_name == INCEPTION_FEATS_MODEL_NAME:
-        return tfs_utils.TFSHeavyNodeconfig(name=INCEPTION_FEATS_MODEL_NAME,
+        return tfs_utils.TFSHeavyNodeConfig(name=INCEPTION_FEATS_MODEL_NAME,
                                             model_base_path=INCEPTION_FEATS_MODEL_BASE_PATH,
                                             ports=INCEPTION_PORTS,
                                             input_type="floats",
@@ -89,7 +89,7 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, allocated_cpus, 
                                             batch_size=batch_size)
 
     elif model_name == LOG_REG_MODEL_NAME:
-        return tfs_utils.TFSHeavyNodeconfig(name=LOG_REG_MODEL_NAME,
+        return tfs_utils.TFSHeavyNodeConfig(name=LOG_REG_MODEL_NAME,
                                             model_base_path=LOG_REG_MODEL_BASE_PATH,
                                             ports=LOG_REG_PORTS,
                                             input_type="floats",
@@ -101,7 +101,7 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, allocated_cpus, 
 
 
     elif model_name == RESNET_152_MODEL_NAME:
-        return tfs_utils.TFSHeavyNodeconfig(name=RESNET_152_MODEL_NAME,
+        return tfs_utils.TFSHeavyNodeConfig(name=RESNET_152_MODEL_NAME,
                                             model_base_path=RESNET_152_MODEL_BASE_PATH,
                                             ports=RESNET_152_PORTS,
                                             input_type="floats",
@@ -112,7 +112,7 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, allocated_cpus, 
                                             batch_size=batch_size)
 
     elif model_name == KERNEL_SVM_MODEL_NAME:
-        return tfs_utils.TFSHeavyNodeconfig(name=KERNEL_SVM_MODEL_NAME,
+        return tfs_utils.TFSHeavyNodeConfig(name=KERNEL_SVM_MODEL_NAME,
                                             model_base_path=KERNEL_SVM_MODEL_BASE_PATH,
                                             ports=KERNEL_SVM_PORTS,
                                             input_type="floats",
