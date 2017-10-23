@@ -275,18 +275,21 @@ class Predictor(object):
                                                 data=log_reg_input)
 
 class DriverBenchmarker(object):
-    def __init__(self, trial_length, queue, clients):
+    def __init__(self, trial_length, queue, configs)
         self.trial_length = trial_length
         self.queue = queue
-        self.clients = clients
+        self.configs = configs
 
     def run(self, num_trials, request_delay=.01):
+        logger.info("Creating clients!")
+        clients = create_clients(configs)
+
         logger.info("Generating random inputs")
         base_inputs = [(self._get_resnet_input(), self._get_inception_input()) for _ in range(1000)]
         inputs = [i for _ in range(40) for i in base_inputs]
         logger.info("Starting predictions")
         start_time = datetime.now()
-        predictor = Predictor(trial_length=self.trial_length, clients=self.clients)
+        predictor = Predictor(trial_length=self.trial_length, clients=clients)
         for resnet_input, inception_input in inputs:
             predictor.predict(resnet_input, inception_input)
             time.sleep(request_delay)
@@ -358,15 +361,12 @@ if __name__ == "__main__":
     # Set up TFS nodes
     #setup_heavy_nodes(model_configs)
 
-    # Create GRPC clients to communicate with nodes
-    clients = create_clients(model_configs)
-
     queue = Queue()
 
     procs = []
     for i in range(args.num_clients):
         clipper_metrics = (i == 0)
-        benchmarker = DriverBenchmarker(args.trial_length, queue, clients)
+        benchmarker = DriverBenchmarker(args.trial_length, queue, model_configs)
         p = Process(target=benchmarker.run, args=(args.num_trials, args.request_delay))
         p.start()
         procs.append(p)
