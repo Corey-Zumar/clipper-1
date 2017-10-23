@@ -353,10 +353,10 @@ if __name__ == "__main__":
                                            allocated_cpus=[24,25])
 
     model_configs = {
-        RESNET_152_MODEL_NAME : resnet_feats_config,
+        #RESNET_152_MODEL_NAME : resnet_feats_config,
         #KERNEL_SVM_MODEL_NAME : kernel_svm_config,
-        INCEPTION_FEATS_MODEL_NAME : inception_feats_config
-        #LOG_REG_MODEL_NAME : log_reg_config
+        INCEPTION_FEATS_MODEL_NAME : inception_feats_config,
+        LOG_REG_MODEL_NAME : log_reg_config
     }
 
     # Set up TFS nodes
