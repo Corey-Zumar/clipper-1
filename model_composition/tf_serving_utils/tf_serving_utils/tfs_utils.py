@@ -5,6 +5,7 @@ import logging
 import tensorflow as tf
 import subprocess
 import requests
+import numpy as np
 
 from datetime import datetime
 
