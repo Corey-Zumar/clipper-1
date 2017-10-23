@@ -356,7 +356,7 @@ if __name__ == "__main__":
     }
 
     # Set up TFS nodes
-    setup_heavy_nodes(model_configs)
+    #setup_heavy_nodes(model_configs)
 
     # Create GRPC clients to communicate with nodes
     clients = create_clients(model_configs)

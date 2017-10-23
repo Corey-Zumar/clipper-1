@@ -77,8 +77,11 @@ class GRPCClient:
         return prediction_service_pb2.beta_create_PredictionService_stub(address.get_channel())
 
     def _run(self, replica_num):
+        i = 0
         while self.active:
+            print("HERE {}".format(i))
             input_item, callback = self.request_queue.get(block=True)
             response = self.clients[replica_num].predict(input_item, REQUEST_TIME_OUT_SECONDS)
             callback(response)
+            i += 1
 
