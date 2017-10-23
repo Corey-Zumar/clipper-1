@@ -84,7 +84,8 @@ def create_predict_request(model_name, data, signature_name="predict_inputs"):
     request = predict_pb2.PredictRequest()
     request.model_spec.name = model_name
     request.model_spec.signature_name = signature_name
-    request.inputs['inputs'].CopyFrom(tf.contrib.util.make_tensor_proto(data, shape=data.shape))
+    wrapped_data = np.array([data])
+    request.inputs['inputs'].CopyFrom(tf.contrib.util.make_tensor_proto(wrapped_data, shape=wrapped_data.shape))
     return request
 
 def setup_heavy_node(config):
