@@ -121,14 +121,14 @@ def _start_serving(config, port_number, gpu_number, cpus):
                 "--batching_parameters_file {bpf}").format(cf=cmd_filter_cpus,
                                                            msp=model_server_path,
                                                            pn=port_number,
-                                                           mn=config.model_name,
+                                                           mn=config.name,
                                                            mbp=config.model_base_path,
                                                            bpf=batching_params_path)
 
     subprocess.call(cmd_filter_gpus, shell=True)
     subprocess.call(cmd_serve, shell=True)
 
-    print("Started node! model name: {mn} port: {pn} gpu_num: {gpu} cpu_num: {cpu}".format(mn=config.model_name, 
+    print("Started node! model name: {mn} port: {pn} gpu_num: {gpu} cpu_num: {cpu}".format(mn=config.name, 
                                                                                            pn=port_number,
                                                                                            gpu_number=gpu_number,
                                                                                            cpu_number=cpu_number))
