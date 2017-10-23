@@ -127,7 +127,7 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, allocated_cpus, 
 
 class Predictor(object):
 
-    def __init__(self, trial_length, clients)
+    def __init__(self, trial_length, clients):
         self.trial_length = trial_length
         self.outstanding_reqs = {}
 
