@@ -40,7 +40,7 @@ class GRPCClient:
         # TODO(czumar): Make sure this synchronization var works
         self.active = False
 
-        self.threads = [Thread(target=self._run, args=(i,)) for i in range(len(self.clients))]
+        self.threads = [Thread(target=self._run, args=(i,self.request_queue,self.clients)) for i in range(len(self.clients))]
 
     def predict(self, input_item, callback):
         """ 
@@ -75,17 +75,15 @@ class GRPCClient:
 
         return prediction_service_pb2.beta_create_PredictionService_stub(address.get_channel())
 
-    def _run(self, replica_num):
-        while self.active:
-            if self.request_queue.empty():
+    def _run(self, replica_num, request_queue, clients):
+        while True:
+            if request_queue.empty():
                 time.sleep(REQUEST_QUEUE_POLLING_DELAY_SECONDS)
 
             else:
-                input_item, callback = self.request_queue.get(block=True)
-                print("HERE!")
-                response = self.clients[replica_num].predict(input_item, REQUEST_TIME_OUT_SECONDS)
-                print("GOT RESPONSE!")
-                print(response)
+                print("HERE!!!")
+                input_item, callback = request_queue.get(block=True)
+                response = clients[replica_num].predict(input_item, REQUEST_TIME_OUT_SECONDS)
                 callback(response)
 
 
