@@ -30,10 +30,13 @@ RESNET_152_MODEL_NAME = "resnet"
 LOG_REG_MODEL_NAME = "log_reg"
 KERNEL_SVM_MODEL_NAME = "kernel_svm"
 
-INCEPTION_FEATS_MODEL_BASE_PATH = "FILL IN"
-RESNET_152_MODEL_BASE_PATH = "FILL IN"
-LOG_REG_MODEL_BASE_PATH = "FILL IN"
-KERNEL_SVM_MODEL_BASE_PATH = "FILL IN"
+CURR_DIR = os.path.dirname(os.path.realpath(__file__))
+MODEL_BASE_DIR_PATH = os.path.join(CURR_DIR, "exported_tf_models")
+
+INCEPTION_FEATS_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "inception_tfserve")
+RESNET_152_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "resnet_tfserve")
+LOG_REG_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "log_reg_tfserve")
+KERNEL_SVM_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "kernel_svm_tfserve")
 
 INCEPTION_PORTS = range(9500,9508)
 RESNET_152_PORTS = range(9508, 9516)
