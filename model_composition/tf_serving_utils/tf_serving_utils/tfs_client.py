@@ -21,7 +21,7 @@ class ReplicaAddress:
         self.port = port
 
     def get_channel(self):
-        return implementations.insecure_channel(host, int(port))
+        return implementations.insecure_channel(self.host_name, int(self.port))
 
 class GRPCClient:
 

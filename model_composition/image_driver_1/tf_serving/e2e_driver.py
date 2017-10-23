@@ -57,7 +57,7 @@ def setup_heavy_nodes(configs):
 
     for config in configs.values():
         tfs_utils.setup_heavy_node(config)
-        time.sleep(10)
+        time.sleep(5)
 
 def create_clients(configs):
     """
