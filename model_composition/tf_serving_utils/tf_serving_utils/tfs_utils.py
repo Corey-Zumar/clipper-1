@@ -43,7 +43,6 @@ class TFSHeavyNodeConfig(object):
         self.input_type = input_type
         self.allocated_cpus = allocated_cpus
         self.cpus_per_replica = cpus_per_replica
-        self.slo = slo
         self.num_replicas = num_replicas
         self.gpus = gpus
         self.batch_size = batch_size
