@@ -366,7 +366,7 @@ if __name__ == "__main__":
     procs = []
     for i in range(args.num_clients):
         clipper_metrics = (i == 0)
-        benchmarker = DriverBenchmarker(args.trial_length, queue)
+        benchmarker = DriverBenchmarker(args.trial_length, queue, clients)
         p = Process(target=benchmarker.run, args=(args.num_trials, args.request_delay))
         p.start()
         procs.append(p)
