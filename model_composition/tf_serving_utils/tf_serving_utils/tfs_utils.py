@@ -103,7 +103,7 @@ def _start_serving(config, port_number, gpu_number, cpus):
     model_server_path = os.path.join(TFS_BASE_PATH, MODEL_SERVER_RELATIVE_PATH)
 
     batching_params = _get_batching_params(config.batch_size)
-    batching_params_path = os.path.join("/tmp", "batching_params-{%y%m%d_%H%M%S}.json".format(datetime.datetime.now()))
+    batching_params_path = os.path.join("/tmp", "batching_params-{%y%m%d_%H%M%S}.json".format(datetime.now()))
 
     batching_params_file = open(batching_params_path, "w")
     batching_params_file.write(batching_params)
