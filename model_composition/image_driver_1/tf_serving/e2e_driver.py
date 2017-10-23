@@ -10,7 +10,6 @@ import tensorflow as tf
 
 from threading import Lock
 from datetime import datetime
-from containerized_utils import driver_utils
 from multiprocessing import Process, Queue
 
 from tf_serving_utils import GRPCClient, ReplicaAddress
