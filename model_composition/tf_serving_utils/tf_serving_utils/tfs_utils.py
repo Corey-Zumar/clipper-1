@@ -130,11 +130,9 @@ def _start_serving(config, port_number, cpus, gpu_number=None):
                                                            mbp=config.model_base_path,
                                                            bpf=batching_params_path)
 
-    subprocess.call(cmd_filter_gpus, shell=True)
+    full_cmd = "({cf};{cs}) &".format(cf=cmd_filter_gpus, cs=cmd_serve)
 
-    print(cmd_serve)
-
-    subprocess.call(cmd_serve, shell=True)
+    subprocess.call(full_cmd, shell=True)
 
     print("Started node! model name: {mn} port: {pn} gpu_num: {gpu} cpus: {cpus}".format(mn=config.name, 
                                                                                            pn=port_number,
