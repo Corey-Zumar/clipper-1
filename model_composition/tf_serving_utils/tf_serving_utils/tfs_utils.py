@@ -120,10 +120,10 @@ def _start_serving(config, port_number, cpus, gpu_number=None):
         cmd_filter_gpus = "export CUDA_VISIBLE_DEVICES=''"
 
     cmd_serve = ("{cf} {msp} --enable_batching \\\n"
-                "--port {pn} \\\n"
-                "--model_name {mn} \\\n"
-                "--model_base_path {mbp} \\\n"
-                "--batching_parameters_file {bpf}").format(cf=cmd_filter_cpus,
+                "--port={pn} \\\n"
+                "--model_name={mn} \\\n"
+                "--model_base_path={mbp} \\\n"
+                "--batching_parameters_file={bpf}").format(cf=cmd_filter_cpus,
                                                            msp=model_server_path,
                                                            pn=port_number,
                                                            mn=config.name,
