@@ -40,12 +40,12 @@ class TFSHeavyNodeConfig(object):
 
         self.name = name
         self.model_base_path = model_base_path
-        self.ports = list(ports)
+        self.ports = ports
         self.input_type = input_type
-        self.allocated_cpus = list(allocated_cpus)
+        self.allocated_cpus = allocated_cpus
         self.cpus_per_replica = cpus_per_replica
         self.num_replicas = num_replicas
-        self.gpus = list(gpus)
+        self.gpus = gpus
         self.batch_size = batch_size
         self.instance_type = requests.get(
             "http://169.254.169.254/latest/meta-data/instance-type").text
@@ -86,18 +86,18 @@ def create_predict_request(model_name, data, signature_name="predict_images"):
     request.model_spec.signature_name = signature_name
     request.inputs['inputs'].CopyFrom(tf.contrib.util.make_tensor_proto(data, shape=data.shape))
 
-def setup_heavy_node(config):
-    for _ in range(config.num_replicas):
+def setup_heavy_node(cpus, gpus, num_replicas, cpus_per_replica, ports):
+    for _ in range(num_replicas):
         node_gpu = None
-        if len(config.gpus) > 0:
+        if len(gpus) > 0:
             node_gpu = config.gpus.pop()
 
 
         node_cpus = []
-        for _ in range(config.cpus_per_replica):
-            node_cpus.append(config.allocated_cpus.pop())
+        for _ in range(cpus_per_replica):
+            node_cpus.append(cpus.pop())
 
-        port_number = config.ports.pop()
+        port_number = ports.pop()
 
         _start_serving(config, port_number, node_cpus, node_gpu)
 
