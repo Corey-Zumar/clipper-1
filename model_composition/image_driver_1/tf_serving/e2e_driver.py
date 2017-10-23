@@ -359,7 +359,7 @@ if __name__ == "__main__":
     }
 
     # Set up TFS nodes
-    #setup_heavy_nodes(model_configs)
+    setup_heavy_nodes(model_configs)
 
     queue = Queue()
 
