@@ -275,7 +275,7 @@ class Predictor(object):
                                                 data=log_reg_input)
 
 class DriverBenchmarker(object):
-    def __init__(self, trial_length, queue, configs)
+    def __init__(self, trial_length, queue, configs):
         self.trial_length = trial_length
         self.queue = queue
         self.configs = configs
