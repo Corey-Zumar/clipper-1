@@ -323,8 +323,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    get_heavy_node_config(model_name, batch_size, num_replicas, allocated_cpus, pus_per_replica=2, allocated_gpus=[]):
-
     resnet_feats_config = get_heavy_node_config(model_name=RESNET_152_MODEL_NAME,
                                                 batch_size=64,
                                                 num_replicas=1,
