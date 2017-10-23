@@ -76,8 +76,7 @@ class GRPCClient:
         return prediction_service_pb2.beta_create_PredictionService_stub(address.get_channel())
 
     def _run(self, replica_num):
-        print("STARTED CLIENT!!!")
-        while True:
+        while self.active:
             if self.request_queue.empty():
                 time.sleep(REQUEST_QUEUE_POLLING_DELAY_SECONDS)
 

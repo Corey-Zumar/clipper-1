@@ -40,12 +40,12 @@ class TFSHeavyNodeConfig(object):
 
         self.name = name
         self.model_base_path = model_base_path
-        self.ports = ports
+        self.ports = list(ports)
         self.input_type = input_type
-        self.allocated_cpus = allocated_cpus
+        self.allocated_cpus = list(allocated_cpus)
         self.cpus_per_replica = cpus_per_replica
         self.num_replicas = num_replicas
-        self.gpus = gpus
+        self.gpus = list(gpus)
         self.batch_size = batch_size
         self.instance_type = requests.get(
             "http://169.254.169.254/latest/meta-data/instance-type").text
