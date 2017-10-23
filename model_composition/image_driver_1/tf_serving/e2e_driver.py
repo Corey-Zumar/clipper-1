@@ -57,7 +57,8 @@ def setup_heavy_nodes(configs):
 
     for config in configs.values():
         tfs_utils.setup_heavy_node(config)
-        time.sleep(15)
+    
+    time.sleep(60)
 
 def create_clients(configs):
     """
@@ -196,15 +197,15 @@ class Predictor(object):
 
         def log_reg_continuation(log_reg_vals):
             classifications_lock.acquire()
-            if KERNEL_SVM_MODEL_NAME not in classifications:
-                classifications[LOG_REG_MODEL_NAME] = log_reg_vals
-            else:
-                update_perf_stats()
+            # if KERNEL_SVM_MODEL_NAME not in classifications:
+            #     classifications[LOG_REG_MODEL_NAME] = log_reg_vals
+            # else:
+            update_perf_stats()
             classifications_lock.release()
 
 
-        resnet_request = tfs_utils.create_predict_request(RESNET_152_MODEL_NAME, resnet_input)
-        self.resnet_client.predict(resnet_request, resnet_feats_continuation)
+        # resnet_request = tfs_utils.create_predict_request(RESNET_152_MODEL_NAME, resnet_input)
+        # self.resnet_client.predict(resnet_request, resnet_feats_continuation)
 
         inception_request = tfs_utils.create_predict_request(INCEPTION_FEATS_MODEL_NAME, inception_input)
         self.inception_client.predict(inception_request, inception_feats_continuation)
@@ -353,9 +354,9 @@ if __name__ == "__main__":
 
     model_configs = {
         RESNET_152_MODEL_NAME : resnet_feats_config,
-        KERNEL_SVM_MODEL_NAME : kernel_svm_config,
-        INCEPTION_FEATS_MODEL_NAME : inception_feats_config,
-        LOG_REG_MODEL_NAME : log_reg_config
+        #KERNEL_SVM_MODEL_NAME : kernel_svm_config,
+        INCEPTION_FEATS_MODEL_NAME : inception_feats_config
+        #LOG_REG_MODEL_NAME : log_reg_config
     }
 
     # Set up TFS nodes
