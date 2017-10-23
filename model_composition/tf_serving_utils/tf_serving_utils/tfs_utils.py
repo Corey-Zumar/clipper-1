@@ -135,10 +135,10 @@ def _start_serving(config, port_number, gpu_number, cpus):
 
 
 def _get_batching_params(max_batch_size, batch_timeout_micros=5000, max_enqueued_batches=4):
-    batching_params_text = ("max_batch_size \{ value : {mbs} \} \n"
-                            "batch_timeout_micros \{ value : {btm} \} \n"
-                            "max_enqueued_batches \{ value : {meb} \} \n"
-                            "num_batch_threads \{ value : {nbt} \} \n")
+    batching_params_text = ("max_batch_size {{ value : {mbs} }} \n"
+                            "batch_timeout_micros {{ value : {btm} }} \n"
+                            "max_enqueued_batches {{ value : {meb} }} \n"
+                            "num_batch_threads {{ value : {nbt} }} \n")
 
     num_batch_threads = max_batch_size * 2
 
