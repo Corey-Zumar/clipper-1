@@ -128,10 +128,10 @@ def _start_serving(config, port_number, gpu_number, cpus):
     subprocess.call(cmd_filter_gpus, shell=True)
     subprocess.call(cmd_serve, shell=True)
 
-    print("Started node! model name: {mn} port: {pn} gpu_num: {gpu} cpu_num: {cpu}".format(mn=config.name, 
+    print("Started node! model name: {mn} port: {pn} gpu_num: {gpu} cpus: {cpus}".format(mn=config.name, 
                                                                                            pn=port_number,
-                                                                                           gpu_number=gpu_number,
-                                                                                           cpu_number=cpu_number))
+                                                                                           gpu=gpu_number,
+                                                                                           cpus=cpus_str))
 
 
 def _get_batching_params(max_batch_size, batch_timeout_micros=5000, max_enqueued_batches=4):
