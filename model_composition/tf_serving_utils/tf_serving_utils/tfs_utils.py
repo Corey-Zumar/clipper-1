@@ -111,7 +111,7 @@ def _start_serving(config, port_number, cpus, gpu_number=None):
     batching_params_file.write(batching_params)
     batching_params_file.close()
 
-    cpus_str = ", ".join(["%d"] * len(cpus)) % tuple(cpus)
+    cpus_str = ",".join(["%d"] * len(cpus)) % tuple(cpus)
     cmd_filter_cpus = "numactl -C {cpus}".format(cpus=cpus_str)
 
     if gpu_number:
