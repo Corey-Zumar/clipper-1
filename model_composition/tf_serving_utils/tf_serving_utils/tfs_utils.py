@@ -80,7 +80,7 @@ def save_results(configs, client_metrics, results_dir, prefix="results"):
         json.dump(results_obj, f, indent=4)
         logger.info("Saved results to {}".format(results_file))
 
-def create_predict_request(model_name, data, signature_name="predict_images"):
+def create_predict_request(model_name, data, signature_name="predict_inputs"):
     request = predict_pb2.PredictRequest()
     request.model_spec.name = model_name
     request.model_spec.signature_name = signature_name
