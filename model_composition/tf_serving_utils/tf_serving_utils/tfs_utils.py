@@ -88,8 +88,10 @@ def create_predict_request(model_name, data, signature_name="predict_images"):
 
 def setup_heavy_node(config):
     for _ in range(config.num_replicas):
+        node_gpy = None
         if len(config.gpus) > 0:
             node_gpu = config.gpus.pop()
+
 
         node_cpus = []
         for _ in range(config.cpus_per_replica):
@@ -99,7 +101,7 @@ def setup_heavy_node(config):
 
         _start_serving(config, port_number, node_gpu, node_cpus)
 
-def _start_serving(config, port_number, gpu_number, cpus):
+def _start_serving(config, port_number, cpus, gpu_number=None):
     model_server_path = os.path.join(TFS_BASE_PATH, MODEL_SERVER_RELATIVE_PATH)
 
     batching_params = _get_batching_params(config.batch_size)
@@ -112,7 +114,10 @@ def _start_serving(config, port_number, gpu_number, cpus):
     cpus_str = ", ".join(["%d"] * len(cpus)) % tuple(cpus)
     cmd_filter_cpus = "numactl -C {cpus}".format(cpus=cpus_str)
 
-    cmd_filter_gpus = "export CUDA_VISIBLE_DEVICES={gpu}".format(gpu=gpu_number)
+    if gpu_number:
+        cmd_filter_gpus = "export CUDA_VISIBLE_DEVICES={gpu}".format(gpu=gpu_number)
+    else:
+        cmd_filter_gpus = "export CUDA_VISIBLE_DEVICES=''"
 
     cmd_serve = ("{cf} {msp} --enable_batching \\\n"
                 "--port {pn} \\\n"
@@ -126,6 +131,9 @@ def _start_serving(config, port_number, gpu_number, cpus):
                                                            bpf=batching_params_path)
 
     subprocess.call(cmd_filter_gpus, shell=True)
+
+    print(cmd_serve)
+
     subprocess.call(cmd_serve, shell=True)
 
     print("Started node! model name: {mn} port: {pn} gpu_num: {gpu} cpus: {cpus}".format(mn=config.name, 
