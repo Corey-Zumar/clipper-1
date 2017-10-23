@@ -282,7 +282,7 @@ class DriverBenchmarker(object):
 
     def run(self, num_trials, request_delay=.01):
         logger.info("Creating clients!")
-        clients = create_clients(configs)
+        clients = create_clients(self.configs)
 
         logger.info("Generating random inputs")
         base_inputs = [(self._get_resnet_input(), self._get_inception_input()) for _ in range(1000)]
