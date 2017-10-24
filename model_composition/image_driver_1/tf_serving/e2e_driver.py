@@ -194,10 +194,10 @@ class Predictor(object):
         def svm_continuation(svm_response):
             svm_classification = tfs_utils.parse_predict_response(svm_response, KERNEL_SVM_OUTPUT_KEY)
             classifications_lock.acquire()
-            # if LOG_REG_MODEL_NAME not in classifications:
-            #     classifications[KERNEL_SVM_MODEL_NAME] = svm_classification
-            # else:
-            update_perf_stats()
+            if LOG_REG_MODEL_NAME not in classifications:
+                classifications[KERNEL_SVM_MODEL_NAME] = svm_classification
+            else:
+                update_perf_stats()
             classifications_lock.release()
 
         def inception_feats_continuation(inception_response):
