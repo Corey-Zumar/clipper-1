@@ -86,7 +86,6 @@ def create_predict_request(model_name, data, signature_name="predict_inputs"):
     request.model_spec.name = model_name
     request.model_spec.signature_name = signature_name
     wrapped_data = np.array([data])
-    print("Wrapped shape: {}".format(wrapped_data.shape))
     request.inputs['inputs'].CopyFrom(tf.contrib.util.make_tensor_proto(wrapped_data, shape=wrapped_data.shape))
     return request
 

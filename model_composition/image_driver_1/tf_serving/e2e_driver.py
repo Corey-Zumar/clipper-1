@@ -136,8 +136,8 @@ class Predictor(object):
         self.trial_length = trial_length
         self.outstanding_reqs = {}
 
-        #self.resnet_client = clients[RESNET_152_MODEL_NAME]
-        #self.svm_client = clients[KERNEL_SVM_MODEL_NAME]
+        self.resnet_client = clients[RESNET_152_MODEL_NAME]
+        self.svm_client = clients[KERNEL_SVM_MODEL_NAME]
         self.inception_client = clients[INCEPTION_FEATS_MODEL_NAME]
         self.log_reg_client = clients[LOG_REG_MODEL_NAME]
 
@@ -163,7 +163,7 @@ class Predictor(object):
         thru = float(self.batch_num_complete) / (end_time - self.start_time).total_seconds()
         self.stats["thrus"].append(thru)
         self.stats["p99_lats"].append(p99)
-        self.stats["all_lats"] = self.stats["all_lats"] + self.latencies
+        self.stats["all_lats"].append(self.latencies)
         self.stats["mean_lats"].append(mean)
         logger.info("p99: {p99}, mean: {mean}, thruput: {thru}".format(p99=p99,
                                                                        mean=mean,
@@ -206,15 +206,15 @@ class Predictor(object):
         def log_reg_continuation(log_reg_response):
             log_reg_vals = tfs_utils.parse_predict_response(log_reg_response, LOG_REG_OUTPUT_KEY)
             classifications_lock.acquire()
-            # if KERNEL_SVM_MODEL_NAME not in classifications:
-            #     classifications[LOG_REG_MODEL_NAME] = log_reg_vals
-            # else:
-            update_perf_stats()
+            if KERNEL_SVM_MODEL_NAME not in classifications:
+                classifications[LOG_REG_MODEL_NAME] = log_reg_vals
+            else:
+                update_perf_stats()
             classifications_lock.release()
 
 
-        # resnet_request = tfs_utils.create_predict_request(RESNET_152_MODEL_NAME, resnet_input)
-        # self.resnet_client.predict(resnet_request, resnet_feats_continuation)
+        resnet_request = tfs_utils.create_predict_request(RESNET_152_MODEL_NAME, resnet_input)
+        self.resnet_client.predict(resnet_request, resnet_feats_continuation)
 
         inception_request = tfs_utils.create_predict_request(INCEPTION_FEATS_MODEL_NAME, inception_input)
         self.inception_client.predict(inception_request, inception_feats_continuation)
@@ -362,8 +362,8 @@ if __name__ == "__main__":
                                            allocated_cpus=[24,25])
 
     model_configs = {
-        #RESNET_152_MODEL_NAME : resnet_feats_config,
-        #KERNEL_SVM_MODEL_NAME : kernel_svm_config,
+        RESNET_152_MODEL_NAME : resnet_feats_config,
+        KERNEL_SVM_MODEL_NAME : kernel_svm_config,
         INCEPTION_FEATS_MODEL_NAME : inception_feats_config,
         LOG_REG_MODEL_NAME : log_reg_config
     }
