@@ -209,18 +209,18 @@ class Predictor(object):
         def log_reg_continuation(log_reg_response):
             log_reg_vals = tfs_utils.parse_predict_response(log_reg_response, LOG_REG_OUTPUT_KEY)
             classifications_lock.acquire()
-            # if KERNEL_SVM_MODEL_NAME not in classifications:
-            #     classifications[LOG_REG_MODEL_NAME] = log_reg_vals
-            # else:
-            update_perf_stats()
+            if KERNEL_SVM_MODEL_NAME not in classifications:
+                classifications[LOG_REG_MODEL_NAME] = log_reg_vals
+            else:
+                update_perf_stats()
             classifications_lock.release()
 
 
         resnet_request = tfs_utils.create_predict_request(RESNET_152_MODEL_NAME, resnet_input)
         self.resnet_client.predict(resnet_request, resnet_feats_continuation)
 
-        # inception_request = tfs_utils.create_predict_request(INCEPTION_FEATS_MODEL_NAME, inception_input)
-        # self.inception_client.predict(inception_request, inception_feats_continuation)
+        inception_request = tfs_utils.create_predict_request(INCEPTION_FEATS_MODEL_NAME, inception_input)
+        self.inception_client.predict(inception_request, inception_feats_continuation)
 
     def _get_resnet_request(self, resnet_input):
         """
@@ -335,7 +335,6 @@ if __name__ == "__main__":
     parser.add_argument('-rd', '--request_delay', type=float, default=.015, help="The delay, in seconds, between requests")
     parser.add_argument('-l', '--trial_length', type=int, default=10, help="The length of each trial, in number of requests")
     parser.add_argument('-n', '--num_clients', type=int, default=1, help='number of clients')
-    parser.add_argument('--setup', action="store_true", help='Setup TF-Serving cluster')
 
 
     args = parser.parse_args()
@@ -374,8 +373,7 @@ if __name__ == "__main__":
     }
 
     # Set up TFS nodes
-    if args.setup:
-        setup_heavy_nodes(model_configs)
+    setup_heavy_nodes(model_configs)
 
     time.sleep(10)
     queue = Queue()

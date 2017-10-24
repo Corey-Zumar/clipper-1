@@ -76,7 +76,7 @@ def save_results(configs, client_metrics, results_dir, prefix="results"):
         "client_metrics": client_metrics,
     }
     results_file = os.path.join(results_dir, "{prefix}-{ts:%y%m%d_%H%M%S}.json".format(
-        prefix=prefix, ts=datetime.datetime.now()))
+        prefix=prefix, ts=datetime.now()))
     with open(results_file, "w") as f:
         json.dump(results_obj, f, indent=4)
         logger.info("Saved results to {}".format(results_file))
