@@ -186,6 +186,8 @@ class Predictor(object):
 
         def resnet_feats_continuation(resnet_response):
             resnet_features = tfs_utils.parse_predict_response(resnet_response, RESNET_FEATS_OUTPUT_KEY)
+            # The SVM expects reduced dimensionality
+            resnet_features = resnet_features[0]
             request = tfs_utils.create_predict_request(KERNEL_SVM_MODEL_NAME, resnet_features)
             self.svm_client.predict(request, svm_continuation)
 
