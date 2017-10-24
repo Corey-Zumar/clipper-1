@@ -12,7 +12,7 @@ from Queue import Queue
 from threading import Thread, Lock
 
 REQUEST_QUEUE_POLLING_DELAY_SECONDS = .005
-REQUEST_TIME_OUT_SECONDS = 5
+REQUEST_TIME_OUT_SECONDS = 30
 
 class ReplicaAddress:
 

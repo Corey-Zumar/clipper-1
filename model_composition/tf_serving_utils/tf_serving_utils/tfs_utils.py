@@ -90,6 +90,10 @@ def create_predict_request(model_name, data, signature_name="predict_inputs"):
     request.inputs['inputs'].CopyFrom(tf.contrib.util.make_tensor_proto(wrapped_data, shape=wrapped_data.shape))
     return request
 
+def parse_predict_response(response, output_key):
+    outputs_tensor = response.outputs[output_key]
+    return tf.contrib.util.make_ndarray(outputs_tensor)
+
 def setup_heavy_node(config):
     gpus = list(config.gpus)
     cpus = list(config.allocated_cpus)

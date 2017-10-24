@@ -37,6 +37,11 @@ RESNET_152_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "resnet_tfserve")
 LOG_REG_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "log_reg_tfserve")
 KERNEL_SVM_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "kernel_svm_tfserve")
 
+INCEPTION_FEATS_OUTPUT_KEY = "feats"
+RESNET_FEATS_OUTPUT_KEY = "feats"
+KERNEL_SVM_OUTPUT_KEY = "outputs"
+LOG_REG_OUTPUT_KEY = "outputs"
+
 INCEPTION_PORTS = range(9500,9508)
 RESNET_152_PORTS = range(9508, 9516)
 LOG_REG_PORTS = range(9516, 9524)
@@ -58,7 +63,7 @@ def setup_heavy_nodes(configs):
     for config in configs.values():
         tfs_utils.setup_heavy_node(config)
     
-    time.sleep(60)
+    time.sleep(5)
 
 def create_clients(configs):
     """
@@ -179,11 +184,13 @@ class Predictor(object):
                 self.print_stats()
                 self.init_stats()
 
-        def resnet_feats_continuation(resnet_features):
+        def resnet_feats_continuation(resnet_response):
+            resnet_features = tfs_utils.parse_predict_response(resnet_response, RESNET_FEATS_OUTPUT_KEY)
             request = tfs_utils.create_predict_request(KERNEL_SVM_MODEL_NAME, resnet_features)
             self.svm_client.predict(request, svm_feats_continuation)
 
-        def svm_continuation(svm_classification):
+        def svm_continuation(svm_response):
+            svm_classification = tfs_utils.parse_predict_response(svm_response, KERNEL_SVM_OUTPUT_KEY)
             classifications_lock.acquire()
             if LOG_REG_MODEL_NAME not in classifications:
                 classifications[KERNEL_SVM_MODEL_NAME] = svm_classification
@@ -191,11 +198,13 @@ class Predictor(object):
                 update_perf_stats()
             classifications_lock.release()
 
-        def inception_feats_continuation(inception_features):
+        def inception_feats_continuation(inception_response):
+            inception_features = tfs_utils.parse_predict_response(inception_response, INCEPTION_FEATS_OUTPUT_KEY)
             request = tfs_utils.create_predict_request(LOG_REG_MODEL_NAME, inception_features)
             self.log_reg_client.predict(request, log_reg_continuation)
 
-        def log_reg_continuation(log_reg_vals):
+        def log_reg_continuation(log_reg_response):
+            log_reg_vals = tfs_utils.parse_predict_response(log_reg_response, LOG_REG_OUTPUT_KEY)
             classifications_lock.acquire()
             # if KERNEL_SVM_MODEL_NAME not in classifications:
             #     classifications[LOG_REG_MODEL_NAME] = log_reg_vals
