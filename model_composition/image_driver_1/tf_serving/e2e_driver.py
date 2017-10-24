@@ -131,8 +131,8 @@ class Predictor(object):
         self.trial_length = trial_length
         self.outstanding_reqs = {}
 
-        self.resnet_client = clients[RESNET_152_MODEL_NAME]
-        self.svm_client = clients[KERNEL_SVM_MODEL_NAME]
+        #self.resnet_client = clients[RESNET_152_MODEL_NAME]
+        #self.svm_client = clients[KERNEL_SVM_MODEL_NAME]
         self.inception_client = clients[INCEPTION_FEATS_MODEL_NAME]
         self.log_reg_client = clients[LOG_REG_MODEL_NAME]
 
