@@ -144,7 +144,7 @@ def _start_serving(config, port_number, cpus, gpu_number=None):
     full_cmd = "({cf};{cs}) &".format(cf=cmd_filter_gpus, cs=cmd_serve)
 
     print("Starting node! model name: {mn} port: {pn} gpu_num: {gpu} cpus: {cpus} \n\n\n"
-        .format(mn=config.name, 
+        .format(mn=config.name,
                 pn=port_number,
                 gpu=gpu_number,
                 cpus=cpus_str))
@@ -152,7 +152,7 @@ def _start_serving(config, port_number, cpus, gpu_number=None):
     subprocess.call(full_cmd, shell=True)
 
 
-def _get_batching_params(max_batch_size, batch_timeout_micros=5000, max_enqueued_batches=4):
+def _get_batching_params(max_batch_size, batch_timeout_micros=10000, max_enqueued_batches=4):
     batching_params_text = ("max_batch_size {{ value : {mbs} }} \n"
                             "batch_timeout_micros {{ value : {btm} }} \n"
                             "max_enqueued_batches {{ value : {meb} }} \n"

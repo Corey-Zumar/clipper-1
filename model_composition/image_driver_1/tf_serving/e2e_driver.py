@@ -62,7 +62,7 @@ def setup_heavy_nodes(configs):
 
     for config in configs.values():
         tfs_utils.setup_heavy_node(config)
-    
+
     time.sleep(5)
 
 def create_clients(configs):
@@ -194,32 +194,33 @@ class Predictor(object):
         def svm_continuation(svm_response):
             svm_classification = tfs_utils.parse_predict_response(svm_response, KERNEL_SVM_OUTPUT_KEY)
             classifications_lock.acquire()
-            if LOG_REG_MODEL_NAME not in classifications:
-                classifications[KERNEL_SVM_MODEL_NAME] = svm_classification
-            else:
-                update_perf_stats()
+            # if LOG_REG_MODEL_NAME not in classifications:
+            #     classifications[KERNEL_SVM_MODEL_NAME] = svm_classification
+            # else:
+            update_perf_stats()
             classifications_lock.release()
 
         def inception_feats_continuation(inception_response):
             inception_features = tfs_utils.parse_predict_response(inception_response, INCEPTION_FEATS_OUTPUT_KEY)
+            inception_features = inception_features[0][0][0]
             request = tfs_utils.create_predict_request(LOG_REG_MODEL_NAME, inception_features)
             self.log_reg_client.predict(request, log_reg_continuation)
 
         def log_reg_continuation(log_reg_response):
             log_reg_vals = tfs_utils.parse_predict_response(log_reg_response, LOG_REG_OUTPUT_KEY)
             classifications_lock.acquire()
-            if KERNEL_SVM_MODEL_NAME not in classifications:
-                classifications[LOG_REG_MODEL_NAME] = log_reg_vals
-            else:
-                update_perf_stats()
+            # if KERNEL_SVM_MODEL_NAME not in classifications:
+            #     classifications[LOG_REG_MODEL_NAME] = log_reg_vals
+            # else:
+            update_perf_stats()
             classifications_lock.release()
 
 
         resnet_request = tfs_utils.create_predict_request(RESNET_152_MODEL_NAME, resnet_input)
         self.resnet_client.predict(resnet_request, resnet_feats_continuation)
 
-        inception_request = tfs_utils.create_predict_request(INCEPTION_FEATS_MODEL_NAME, inception_input)
-        self.inception_client.predict(inception_request, inception_feats_continuation)
+        # inception_request = tfs_utils.create_predict_request(INCEPTION_FEATS_MODEL_NAME, inception_input)
+        # self.inception_client.predict(inception_request, inception_feats_continuation)
 
     def _get_resnet_request(self, resnet_input):
         """
@@ -322,7 +323,7 @@ class DriverBenchmarker(object):
 class RequestDelayConfig:
     def __init__(self, request_delay):
         self.request_delay = request_delay
-        
+
     def to_json(self):
         return json.dumps(self.__dict__)
 
@@ -334,31 +335,33 @@ if __name__ == "__main__":
     parser.add_argument('-rd', '--request_delay', type=float, default=.015, help="The delay, in seconds, between requests")
     parser.add_argument('-l', '--trial_length', type=int, default=10, help="The length of each trial, in number of requests")
     parser.add_argument('-n', '--num_clients', type=int, default=1, help='number of clients')
+    parser.add_argument('--setup', action="store_true", help='Setup TF-Serving cluster')
+
 
     args = parser.parse_args()
 
     resnet_feats_config = get_heavy_node_config(model_name=RESNET_152_MODEL_NAME,
-                                                batch_size=64,
+                                                batch_size=1,
                                                 num_replicas=1,
                                                 cpus_per_replica=2,
                                                 allocated_cpus=[14,15,16,17],
                                                 allocated_gpus=[0,1,2,3])
 
     kernel_svm_config = get_heavy_node_config(model_name=KERNEL_SVM_MODEL_NAME,
-                                              batch_size=32,
+                                              batch_size=1,
                                               num_replicas=1,
                                               cpus_per_replica=2,
                                               allocated_cpus=[18,19])
 
-    inception_feats_config = get_heavy_node_config(model_name=INCEPTION_FEATS_MODEL_NAME, 
-                                                   batch_size=20, 
-                                                   num_replicas=1, 
-                                                   cpus_per_replica=2, 
-                                                   allocated_cpus=[20,21,22,23], 
+    inception_feats_config = get_heavy_node_config(model_name=INCEPTION_FEATS_MODEL_NAME,
+                                                   batch_size=8,
+                                                   num_replicas=1,
+                                                   cpus_per_replica=2,
+                                                   allocated_cpus=[20,21,22,23],
                                                    allocated_gpus=[4,5,6,7])
 
     log_reg_config = get_heavy_node_config(model_name=LOG_REG_MODEL_NAME,
-                                           batch_size=1,
+                                           batch_size=16,
                                            num_replicas=1,
                                            cpus_per_replica=2,
                                            allocated_cpus=[24,25])
@@ -371,8 +374,10 @@ if __name__ == "__main__":
     }
 
     # Set up TFS nodes
-    setup_heavy_nodes(model_configs)
+    if args.setup:
+        setup_heavy_nodes(model_configs)
 
+    time.sleep(10)
     queue = Queue()
 
     procs = []
