@@ -66,5 +66,5 @@ class ResNet18Model(ModelBase):
         input_batch = Variable(torch.stack(inputs, dim=0))
         if torch.cuda.is_available():
             input_batch = input_batch.cuda()
-        logits = self.model(input_batch)
-        return logits
+        features = self.model(input_batch)
+        return features
