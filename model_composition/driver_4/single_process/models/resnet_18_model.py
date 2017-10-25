@@ -36,12 +36,12 @@ class ResNet18Model(ModelBase):
             std=[0.229, 0.224, 0.225]
         )
 
-        # self.preprocess = transforms.Compose([
-        #     transforms.Scale(256),
-        #     transforms.CenterCrop(224),
-        #     transforms.ToTensor(),
-        #     normalize
-        # ])
+        self.preprocess = transforms.Compose([
+            transforms.Scale(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize
+        ])
 
     def predict(self, inputs):
         start = datetime.now()
@@ -84,15 +84,15 @@ class ResNet18Model(ModelBase):
     #     logger.info("BATCH TOOK %f seconds" % (end - start).total_seconds())
     #     return outputs
 
-    # def _predict_raw(self, input_arrs):
-    #     inputs = []
-    #     for i in input_arrs:
-    #         img = Image.fromarray(i, mode="RGB")
-    #         inputs.append(self.preprocess(img))
-    #     input_batch = Variable(torch.stack(inputs, dim=0))
-    #     if torch.cuda.is_available():
-    #         input_batch = input_batch.cuda()
-    #     logits = self.model(input_batch)
-    #     maxes, arg_maxes = torch.max(logits, dim=1)
-    #     pred_classes = arg_maxes.squeeze().data.cpu().numpy()
-    #     return pred_classes
+    def _predict_raw(self, input_arrs):
+        inputs = []
+        for i in input_arrs:
+            img = Image.fromarray(i, mode="RGB")
+            inputs.append(self.preprocess(img))
+        input_batch = Variable(torch.stack(inputs, dim=0))
+        if torch.cuda.is_available():
+            input_batch = input_batch.cuda()
+        logits = self.model(input_batch)
+        maxes, arg_maxes = torch.max(logits, dim=1)
+        pred_classes = arg_maxes.squeeze().data.cpu().numpy()
+        return pred_classes
