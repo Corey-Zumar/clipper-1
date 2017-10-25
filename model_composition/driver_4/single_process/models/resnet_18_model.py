@@ -67,6 +67,4 @@ class ResNet18Model(ModelBase):
         if torch.cuda.is_available():
             input_batch = input_batch.cuda()
         logits = self.model(input_batch)
-        maxes, arg_maxes = torch.max(logits, dim=1)
-        pred_classes = arg_maxes.squeeze().data.cpu().numpy()
-        return pred_classes
+        return logits
