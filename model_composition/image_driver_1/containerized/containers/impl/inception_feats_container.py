@@ -49,8 +49,6 @@ class InceptionFeaturizationContainer(rpc.ModelContainerBase):
             node.device = ""
 
         with tf.device("/gpu:0"):
-            # Create placeholder for an arbitrary number
-            # of byte-encoded JPEG images
             images_tensor = tf.placeholder(tf.float32, shape=[None,299,299,3])
             tf.import_graph_def(graph_def, name='', input_map={ "ResizeBilinear:0" : images_tensor})
 
