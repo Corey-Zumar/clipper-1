@@ -41,8 +41,15 @@ class TfLstmContainer(rpc.ModelContainerBase):
             self.input_data : inputs_matrix
         }
 
-        sentiment_preds = self.sess.run(self.sentiment_preds, feed_dict=feed_dict)
-        return [np.array(pred, dtype=np.float32) for pred in sentiment_preds]
+        sentiment_scores = self.sess.run(self.sentiment_scores, feed_dict=feed_dict)
+        outputs = []
+        for pos_score, neg_score in sentiment_scores:
+            if pos_score >= neg_score:
+                outputs.append(1)
+            else:
+                outputs.append(0)
+
+        return [np.array(output, dtype=np.float32) for output in outputs]
 
     def _get_inputs_matrix(self, inputs):
         """ 
@@ -87,9 +94,9 @@ class TfLstmContainer(rpc.ModelContainerBase):
             value = tf.transpose(value, [1, 0, 2])
             last = tf.gather(value, int(value.get_shape()[0]) - 1)
             
-            sentiment_preds = tf.matmul(last, weight) + bias
+            sentiment_scores = tf.matmul(last, weight) + bias
 
-        return sess, input_data, sentiment_preds
+        return sess, input_data, sentiment_scores
 
 if __name__ == "__main__":
     print("Starting TF Language Detection Container!")
