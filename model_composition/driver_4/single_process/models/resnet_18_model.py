@@ -3,6 +3,7 @@ import os
 import sys
 import numpy as np
 import torch
+import torch.nn as nn
 from torchvision import models, transforms
 from torch.autograd import Variable
 from PIL import Image
@@ -24,6 +25,8 @@ class ResNet18Model(ModelBase):
 
         self.model = models.resnet18(pretrained=True)
 
+        self.model = nn.Sequential(*list(self.model.children())[:-1])
+
         if torch.cuda.is_available():
             self.model.cuda()
 
@@ -35,8 +38,8 @@ class ResNet18Model(ModelBase):
             mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225]
         )
-
         self.preprocess = transforms.Compose([
+
             transforms.Scale(256),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
@@ -54,35 +57,6 @@ class ResNet18Model(ModelBase):
         end = datetime.now()
         logger.info("BATCH TOOK %f seconds" % (end - start).total_seconds())
         return outputs
-
-    # def predict_doubles(self, inputs):
-    #     start = datetime.now()
-    #     input_arrs = []
-    #     for t in inputs:
-    #         i = t.reshape(self.height, self.width, 3)
-    #         input_arrs.append(i)
-    #     pred_classes = self._predict_raw(input_arrs)
-    #     outputs = [str(l) for l in pred_classes]
-    #     end = datetime.now()
-    #     logger.info("BATCH TOOK %f seconds" % (end - start).total_seconds())
-    #     return outputs
-
-    # def predict_floats(self, inputs):
-    #     return self.predict_doubles(inputs)
-
-    # def predict_bytes(self, inputs):
-    #     start = datetime.now()
-    #     input_arrs = []
-    #     for byte_arr in inputs:
-    #         t = np.frombuffer(byte_arr, dtype=np.float32)
-    #         i = t.reshape(self.height, self.width, 3)
-    #         input_arrs.append(i)
-    #     pred_classes = self._predict_raw(input_arrs)
-    #     outputs = [str(l) for l in pred_classes]
-    #     logger.debug("Outputs: {}".format(outputs))
-    #     end = datetime.now()
-    #     logger.info("BATCH TOOK %f seconds" % (end - start).total_seconds())
-    #     return outputs
 
     def _predict_raw(self, input_arrs):
         inputs = []
