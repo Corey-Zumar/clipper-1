@@ -99,7 +99,7 @@ class TfLstmContainer(rpc.ModelContainerBase):
         return sess, input_data, sentiment_scores
 
 if __name__ == "__main__":
-    print("Starting TF Language Detection Container!")
+    print("Starting TF Lstm Container!")
     try:
         model_name = os.environ["CLIPPER_MODEL_NAME"]
     except KeyError:
