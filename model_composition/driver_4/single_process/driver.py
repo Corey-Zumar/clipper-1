@@ -25,7 +25,7 @@ MODELS_DIR = os.path.join(CURR_DIR, "models")
 RESNET_MODEL_NAME = "resnet_18"
 KERNEL_SVM_MODEL_NAME = "kernel_svm"
 
-KERNEL_SVM_MODEL_PATH = os.path.join(MODELS_DIR, "kernel_svm_model_path", "kernel_svm_trained.sav")
+KERNEL_SVM_MODEL_PATH = os.path.join(MODELS_DIR, "kernel_svm_model_data", "kernel_svm_trained.sav")
 
 ########## Setup ##########
 
