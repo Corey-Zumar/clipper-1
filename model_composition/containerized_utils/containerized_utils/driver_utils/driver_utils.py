@@ -109,7 +109,7 @@ def save_results(configs, clipper_conn, client_metrics, results_dir, prefix="res
         logger.info("Saved results to {}".format(results_file))
 
 
-def check_convergence(stats, configs):
+def check_convergence(stats, configs, latency_upper_bound=None):
     """
     Returns
     -------
@@ -124,6 +124,7 @@ def check_convergence(stats, configs):
     """
     window_size = min(15, len(stats["p99_lats"]) - 1)
     p99_lats = stats["p99_lats"][-1*window_size:]
+
     mean_batch_sizes = {}
     for c in configs:
         mean_batch_sizes[c.name] = np.mean([b[c.name] for b in stats["mean_batch_sizes"][-1*window_size:]])
@@ -145,7 +146,14 @@ def check_convergence(stats, configs):
         # than
         # configured batch size.
 
-        # If any of the nodes batch sizes are set to 1 and we have a slope of 0, we've converged.
+        if latency_upper_bound is not None:
+            mean_p99_lats = np.mean(p99_lats)
+            if mean_p99_lats > latency_upper_bound:
+                logger.info("Slope is 0 but p99 latency ({lat} s) is too high for node {name}.".format(
+                    lat=mean_p99_lats, name=c.name))
+                return CONVERGED_HIGH
+
+        # If any of the nodes batch sizes are set to 1, skip the batch size check
         for c in configs:
             if c.batch_size == 1.0:
                 return CONVERGED

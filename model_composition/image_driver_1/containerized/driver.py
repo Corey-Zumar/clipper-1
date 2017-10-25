@@ -11,7 +11,10 @@ from datetime import datetime
 from PIL import Image
 from containerized_utils.zmq_client import Client
 from containerized_utils import driver_utils
+from containerized_utils.driver_utils import INCREASING, DECREASING, CONVERGED_HIGH, CONVERGED, UNKNOWN
 from multiprocessing import Process, Queue
+
+
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -95,7 +98,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
-                                            use_nvidia_docker=True)
+                                            use_nvidia_docker=True,
+                                            no_diverge=True)
 
     elif model_name == INCEPTION_FEATS_MODEL_APP_NAME:
         if not cpus_per_replica:
@@ -113,7 +117,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
-                                            use_nvidia_docker=True)
+                                            use_nvidia_docker=True,
+                                            no_diverge=True)
 
     elif model_name == VGG_KPCA_SVM_MODEL_APP_NAME:
         if not cpus_per_replica:
@@ -130,7 +135,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             cpus_per_replica=cpus_per_replica,
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
-                                            num_replicas=num_replicas)
+                                            num_replicas=num_replicas,
+                                            no_diverge=True)
 
     elif model_name == VGG_KERNEL_SVM_MODEL_APP_NAME:
         if not cpus_per_replica:
@@ -147,7 +153,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
-                                            use_nvidia_docker=False)
+                                            use_nvidia_docker=False,
+                                            no_diverge=True)
 
     elif model_name == VGG_ELASTIC_NET_MODEL_APP_NAME:
         if not cpus_per_replica:
@@ -164,7 +171,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
-                                            use_nvidia_docker=False)       
+                                            use_nvidia_docker=False,
+                                            no_diverge=True)     
 
 
     elif model_name == LGBM_MODEL_APP_NAME:
@@ -183,7 +191,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
-                                            use_nvidia_docker=False)
+                                            use_nvidia_docker=False,
+                                            no_diverge=True)
 
     elif model_name == TF_KERNEL_SVM_MODEL_APP_NAME:
         if not cpus_per_replica:
@@ -191,7 +200,7 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
         if not allocated_cpus:
             allocated_cpus = [20]
         if not allocated_gpus:
-            allocated_gpus = [1]
+            allocated_gpus = []
 
         return driver_utils.HeavyNodeConfig(name=TF_KERNEL_SVM_MODEL_APP_NAME,
                                             input_type="floats",
@@ -201,7 +210,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
-                                            use_nvidia_docker=True)
+                                            use_nvidia_docker=True,
+                                            no_diverge=True)
 
     elif model_name == TF_LOG_REG_MODEL_APP_NAME:
         if not cpus_per_replica:
@@ -209,7 +219,7 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
         if not allocated_cpus:
             allocated_cpus = [20]
         if not allocated_gpus:
-            allocated_gpus = [1]
+            allocated_gpus = []
 
         return driver_utils.HeavyNodeConfig(name=TF_LOG_REG_MODEL_APP_NAME,
                                             input_type="floats",
@@ -219,7 +229,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
-                                            use_nvidia_docker=True)
+                                            use_nvidia_docker=True,
+                                            no_diverge=True)
 
     elif model_name == TF_RESNET_MODEL_APP_NAME:
         if not cpus_per_replica:
@@ -237,14 +248,15 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
-                                            use_nvidia_docker=True)
+                                            use_nvidia_docker=True,
+                                            no_diverge=True)
 
 
 ########## Benchmarking ##########
 
 class Predictor(object):
 
-    def __init__(self):
+    def __init__(self, clipper_metrics):
         self.outstanding_reqs = {}
         self.client = Client(CLIPPER_ADDRESS, CLIPPER_SEND_PORT, CLIPPER_RECV_PORT)
         self.client.start()
@@ -256,6 +268,12 @@ class Predictor(object):
             "all_lats": [],
         }
         self.total_num_complete = 0
+        self.cl = ClipperConnection(DockerContainerManager(redis_port=6380))
+        self.cl.connect()
+        self.get_clipper_metrics = clipper_metrics
+        if self.get_clipper_metrics:
+            self.stats["all_metrics"] = []
+            self.stats["mean_batch_sizes"] = []
 
     def init_stats(self):
         self.latencies = []
@@ -272,10 +290,20 @@ class Predictor(object):
         self.stats["thrus"].append(thru)
         self.stats["p99_lats"].append(p99)
         self.stats["mean_lats"].append(mean)
-        self.stats["all_lats"] += self.latencies
-        logger.info("p99: {p99}, mean: {mean}, thruput: {thru}".format(p99=p99,
-                                                                       mean=mean,
-                                                                       thru=thru))
+        self.stats["all_lats"].append(self.latencies)
+        if self.get_clipper_metrics:
+            metrics = self.cl.inspect_instance()
+            batch_sizes = get_batch_sizes(metrics)
+            self.stats["mean_batch_sizes"].append(batch_sizes)
+            self.stats["all_metrics"].append(metrics)
+            logger.info(("p99: {p99}, mean: {mean}, thruput: {thru}, "
+                         "batch_sizes: {batches}").format(p99=p99, mean=mean, thru=thru,
+                                                          batches=json.dumps(
+                                                              batch_sizes, sort_keys=True)))
+        else:
+            logger.info("p99: {p99}, mean: {mean}, thruput: {thru}".format(p99=p99,
+                                                                           mean=mean,
+                                                                           thru=thru))
 
     def predict(self, model_app_name, input_item):
         begin_time = datetime.now()
@@ -298,24 +326,80 @@ class ModelBenchmarker(object):
         self.config = config
         self.queue = queue
         self.input_generator_fn = self._get_input_generator_fn(model_app_name=self.config.name)
-
-    def run(self, duration_seconds=120):
         logger.info("Generating random inputs")
-        inputs = [self.input_generator_fn() for _ in range(10000)]
-        logger.info("Starting predictions")
-        start_time = datetime.now()
-        predictor = Predictor()
-        for input_item in inputs:
-            predictor.predict(model_app_name=self.config.name, input_item=input_item)
-            # time.sleep(0.005)
-            time.sleep(0)
-        while True:
-            curr_time = datetime.now()
-            if ((curr_time - start_time).total_seconds() > duration_seconds) or (predictor.total_num_complete == 10000):
-                break
-            time.sleep(1)
+        base_inputs = [self.input_generator_fn() for _ in range(1000)]
+        self.inputs = [i for _ in range(60) for i in base_inputs]
 
-        self.queue.put(predictor.stats)
+    def run(self, client_num=0):
+        assert client_num == 0
+        self.initialize_request_rate()
+        self.find_steady_state()
+        return
+
+    # start with an overly aggressive request rate
+    # then back off
+    def initialize_request_rate(self):
+        # initialize delay to be very small
+        self.delay = 0.001
+        setup_clipper(self.config)
+        time.sleep(5)
+        predictor = Predictor(clipper_metrics=True)
+        idx = 0
+        while len(predictor.stats["thrus"]) < 5:
+            predictor.predict(model_app_name=self.config.name, input_item=self.inputs[idx])
+            time.sleep(self.delay)
+            idx += 1
+            idx = idx % len(self.inputs)
+
+        max_thruput = np.mean(predictor.stats["thrus"][1:])
+        self.delay = 1.0 / max_thruput
+        logger.info("Initializing delay to {}".format(self.delay))
+
+    def increase_delay(self):
+        if self.delay < 0.005:
+            self.delay += 0.0002
+        else:
+            self.delay += 0.0005
+
+    def find_steady_state(self):
+        setup_clipper(self.config)
+        time.sleep(7)
+        predictor = Predictor(clipper_metrics=True)
+        idx = 0
+        done = False
+        # start checking for steady state after 7 trials
+        last_checked_length = 6
+        while not done:
+            predictor.predict(model_app_name=self.config.name, input_item=self.inputs[idx])
+            time.sleep(self.delay)
+            idx += 1
+            idx = idx % len(self.inputs)
+
+            if len(predictor.stats["thrus"]) > last_checked_length:
+                last_checked_length = len(predictor.stats["thrus"]) + 4
+                convergence_state = driver_utils.check_convergence(predictor.stats, [self.config])
+                # Diverging, try again with higher
+                # delay
+                if convergence_state == INCREASING or convergence_state == CONVERGED_HIGH:
+                    self.increase_delay()
+                    logger.info("Increasing delay to {}".format(self.delay))
+                    done = True
+                    return self.find_steady_state()
+                elif convergence_state == CONVERGED:
+                    logger.info("Converged with delay of {}".format(self.delay))
+                    done = True
+                    self.queue.put(predictor.stats)
+                    return
+                elif len(predictor.stats) > 100:
+                    self.increase_delay()
+                    logger.info("Increasing delay to {}".format(self.delay))
+                    done = True
+                    return self.find_steady_state()
+                elif convergence_state == DECREASING or convergence_state == UNKNOWN:
+                    logger.info("Not converged yet. Still waiting")
+                else:
+                    logger.error("Unknown convergence state: {}".format(convergence_state))
+                    sys.exit(1)
 
     def _get_vgg_feats_input(self):
         input_img = np.array(np.random.rand(224, 224, 3) * 255, dtype=np.float32)
@@ -359,7 +443,6 @@ class ModelBenchmarker(object):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Clipper image driver 1')
-    parser.add_argument('-d', '--duration', type=int, default=120, help='The maximum duration of the benchmarking process in seconds, per iteration')
     parser.add_argument('-m', '--model_name', type=str, help="The name of the model to benchmark. One of: 'vgg', 'kpca-svm', 'kernel-svm', 'elastic-net', 'inception', 'lgbm', 'tf-kernel-svm', 'tf-log-reg', 'tf-resnet-feats'")
     parser.add_argument('-b', '--batch_sizes', type=int, nargs='+', help="The batch size configurations to benchmark for the model. Each configuration will be benchmarked separately.")
     parser.add_argument('-r', '--num_replicas', type=int, nargs='+', help="The replica number configurations to benchmark for the model. Each configuration will be benchmarked separately.")
@@ -391,14 +474,13 @@ if __name__ == "__main__":
                                                      cpus_per_replica=cpus_per_replica,
                                                      allocated_cpus=args.model_cpus,                               
                                                      allocated_gpus=args.model_gpus)
-                setup_clipper(model_config)
                 queue = Queue()
                 benchmarker = ModelBenchmarker(model_config, queue)
 
                 processes = []
                 all_stats = []
-                for _ in range(args.num_clients):
-                    p = Process(target=benchmarker.run, args=(args.duration,))
+                for client_num in range(args.num_clients):
+                    p = Process(target=benchmarker.run, args=(client_num,))
                     p.start()
                     processes.append(p)
                 for p in processes:

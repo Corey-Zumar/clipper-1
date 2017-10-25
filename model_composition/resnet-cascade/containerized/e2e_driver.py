@@ -217,7 +217,7 @@ class Predictor(object):
 
 
 class ModelBenchmarker(object):
-    def __init__(self, configs, queue, client_num):
+    def __init__(self, configs, queue, client_num, latency_upper_bound):
         self.configs = configs
         self.queue = queue
         assert client_num == 0
@@ -225,6 +225,7 @@ class ModelBenchmarker(object):
         logger.info("Generating random inputs")
         base_inputs = [np.array(np.random.rand(299*299*3), dtype=np.float32) for _ in range(1000)]
         self.inputs = [i for _ in range(60) for i in base_inputs]
+        self.latency_upper_bound = latency_upper_bound
 
     # start with an overly aggressive request rate
     # then back off
@@ -242,14 +243,17 @@ class ModelBenchmarker(object):
             idx = idx % len(self.inputs)
 
         max_thruput = np.mean(predictor.stats["thrus"][1:])
-        self.delay = 1.0 / max_thruput - 0.0005
+        self.delay = 1.0 / max_thruput
         logger.info("Initializing delay to {}".format(self.delay))
 
     def increase_delay(self):
         if self.delay < 0.005:
             self.delay += 0.0002
-        else:
+        elif self.delay < 0.01:
             self.delay += 0.0005
+        else:
+            self.delay += 0.001
+
 
     def find_steady_state(self):
         setup_clipper(self.configs)
@@ -267,7 +271,7 @@ class ModelBenchmarker(object):
 
             if len(predictor.stats["thrus"]) > last_checked_length:
                 last_checked_length = len(predictor.stats["thrus"]) + 4
-                convergence_state = driver_utils.check_convergence(predictor.stats, self.configs)
+                convergence_state = driver_utils.check_convergence(predictor.stats, self.configs, self.latency_upper_bound)
                 # Diverging, try again with higher
                 # delay
                 if convergence_state == INCREASING or convergence_state == CONVERGED_HIGH:
@@ -307,9 +311,11 @@ if __name__ == "__main__":
 
     queue = Queue()
 
-    alex_batch = 35
-    res50_batch = 27
-    res152_batch = 14
+    alex_batch = 1
+    res50_batch = 1
+    res152_batch = 1
+
+    latency_upper_bound = 0.300
 
     # alexnet_reps = 1
     # res50_reps = 1
@@ -350,7 +356,8 @@ if __name__ == "__main__":
                          allocated_gpus=get_gpus(res152_reps))
         ]
 
-        benchmarker = ModelBenchmarker(configs, queue, 0)
+        client_num = 0
+        benchmarker = ModelBenchmarker(configs, queue, client_num, latency_upper_bound)
         p = Process(target=benchmarker.run)
         p.start()
 
@@ -361,8 +368,8 @@ if __name__ == "__main__":
         cl = ClipperConnection(DockerContainerManager(redis_port=6380))
         cl.connect()
         fname = "alex_{}-r50_{}-r152_{}".format(alexnet_reps, res50_reps, res152_reps)
-        driver_utils.save_results(configs, cl, all_stats, "e2e_max_thru_resnet-cascade", prefix=fname)
-        # driver_utils.save_results(configs, cl, all_stats, "e2e_min_lat_resnet-cascade", prefix=fname)
+        # driver_utils.save_results(configs, cl, all_stats, "e2e_max_thru_resnet-cascade", prefix=fname)
+        driver_utils.save_results(configs, cl, all_stats, "e2e_min_lat_resnet-cascade", prefix=fname)
         # driver_utils.save_results(configs, cl, all_stats, "e2e_500_slo_resnet-cascade", prefix=fname)
         # driver_utils.save_results(configs, cl, all_stats,
         #                           "e2e_alex_no_gpu_resnet-cascade", prefix=fname)

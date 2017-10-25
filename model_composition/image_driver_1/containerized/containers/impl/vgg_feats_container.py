@@ -22,9 +22,11 @@ class VggFeaturizationContainer:
         np.float32, outputs a corresponding list of numpy arrays, each of 
         which is a featurized image
         """
-        reshaped_inputs = [input_item.reshape(224,224,3) for input_item in inputs]
-        all_img_features = self._get_image_features(reshaped_inputs)
-        return [np.array(item, dtype=np.float32) for item in all_img_features]
+        time.sleep(.444)
+        # reshaped_inputs = [input_item.reshape(224,224,3) for input_item in inputs]
+        # all_img_features = self._get_image_features(reshaped_inputs)
+        # return [np.array(item, dtype=np.float32) for item in all_img_features]
+        return [np.array(np.random.rand(4096), dtype=np.float32) for item in inputs]
 
     def _load_vgg_model(self, vgg_model_path):
         vgg_file = open(vgg_model_path, mode='rb')
