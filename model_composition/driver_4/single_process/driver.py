@@ -110,16 +110,10 @@ class Predictor(object):
 
         begin_time = datetime.now()
 
-        # resnet_svm_future = self.thread_pool.submit(
-        #     lambda inputs : self.kernel_svm_model.predict(self.resnet_model.predict(inputs)), resnet_inputs)
+        resnet_svm_future = self.thread_pool.submit(
+            lambda inputs : self.kernel_svm_model.predict(np.array(self.resnet_model.predict(inputs)), resnet_inputs))
 
-        resnet_future = self.thread_pool.submit(self.resnet_model.predict, resnet_inputs)
-
-        resnet_outs = resnet_future.result()
-        print(resnet_outs)
-        print(resnet_outs.shape)
-
-        # resnet_svm_classes = resnet_svm_future.result()
+        resnet_svm_classes = resnet_svm_future.result()
 
         end_time = datetime.now()
 
