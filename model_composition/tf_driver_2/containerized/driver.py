@@ -114,9 +114,20 @@ def get_heavy_node_config(model_name,
 
 ########## Benchmarking ##########
 
+def get_batch_sizes(metrics_json):
+    hists = metrics_json["histograms"]
+    mean_batch_sizes = {}
+    for h in hists:
+        if "batch_size" in h.keys()[0]:
+            name = h.keys()[0]
+            model = name.split(":")[1]
+            mean = h[name]["mean"]
+            mean_batch_sizes[model] = round(float(mean), 2)
+    return mean_batch_sizes
+
 class Predictor(object):
 
-    def __init__(self):
+    def __init__(self, config, clipper_metrics):
         self.outstanding_reqs = {}
         self.client = Client(CLIPPER_ADDRESS, CLIPPER_SEND_PORT, CLIPPER_RECV_PORT)
         self.client.start()
@@ -127,6 +138,12 @@ class Predictor(object):
             "p99_lats": [],
             "mean_lats": []}
         self.total_num_complete = 0
+        self.cl = ClipperConnection(DockerContainerManager(redis_port=6380))
+        self.cl.connect()
+        self.get_clipper_metrics = clipper_metrics
+        if self.get_clipper_metrics:
+            self.stats["all_metrics"] = []
+            self.stats["mean_batch_sizes"] = []
 
     def init_stats(self):
         self.latencies = []
@@ -144,9 +161,19 @@ class Predictor(object):
         self.stats["all_lats"] = self.stats["all_lats"] + self.latencies
         self.stats["p99_lats"].append(p99)
         self.stats["mean_lats"].append(mean)
-        logger.info("p99: {p99}, mean: {mean}, thruput: {thru}".format(p99=p99,
-                                                                       mean=mean,
-                                                                       thru=thru))
+        if self.get_clipper_metrics:
+            metrics = self.cl.inspect_instance()
+            batch_sizes = get_batch_sizes(metrics)
+            self.stats["mean_batch_sizes"].append(batch_sizes)
+            self.stats["all_metrics"].append(metrics)
+            logger.info(("p99: {p99}, mean: {mean}, thruput: {thru}, "
+                         "batch_sizes: {batches}").format(p99=p99, mean=mean, thru=thru,
+                                                          batches=json.dumps(
+                                                              batch_sizes, sort_keys=True)))
+        else:
+            logger.info("p99: {p99}, mean: {mean}, thruput: {thru}".format(p99=p99,
+                                                                           mean=mean,
+                                                                           thru=thru))
 
     def predict(self, model_app_name, input_item):
         begin_time = datetime.now()
@@ -168,8 +195,10 @@ class ModelBenchmarker(object):
     def __init__(self, config, queue, input_length=20):
         self.config = config
         self.queue = queue
-        self.input_generator_fn = self._get_input_generator_fn(model_app_name=self.config.name, input_length=input_length)
+        self.load_text_fn = self._get_load_text_fn(model_app_name=self.config.name)
         self.loaded_docs = False
+        base_inputs = self._gen_inputs(num_inputs=1000, input_length=input_length)
+        self.inputs = [i for _ in range(40) for i in base_inputs]
 
     def run(self, client_num=0):
         assert client_num == 0
@@ -242,16 +271,16 @@ class ModelBenchmarker(object):
                     logger.error("Unknown convergence state: {}".format(convergence_state))
                     sys.exit(1)
 
-    def _gen_docs_inputs(self, num_inputs=1000, input_length=20):
-        if not self.loaded_docs:
-            self.doc_text = self._load_doc_text()
-            self.loaded_docs = True
+    def _gen_inputs(self, num_inputs=1000, input_length=20):
+        if not self.loaded_text:
+            self.text = self.load_text_fn()
+            self.loaded_text = True
 
         inputs = []
         num_gen_inputs = 0
         while num_gen_inputs < num_inputs:
-            idx = np.random.randint(len(self.doc_text))
-            text = self.doc_text[idx]
+            idx = np.random.randint(len(self.text))
+            text = self.text[idx]
             words = text.split()
             if len(words) < input_length:
                 expansion_factor = int(math.ceil(float(input_length)/len(text)))
@@ -263,16 +292,7 @@ class ModelBenchmarker(object):
 
         return inputs
 
-    def _gen_nmt_inputs(self, num_inputs, input_length=20):
-        return
-
-    def _gen_detect_inputs(self, num_inputs, input_length=20):
-        return
-
-    def _gen_lstm_inputs(self, num_inputs, input_length=20):
-        return
-
-    def _load_text(self):
+    def _get_load_text_fn(self):
         if self.model_app_name == NMT_MODEL_APP_NAME:
             return self._load_nmt_text
 
@@ -302,16 +322,6 @@ class ModelBenchmarker(object):
         lstm_text = lstm_data_file.readlines()
         np.random.shuffle(lstm_text)
         return lstm_text
-
-    def _get_input_generator_fn(self, model_app_name, input_length=20):
-        if model_app_name == NMT_MODEL_APP_NAME:
-            return lambda num_inputs : self._gen_nmt_inputs(num_inputs=num_inputs, input_length=input_length)
-
-        elif model_app_name == LANG_DETECT_MODEL_APP_NAME:
-            return lambda num_inputs : self._gen_detect_inputs(num_inputs=num_inputs, input_length=input_length)
-
-        elif model_app_name == LSTM_MODEL_APP_NAME:
-            return lambda num_inputs : self._gen_lstm_inputs(num_inputs=num_inputs, input_length=input_length)
 
 class InputLengthConfig:
     def __init__(self, input_length):
