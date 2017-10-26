@@ -81,7 +81,7 @@ class TfLstmContainer(rpc.ModelContainerBase):
         with tf.device("/gpu:0"):
             input_data = tf.placeholder(tf.int32, [None, MAX_SEQ_LENGTH])
 
-            data = tf.nn.embedding_lookup(self.vocabulary.get_word_vecs, input_data)
+            data = tf.nn.embedding_lookup(self.vocabulary.get_word_vecs(), input_data)
 
             lstm_cell = tf.contrib.rnn.BasicLSTMCell(LSTM_UNITS)
             lstm_cell = tf.contrib.rnn.DropoutWrapper(cell=lstm_cell, output_keep_prob=0.25)
