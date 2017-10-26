@@ -217,7 +217,7 @@ if __name__ == "__main__":
     parser.add_argument('-b',  '--batch_sizes', type=int, nargs='+', help="The batch size configurations to benchmark for the driver. Each configuration will be benchmarked separately.")
     parser.add_argument('-c',  '--cpus', type=int, nargs='+', help="The set of cpu cores on which to run the single process driver")
     parser.add_argument('-lg',  '--lstm_gpu', type=int, default=0, help="The GPU on which to run the Tensorflow LSTM")
-    parser.add_argument('-ng',  '--lstm_gpu', type=int, default=1, help="The GPU on which to run the NMT model")
+    parser.add_argument('-ng',  '--nmt_gpu', type=int, default=1, help="The GPU on which to run the NMT model")
     parser.add_argument('-t',  '--num_trials', type=int, default=15, help="The number of trials to run")
     parser.add_argument('-tl', '--trial_length', type=int, default=200, help="The length of each trial, in requests")
     parser.add_argument('-p',  '--process_number', type=int, default=0)
