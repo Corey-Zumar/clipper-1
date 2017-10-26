@@ -12,6 +12,7 @@ from clipper_admin import ClipperConnection, DockerContainerManager
 from datetime import datetime
 from containerized_utils.zmq_client import Client
 from containerized_utils import driver_utils
+from containerized_utils.driver_utils import INCREASING, DECREASING, CONVERGED_HIGH, CONVERGED, UNKNOWN
 from multiprocessing import Process, Queue
 
 CURR_DIR = os.path.dirname(os.path.realpath(__file__))
