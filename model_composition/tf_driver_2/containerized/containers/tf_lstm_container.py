@@ -27,7 +27,7 @@ class TfLstmContainer(rpc.ModelContainerBase):
 
     def __init__(self, vocab_dir_path):
         self.vocabulary = Vocabulary(vocab_dir_path)
-        self.sess, self.input_data, self.sentiment_preds = self._create_model_graph()
+        self.sess, self.input_data, self.sentiment_scores = self._create_model_graph()
 
     def predict_bytes(self, inputs):
         """

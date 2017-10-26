@@ -36,7 +36,7 @@ class TfLstm(ModelBase):
         checkpoint_dir_path = os.path.join(model_data_path, CHECKPOINT_RELATIVE_PATH)
 
         self.vocabulary = Vocabulary(vocab_dir_path)
-        self.sess, self.input_data, self.sentiment_preds = self._create_model_graph(gpu_num)
+        self.sess, self.input_data, self.sentiment_scores = self._create_model_graph(gpu_num)
 
     def predict(self, inputs):
         """
