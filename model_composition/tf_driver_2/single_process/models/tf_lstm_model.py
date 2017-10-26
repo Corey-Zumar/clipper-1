@@ -7,7 +7,7 @@ import re
 import tensorflow as tf
 import numpy as np
 
-from deps.tf_lstm_vocab import Vocabulary
+from tf_lstm_deps.tf_lstm_vocab import Vocabulary
 
 from single_proc_utils import ModelBase
 

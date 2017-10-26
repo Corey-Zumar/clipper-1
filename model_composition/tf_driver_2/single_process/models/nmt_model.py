@@ -6,10 +6,8 @@ import json
 import tensorflow as tf
 import numpy as np
 
-import gnmt_model
-import model_helper
-import misc_utils as utils
-import hparam_utils
+from nmt_deps import gnmt_model, model_helper, hparam_utils
+from nmt_deps import misc_utils as utils
 
 from single_proc_utils import ModelBase
 
