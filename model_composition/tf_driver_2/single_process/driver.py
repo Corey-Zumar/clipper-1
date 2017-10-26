@@ -143,7 +143,7 @@ class DriverBenchmarker(object):
         predictor = Predictor(self.models_dict, trial_length=self.trial_length)
 
         logger.info("Generating random inputs")
-        lstm_inputs = self._gen_inputs(LSTM_MODEL_NAME, num_inputs=1000, input_length=input_length)
+        lstm_inputs = self._gen_inputs(TF_LSTM_MODEL_NAME, num_inputs=1000, input_length=input_length)
         lstm_inputs = [i for _ in range(40) for i in lstm_inputs]
 
         nmt_inputs = self._gen_inputs(NMT_MODEL_NAME, num_inputs=1000, input_length=input_length)
