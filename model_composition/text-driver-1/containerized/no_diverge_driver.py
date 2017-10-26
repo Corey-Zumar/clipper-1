@@ -1,20 +1,19 @@
 import sys
-# import os
+import os
 import numpy as np
 import time
-# import base64
 import logging
 
 from clipper_admin import ClipperConnection, DockerContainerManager
 from datetime import datetime
-# from io import BytesIO
-# from PIL import Image
 from containerized_utils.zmq_client import Client
 from containerized_utils import driver_utils
-from containerized_utils.driver_utils import INCREASING, DECREASING, CONVERGED_HIGH, CONVERGED, UNKNOWN
+from containerized_utils.driver_utils import (INCREASING, DECREASING, CONVERGED_HIGH,
+                                              CONVERGED, UNKNOWN)
 from multiprocessing import Process, Queue
 import json
-# import argparse
+
+CURR_DIR = os.path.dirname(os.path.realpath(__file__))
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -25,9 +24,13 @@ logger = logging.getLogger(__name__)
 
 # Models and applications for each heavy node
 # will share the same name
-RES50 = "res50"
-RES152 = "res152"
-ALEXNET = "alexnet"
+AUTOCOMPLETION_MODEL_APP_NAME = "autocompletion"
+LSTM_MODEL_APP_NAME = "lstm"
+NMT_MODEL_APP_NAME = "nmt"
+
+AUTOCOMPLETION_IMAGE_NAME = "model-comp/tf-autocomplete"
+LSTM_IMAGE_NAME = "model-comp/theano-lstm"
+NMT_IMAGE_NAME = "model-comp/nmt"
 
 
 CLIPPER_ADDRESS = "localhost"
@@ -55,59 +58,25 @@ def setup_clipper(configs):
     return config
 
 
-def setup_alexnet(batch_size,
-                  num_replicas,
-                  cpus_per_replica,
-                  allocated_cpus,
-                  allocated_gpus):
+def setup_nmt(batch_size,
+              num_replicas,
+              cpus_per_replica,
+              allocated_cpus,
+              allocated_gpus,
+              input_size):
 
-    return driver_utils.HeavyNodeConfig(name="alexnet",
-                                        input_type="floats",
-                                        model_image="model-comp/pytorch-alexnet",
-                                        allocated_cpus=allocated_cpus,
-                                        cpus_per_replica=cpus_per_replica,
-                                        gpus=allocated_gpus,
-                                        batch_size=batch_size,
-                                        num_replicas=num_replicas,
-                                        use_nvidia_docker=True,
-                                        no_diverge=True,
-                                        )
-
-
-def setup_res50(batch_size,
-                num_replicas,
-                cpus_per_replica,
-                allocated_cpus,
-                allocated_gpus):
-    return driver_utils.HeavyNodeConfig(name="res50",
-                                        input_type="floats",
-                                        model_image="model-comp/pytorch-res50",
-                                        allocated_cpus=allocated_cpus,
-                                        cpus_per_replica=cpus_per_replica,
-                                        gpus=allocated_gpus,
-                                        batch_size=batch_size,
-                                        num_replicas=num_replicas,
-                                        use_nvidia_docker=True,
-                                        no_diverge=True,
-                                        )
-
-
-def setup_res152(batch_size,
-                 num_replicas,
-                 cpus_per_replica,
-                 allocated_cpus,
-                 allocated_gpus):
-    return driver_utils.HeavyNodeConfig(name="res152",
-                                        input_type="floats",
-                                        model_image="model-comp/pytorch-res152",
-                                        allocated_cpus=allocated_cpus,
-                                        cpus_per_replica=cpus_per_replica,
-                                        gpus=allocated_gpus,
-                                        batch_size=batch_size,
-                                        num_replicas=num_replicas,
-                                        use_nvidia_docker=True,
-                                        no_diverge=True,
-                                        )
+        return driver_utils.HeavyNodeConfig(name=NMT_MODEL_APP_NAME,
+                                            input_type="bytes",
+                                            model_image=NMT_IMAGE_NAME,
+                                            allocated_cpus=allocated_cpus,
+                                            cpus_per_replica=cpus_per_replica,
+                                            gpus=allocated_gpus,
+                                            batch_size=batch_size,
+                                            num_replicas=num_replicas,
+                                            use_nvidia_docker=True,
+                                            input_size=input_size,
+                                            no_diverge=True,
+                                            )
 
 
 def get_batch_sizes(metrics_json):
@@ -182,48 +151,53 @@ class Predictor(object):
             self.latencies.append(latency)
             self.total_num_complete += 1
             self.batch_num_complete += 1
-            if self.batch_num_complete % 500 == 0:
+            if self.batch_num_complete % 100 == 0:
                 self.print_stats()
                 self.init_stats()
 
-        def res152_cont(output):
+        def continuation(output):
             if output == DEFAULT_OUTPUT:
                 return
             else:
                 complete()
 
-        def res50_cont(output):
-            if output == DEFAULT_OUTPUT:
-                return
-            else:
-                idk = np.random.random() > 0.4633
-                # idk = True
-                if idk:
-                    self.client.send_request("res152", input_item).then(res152_cont)
-                else:
-                    complete()
+        return self.client.send_request("nmt", np.frombuffer(
+            bytearray(input_item), dtype=np.int8)).then(continuation)
 
-        def alex_cont(output):
-            if output == DEFAULT_OUTPUT:
-                return
-            else:
-                idk = np.random.random() > 0.192
-                if idk:
-                    self.client.send_request("res50", input_item).then(res50_cont)
-                else:
-                    complete()
 
-        return self.client.send_request("alexnet", input_item).then(alex_cont)
+def load_german_docs():
+    german_data_path = os.path.join(CURR_DIR, "nmt_workload", "german_text.de")
+    german_data_file = open(german_data_path, "rb")
+    german_text = german_data_file.readlines()
+    np.random.shuffle(german_text)
+    return german_text
+
+
+def gen_german_inputs(num_inputs=5000, input_size=20):
+    german_text = load_german_docs()
+
+    inputs = []
+    num_gen_inputs = 0
+    while num_gen_inputs < num_inputs:
+        idx = np.random.randint(len(german_text))
+        text = german_text[idx]
+        words = text.split()
+        if len(words) > input_size:
+            words = words[:input_size]
+            inputs.append(" ".join(words))
+            num_gen_inputs += 1
+
+    return inputs
 
 
 class ModelBenchmarker(object):
-    def __init__(self, configs, queue, client_num, latency_upper_bound):
+    def __init__(self, configs, queue, client_num, latency_upper_bound, input_size):
         self.configs = configs
         self.queue = queue
         assert client_num == 0
         self.client_num = client_num
         logger.info("Generating random inputs")
-        base_inputs = [np.array(np.random.rand(299*299*3), dtype=np.float32) for _ in range(1000)]
+        base_inputs = gen_german_inputs(input_size=input_size)
         self.inputs = [i for _ in range(60) for i in base_inputs]
         self.latency_upper_bound = latency_upper_bound
 
@@ -236,7 +210,7 @@ class ModelBenchmarker(object):
         time.sleep(5)
         predictor = Predictor(clipper_metrics=True)
         idx = 0
-        while len(predictor.stats["thrus"]) < 6:
+        while len(predictor.stats["thrus"]) < 4:
             predictor.predict(input_item=self.inputs[idx])
             time.sleep(self.delay)
             idx += 1
@@ -254,7 +228,6 @@ class ModelBenchmarker(object):
         else:
             self.delay += 0.001
 
-
     def find_steady_state(self):
         setup_clipper(self.configs)
         time.sleep(7)
@@ -271,7 +244,9 @@ class ModelBenchmarker(object):
 
             if len(predictor.stats["thrus"]) > last_checked_length:
                 last_checked_length = len(predictor.stats["thrus"]) + 4
-                convergence_state = driver_utils.check_convergence(predictor.stats, self.configs, self.latency_upper_bound)
+                convergence_state = driver_utils.check_convergence(predictor.stats,
+                                                                   self.configs,
+                                                                   self.latency_upper_bound)
                 # Diverging, try again with higher
                 # delay
                 if convergence_state == INCREASING or convergence_state == CONVERGED_HIGH:
@@ -302,32 +277,10 @@ class ModelBenchmarker(object):
 
 
 if __name__ == "__main__":
-
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('-d', '--delay', type=float, help='inter-request delay')
-    # parser.add_argument('-c', '--num_clients', type=int, help='number of clients')
-    #
-    # args = parser.parse_args()
-
     queue = Queue()
-
-    alex_batch = 35
-    res50_batch = 27
-    res152_batch = 14
-
+    input_size = 20
     latency_upper_bound = None
-
-    # alexnet_reps = 1
-    # res50_reps = 1
-    # res152_reps = 1
-    reps = [(1, 1, 1),
-            (1, 1, 2),
-            (1, 2, 2),
-            (2, 2, 2),
-            (2, 2, 3),
-            (2, 3, 3)]
-
-    for alexnet_reps, res50_reps, res152_reps in reps:
+    for batch_size in [1, 2, 4, 6, 8, 10, 15, 20, 25]:
         total_cpus = range(9, 32)
 
         def get_cpus(num_cpus):
@@ -339,25 +292,16 @@ if __name__ == "__main__":
             return [total_gpus.pop() for _ in range(num_gpus)]
 
         configs = [
-            setup_alexnet(batch_size=alex_batch,
-                          num_replicas=alexnet_reps,
-                          cpus_per_replica=1,
-                          allocated_cpus=get_cpus(alexnet_reps),
-                          allocated_gpus=get_gpus(alexnet_reps)),
-            setup_res50(batch_size=res50_batch,
-                        num_replicas=res50_reps,
-                        cpus_per_replica=1,
-                        allocated_cpus=get_cpus(res50_reps),
-                        allocated_gpus=get_gpus(res50_reps)),
-            setup_res152(batch_size=res152_batch,
-                         num_replicas=res152_reps,
-                         cpus_per_replica=1,
-                         allocated_cpus=get_cpus(res152_reps),
-                         allocated_gpus=get_gpus(res152_reps))
+            setup_nmt(batch_size=batch_size,
+                      num_replicas=1,
+                      cpus_per_replica=1,
+                      allocated_cpus=get_cpus(1),
+                      allocated_gpus=get_gpus(1),
+                      input_size=input_size),
         ]
 
         client_num = 0
-        benchmarker = ModelBenchmarker(configs, queue, client_num, latency_upper_bound)
+        benchmarker = ModelBenchmarker(configs, queue, client_num, latency_upper_bound, input_size)
         p = Process(target=benchmarker.run)
         p.start()
 
@@ -367,10 +311,6 @@ if __name__ == "__main__":
 
         cl = ClipperConnection(DockerContainerManager(redis_port=6380))
         cl.connect()
-        fname = "alex_{}-r50_{}-r152_{}".format(alexnet_reps, res50_reps, res152_reps)
-        driver_utils.save_results(configs, cl, all_stats, "e2e_max_thru_resnet-cascade", prefix=fname)
-        # driver_utils.save_results(configs, cl, all_stats, "e2e_min_lat_resnet-cascade", prefix=fname)
-        # driver_utils.save_results(configs, cl, all_stats, "e2e_500_slo_resnet-cascade", prefix=fname)
-        # driver_utils.save_results(configs, cl, all_stats,
-        #                           "e2e_alex_no_gpu_resnet-cascade", prefix=fname)
+        fname = "input-size_{}".format(input_size)
+        driver_utils.save_results(configs, cl, all_stats, "no-diverge-nmt-profile", prefix=fname)
     sys.exit(0)

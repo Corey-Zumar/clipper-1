@@ -48,13 +48,15 @@ class NMTContainer(rpc.ModelContainerBase):
                      target_vocab_path)
 
 
-  def predict_strings(self, inputs):
+  def predict_bytes(self, inputs):
     """
     Parameters
     -------------
     inputs : [string]
       A list of strings of German text
     """
+
+    inputs = [str(input_item.tobytes()) for input_item in inputs]
     infer_batch_size = len(inputs)
     self.sess.run(
         self.infer_model.iterator.initializer,
@@ -112,7 +114,7 @@ class NMTContainer(rpc.ModelContainerBase):
 
   def _get_translation(self, nmt_outputs, sent_id, tgt_eos, subword_option):
     """Given batch decoding outputs, select a sentence and turn to text."""
-    if tgt_eos: 
+    if tgt_eos:
       tgt_eos = tgt_eos.encode("utf-8")
     # Select a sentence
     output = nmt_outputs[sent_id, :].tolist()
@@ -198,7 +200,7 @@ if __name__ == "__main__":
     else:
         print("Connecting to Clipper with default port: 7000")
 
-    input_type = "strings"
+    input_type = "bytes"
     container = NMTContainer(model_checkpoint_path,
                              model_default_hparams_path,
                              model_hparams_path,
