@@ -79,9 +79,6 @@ class TfLstmContainer(rpc.ModelContainerBase):
         sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True))
 
         with tf.device("/gpu:0"):
-            saver = tf.train.Saver()
-            saver.restore(sess, tf.train.latest_checkpoint(checkpoint_path))
-
             input_data = tf.placeholder(tf.int32, [None, MAX_SEQ_LENGTH])
 
             data = tf.Variable(tf.zeros([None, MAX_SEQ_LENGTH, NUM_DIMENSIONS]), dtype=tf.float32)
@@ -97,6 +94,9 @@ class TfLstmContainer(rpc.ModelContainerBase):
             last = tf.gather(value, int(value.get_shape()[0]) - 1)
             
             sentiment_scores = tf.matmul(last, weight) + bias
+
+            saver = tf.train.Saver()
+            saver.restore(sess, tf.train.latest_checkpoint(checkpoint_path))
 
         return sess, input_data, sentiment_scores
 
