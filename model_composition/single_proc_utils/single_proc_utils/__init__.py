@@ -1,4 +1,4 @@
 from .model.model import *
 from .driver.driver import *
 from .driver.benchmarking import *
-from .driver.driver_utils import *
+from .driver_utils import *
