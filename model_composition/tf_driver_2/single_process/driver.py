@@ -221,7 +221,7 @@ if __name__ == "__main__":
     parser.add_argument('-t',  '--num_trials', type=int, default=15, help="The number of trials to run")
     parser.add_argument('-tl', '--trial_length', type=int, default=200, help="The length of each trial, in requests")
     parser.add_argument('-p',  '--process_number', type=int, default=0)
-    parser.add_argument('l', '--input_lengths', type=int, nargs='+')
+    parser.add_argument('-l', '--input_lengths', type=int, nargs='+')
     
     args = parser.parse_args()
 
