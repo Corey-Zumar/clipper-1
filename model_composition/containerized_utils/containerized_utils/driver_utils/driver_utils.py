@@ -140,7 +140,7 @@ def check_convergence(stats, configs, latency_upper_bound=None):
             return INCREASING
         else:
             return DECREASING
-    elif lr.pvalue > 0.2:
+    elif lr.pvalue > 0.1:
         # Slope is 0, now check to see
         # if mean batch_sizes are less
         # than

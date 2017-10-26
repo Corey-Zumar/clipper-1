@@ -49,87 +49,86 @@ def setup_clipper(configs):
     cl.start_clipper(
         query_frontend_image="clipper/zmq_frontend:develop",
         redis_cpu_str="0",
-        mgmt_cpu_str="8",
-        query_cpu_str="1-5,9-13")
+        mgmt_cpu_str="0",
+        query_cpu_str="1-8")
     time.sleep(10)
     for config in configs:
         driver_utils.setup_heavy_node(cl, config, DEFAULT_OUTPUT)
-    time.sleep(10)
+    time.sleep(20)
     logger.info("Clipper is set up!")
     return config
 
-def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica=None, allocated_cpus=None, allocated_gpus=None):
-    if model_name == INCEPTION_FEATS_MODEL_APP_NAME:
-        if not cpus_per_replica:
-            cpus_per_replica = 1
-        if not allocated_cpus:
-            allocated_cpus = range(16,19)
-        if not allocated_gpus:
-            allocated_gpus = [0]
+def setup_inception(batch_size,
+                    num_replicas,
+                    cpus_per_replica,
+                    allocated_cpus,
+                    allocated_gpus):
 
-        return driver_utils.HeavyNodeConfig(name=INCEPTION_FEATS_MODEL_APP_NAME,
-                                            input_type="floats",
-                                            model_image=INCEPTION_FEATS_IMAGE_NAME,
-                                            allocated_cpus=allocated_cpus,
-                                            cpus_per_replica=cpus_per_replica,
-                                            gpus=allocated_gpus,
-                                            batch_size=batch_size,
-                                            num_replicas=num_replicas,
-                                            use_nvidia_docker=True)
+    return driver_utils.HeavyNodeConfig(name=INCEPTION_FEATS_MODEL_APP_NAME,
+                                        input_type="floats",
+                                        model_image=INCEPTION_FEATS_IMAGE_NAME,
+                                        allocated_cpus=allocated_cpus,
+                                        cpus_per_replica=cpus_per_replica,
+                                        gpus=allocated_gpus,
+                                        batch_size=batch_size,
+                                        num_replicas=num_replicas,
+                                        use_nvidia_docker=True,
+                                        no_diverge=True,
+                                        )
 
-    elif model_name == TF_KERNEL_SVM_MODEL_APP_NAME:
-        if not cpus_per_replica:
-            cpus_per_replica = 1
-        if not allocated_cpus:
-            allocated_cpus = [20]
-        if not allocated_gpus:
-            allocated_gpus = []
+def setup_log_reg(batch_size,
+                  num_replicas,
+                  cpus_per_replica,
+                  allocated_cpus,
+                  allocated_gpus):
 
-        return driver_utils.HeavyNodeConfig(name=TF_KERNEL_SVM_MODEL_APP_NAME,
-                                            input_type="floats",
-                                            model_image=TF_KERNEL_SVM_IMAGE_NAME,
-                                            allocated_cpus=allocated_cpus,
-                                            cpus_per_replica=cpus_per_replica,
-                                            gpus=allocated_gpus,
-                                            batch_size=batch_size,
-                                            num_replicas=num_replicas,
-                                            use_nvidia_docker=True)
+    return driver_utils.HeavyNodeConfig(name=TF_LOG_REG_MODEL_APP_NAME,
+                                        input_type="floats",
+                                        model_image=TF_LOG_REG_IMAGE_NAME,
+                                        allocated_cpus=allocated_cpus,
+                                        cpus_per_replica=cpus_per_replica,
+                                        gpus=allocated_gpus,
+                                        batch_size=batch_size,
+                                        num_replicas=num_replicas,
+                                        use_nvidia_docker=True,
+                                        no_diverge=True,
+                                        )
 
-    elif model_name == TF_LOG_REG_MODEL_APP_NAME:
-        if not cpus_per_replica:
-            cpus_per_replica = 1
-        if not allocated_cpus:
-            allocated_cpus = [20]
-        if not allocated_gpus:
-            allocated_gpus = []
+def setup_kernel_svm(batch_size,
+                    num_replicas,
+                    cpus_per_replica,
+                    allocated_cpus,
+                    allocated_gpus):
 
-        return driver_utils.HeavyNodeConfig(name=TF_LOG_REG_MODEL_APP_NAME,
-                                            input_type="floats",
-                                            model_image=TF_LOG_REG_IMAGE_NAME,
-                                            allocated_cpus=allocated_cpus,
-                                            cpus_per_replica=cpus_per_replica,
-                                            gpus=allocated_gpus,
-                                            batch_size=batch_size,
-                                            num_replicas=num_replicas,
-                                            use_nvidia_docker=True)
+    return driver_utils.HeavyNodeConfig(name=TF_KERNEL_SVM_MODEL_APP_NAME,
+                                        input_type="floats",
+                                        model_image=TF_KERNEL_SVM_IMAGE_NAME,
+                                        allocated_cpus=allocated_cpus,
+                                        cpus_per_replica=cpus_per_replica,
+                                        gpus=allocated_gpus,
+                                        batch_size=batch_size,
+                                        num_replicas=num_replicas,
+                                        use_nvidia_docker=True,
+                                        no_diverge=True,
+                                        )
 
-    elif model_name == TF_RESNET_MODEL_APP_NAME:
-        if not cpus_per_replica:
-            cpus_per_replica = 1
-        if not allocated_cpus:
-            allocated_cpus = [20]
-        if not allocated_gpus:
-            allocated_gpus = [1]
+def setup_resnet(batch_size,
+                 num_replicas,
+                 cpus_per_replica,
+                 allocated_cpus,
+                 allocated_gpus):
 
-        return driver_utils.HeavyNodeConfig(name=TF_RESNET_MODEL_APP_NAME,
-                                            input_type="floats",
-                                            model_image=TF_RESNET_IMAGE_NAME,
-                                            allocated_cpus=allocated_cpus,
-                                            cpus_per_replica=cpus_per_replica,
-                                            gpus=allocated_gpus,
-                                            batch_size=batch_size,
-                                            num_replicas=num_replicas,
-                                            use_nvidia_docker=True)
+    return driver_utils.HeavyNodeConfig(name=TF_RESNET_MODEL_APP_NAME,
+                                        input_type="floats",
+                                        model_image=TF_RESNET_IMAGE_NAME,
+                                        allocated_cpus=allocated_cpus,
+                                        cpus_per_replica=cpus_per_replica,
+                                        gpus=allocated_gpus,
+                                        batch_size=batch_size,
+                                        num_replicas=num_replicas,
+                                        use_nvidia_docker=True,
+                                        no_diverge=True,
+                                        )
 
 
 ########## Benchmarking ##########
@@ -159,8 +158,7 @@ def get_queue_sizes(metrics_json):
 
 class Predictor(object):
 
-    def __init__(self, clipper_metrics, trial_length):
-        self.trial_length = trial_length
+    def __init__(self, clipper_metrics, batch_size):
         self.outstanding_reqs = {}
         self.client = Client(CLIPPER_ADDRESS, CLIPPER_SEND_PORT, CLIPPER_RECV_PORT)
         self.client.start()
@@ -173,11 +171,11 @@ class Predictor(object):
         self.total_num_complete = 0
         self.cl = ClipperConnection(DockerContainerManager(redis_port=6380))
         self.cl.connect()
+        self.batch_size = batch_size
         self.get_clipper_metrics = clipper_metrics
         if self.get_clipper_metrics:
             self.stats["all_metrics"] = []
             self.stats["mean_batch_sizes"] = []
-            self.stats["mean_queue_sizes"] = []
 
     def init_stats(self):
         self.latencies = []
@@ -200,14 +198,11 @@ class Predictor(object):
             batch_sizes = get_batch_sizes(metrics)
             queue_sizes = get_queue_sizes(metrics)
             self.stats["mean_batch_sizes"].append(batch_sizes)
-            self.stats["mean_queue_sizes"].append(queue_sizes)
             self.stats["all_metrics"].append(metrics)
             logger.info(("p99: {p99}, mean: {mean}, thruput: {thru}, "
                          "batch_sizes: {batches} queue_sizes: {queues}").format(p99=p99, mean=mean, thru=thru,
                                                           batches=json.dumps(
-                                                              batch_sizes, sort_keys=True), 
-                                                          queues=json.dumps(
-                                                              queue_sizes, sort_keys=True)))
+                                                              batch_sizes, sort_keys=True)))
         else:
             logger.info("p99: {p99}, mean: {mean}, thruput: {thru}".format(p99=p99,
                                                                            mean=mean,
@@ -224,6 +219,8 @@ class Predictor(object):
             self.latencies.append(latency)
             self.total_num_complete += 1
             self.batch_num_complete += 1
+
+            trial_length = max(300, 10 * self.batch_size)
             if self.batch_num_complete % self.trial_length == 0:
                 self.print_stats()
                 self.init_stats()
@@ -270,14 +267,16 @@ class Predictor(object):
             .then(log_reg_continuation)
 
 class DriverBenchmarker(object):
-    def __init__(self, trial_length, queue, clipper_metrics, configs):
-        self.trial_length = trial_length
-        self.queue = queue
-        self.clipper_metrics = clipper_metrics
+    def __init__(self, configs, queue, client_num, latency_upper_bound):
         self.configs = configs
+        self.max_batch_size = np.max([config.batch_size for config in configs])
+        self.queue = queue
+        assert client_num == 0
+        self.client_num = client_num
         logger.info("Generating random inputs")
         base_inputs = [(self._get_resnet_input(), self._get_inception_input()) for _ in range(1000)]
         self.inputs = [i for _ in range(40) for i in base_inputs]
+        self.latency_upper_bound = latency_upper_bound
 
     def run(self):
         self.initialize_request_rate()
@@ -291,10 +290,11 @@ class DriverBenchmarker(object):
         self.delay = 0.001
         setup_clipper(self.configs)
         time.sleep(5)
-        predictor = Predictor(clipper_metrics=True)
+        predictor = Predictor(clipper_metrics=True, batch_size=self.max_batch_size)
         idx = 0
         while len(predictor.stats["thrus"]) < 6:
-            predictor.predict(input_item=self.inputs[idx])
+            resnet_input, inception_input = self.inputs[idx]
+            predictor.predict(resnet_input, inception_input)
             time.sleep(self.delay)
             idx += 1
             idx = idx % len(self.inputs)
@@ -315,13 +315,14 @@ class DriverBenchmarker(object):
     def find_steady_state(self):
         setup_clipper(self.configs)
         time.sleep(7)
-        predictor = Predictor(clipper_metrics=True)
+        predictor = Predictor(clipper_metrics=True, batch_size=self.max_batch_size)
         idx = 0
         done = False
         # start checking for steady state after 7 trials
         last_checked_length = 6
         while not done:
-            predictor.predict(input_item=self.inputs[idx])
+            resnet_input, inception_input = self.inputs[idx]
+            predictor.predict(resnet_input, inception_input)
             time.sleep(self.delay)
             idx += 1
             idx = idx % len(self.inputs)
@@ -378,55 +379,109 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    resnet_feats_config = get_heavy_node_config(model_name=TF_RESNET_MODEL_APP_NAME,
-                                                batch_size=64,
-                                                num_replicas=1,
-                                                cpus_per_replica=1,
-                                                allocated_cpus=[14,15,16,17],
-                                                allocated_gpus=[0,1,2,3])
-
-    kernel_svm_config = get_heavy_node_config(model_name=TF_KERNEL_SVM_MODEL_APP_NAME,
-                                              batch_size=32,
-                                              num_replicas=1,
-                                              cpus_per_replica=1,
-                                              allocated_cpus=[18,19])
-
-    inception_feats_config = get_heavy_node_config(model_name=INCEPTION_FEATS_MODEL_APP_NAME, 
-                                                   batch_size=20, 
-                                                   num_replicas=1, 
-                                                   cpus_per_replica=1, 
-                                                   allocated_cpus=[20,21,22,23], 
-                                                   allocated_gpus=[4,5,6,7])
-
-    log_reg_config = get_heavy_node_config(model_name=TF_LOG_REG_MODEL_APP_NAME,
-                                           batch_size=1,
-                                           num_replicas=1,
-                                           cpus_per_replica=1,
-                                           allocated_cpus=[24])
-
-    model_configs = [resnet_feats_config, kernel_svm_config, inception_feats_config, log_reg_config]
-
-    output_config = RequestDelayConfig(args.request_delay)
-    all_configs = model_configs + [output_config]
-    setup_clipper(model_configs)
-
     queue = Queue()
 
-    procs = []
-    for i in range(args.num_clients):
-        clipper_metrics = (i == 0)
-        benchmarker = DriverBenchmarker(args.trial_length, queue, clipper_metrics, model_configs)
-        p = Process(target=benchmarker.run, args=(args.num_trials, args.request_delay))
-        p.start()
-        procs.append(p)
+    ## THIS IS FOR 500MS
+    ## FORMAT IS (INCEPTION, LOG_REG, KSVM, RESNET)
+    five_hundred_ms_reps = [(1, 1, 1, 1),
+                            (1, 1, 1, 2),
+                            (1, 1, 1, 3),
+                            (2, 1, 1, 3),
+                            (2, 1, 1, 4),
+                            (2, 1, 1, 5),
+                            (3, 1, 1, 5)]
 
-    all_stats = []
-    for i in range(args.num_clients):
+    ## THIS IS FOR 500MS
+    ## FORMAT IS (INCEPTION, LOG_REG, KSVM, RESNET)
+    five_hundred_ms_batches = (10, 2, 16, 6)
+
+    five_hundred_ms_latency_upper_bound = 1.500
+
+    ## THIS IS FOR 375MS
+    ## FORMAT IS (INCEPTION, LOG_REG, KSVM, RESNET)
+    three_seven_five_ms_reps = [(1, 1, 1, 1),
+                                (1, 1, 1, 2),
+                                (1, 1, 1, 3),
+                                (1, 1, 1, 4),
+                                (1, 1, 1, 5),
+                                (2, 1, 1, 5),
+                                (2, 1, 1, 6)]
+
+    ## THIS IS FOR 375MS
+    ## FORMAT IS (INCEPTION, LOG_REG, KSVM, RESNET)
+    three_seven_five_ms_batches = (7, 2, 9, 2)
+
+    three_seven_five_ms_latency_upper_bound = 1.000
+
+    ## THIS IS FOR 375MS
+    ## FORMAT IS (INCEPTION, LOG_REG, KSVM, RESNET)
+    thousand_ms_reps = [(1, 1, 1, 1),
+                        (1, 1, 1, 2),
+                        (2, 1, 1, 2),
+                        (2, 1, 1, 3),
+                        (2, 1, 1, 4),
+                        (3, 1, 1, 4),
+                        (3, 1, 1, 5)]
+
+    ## THIS IS FOR 1000MS
+    ## FORMAT IS (INCEPTION, LOG_REG, KSVM, RESNET)
+    thousand_ms_batches = (16, 2, 16, 15)
+
+    thousand_ms_latency_upper_bound = 3.000
+
+    inception_batch_idx = 0
+    log_reg_batch_idx = 1
+    ksvm_batch_idx = 2
+    resnet_batch_idx = 3
+
+    for inception_reps, log_reg_reps, ksvm_reps, resnet_reps in five_hundred_ms_reps:
+        total_cpus = range(9,29)
+
+        def get_cpus(num_cpus):
+            return [total_cpus.pop() for _ in range(num_cpus)]
+
+        total_gpus = range(8)
+
+        def get_gpus(num_gpus):
+            return [total_gpus.pop() for _ in range(num_gpus)]
+
+        configs = [
+            setup_inception(batch_size=five_hundred_ms_batches[inception_batch_idx],
+                            num_replicas=inception_reps,
+                            cpus_per_replica=1,
+                            allocated_cpus=get_cpus(inception_reps),
+                            allocated_gpus=get_gpus(inception_reps)),
+            setup_log_reg(batch_size=five_hundred_ms_batches[log_reg_batch_idx],
+                          num_replicas=log_reg_reps,
+                          cpus_per_replica=1,
+                          allocated_cpus=get_cpus(log_reg_reps),
+                          allocated_gpus=get_gpus(log_reg_reps)),
+            setup_kernel_svm(batch_size=five_hundred_ms_batches[ksvm_batch_idx],
+                             num_replicas=ksvm_reps,
+                             cpus_per_replica=1,
+                             allocated_cpus=get_cpus(ksvm_reps),
+                             allocated_gpus=get_gpus(ksvm_reps)),
+            setup_resnet(batch_size=five_hundred_ms_batches[resnet_batch_idx],
+                         num_replicas=resnet_reps,
+                         cpus_per_replica=1,
+                         allocated_cpus=get_cpus(resnet_reps),
+                         allocated_gpus=get_gpus(resnet_reps))
+        ]
+
+        client_num = 0
+
+        benchmarker = DriverBenchmarker(configs, queue, client_num, five_hundred_ms_latency_upper_bound)
+
+        p = Process(target=benchmarker.run)
+        p.start()
+
+        all_stats = []
         all_stats.append(queue.get())
 
-    cl = ClipperConnection(DockerContainerManager(redis_port=6380))
-    cl.connect()
+        cl = ClipperConnection(DockerContainerManager(redis_port=6380))
+        cl.connect()
 
-    fname = "{clients}_clients".format(clients=args.num_clients)
-    driver_utils.save_results(all_configs, cl, all_stats, "image_driver_1_e2e_exps", prefix=fname)
+        fname = "incep_{}-logreg_{}-ksvm_{}-resnet_{}".format(inception_reps, log_reg_reps, ksvm_reps, resnet_reps)
+        driver_utils.save_results(configs, cl, all_stats, "e2e_500ms_slo_img_driver_1", prefix=fname)
+    
     sys.exit(0)
