@@ -47,7 +47,7 @@ def create_nmt_model(model_path, gpu_num):
 
 def load_models(lstm_gpu, nmt_gpu):
     models_dict = {
-        TF_LSTM_MODEL_NAME : create_lstm_model(TF_LSTM_MODEL_PATH, gpu_num=lstm_gpu),
+        # TF_LSTM_MODEL_NAME : create_lstm_model(TF_LSTM_MODEL_PATH, gpu_num=lstm_gpu),
         NMT_MODEL_NAME : create_nmt_model(NMT_MODEL_PATH, gpu_num=nmt_gpu)
     }
     return models_dict
@@ -70,7 +70,7 @@ class Predictor(object):
         self.trial_length = trial_length
 
         # Models
-        self.lstm_model = models_dict[TF_LSTM_MODEL_NAME]
+        #self.tf_lstm_model = models_dict[TF_LSTM_MODEL_NAME]
         self.nmt_model = models_dict[NMT_MODEL_NAME]
 
     def init_stats(self):
