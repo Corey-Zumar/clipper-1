@@ -36,6 +36,8 @@ class TfLstmContainer(rpc.ModelContainerBase):
         inputs : [str]
             A list of string inputs in one of 64 languages
         """
+        inputs = [str(input_item.tobytes()) for input_item in inputs]
+
         inputs_matrix = self._get_inputs_matrix(inputs)
         feed_dict = {
             self.input_data : inputs_matrix

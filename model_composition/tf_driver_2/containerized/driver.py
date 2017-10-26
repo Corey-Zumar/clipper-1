@@ -75,7 +75,7 @@ def get_heavy_node_config(model_name,
                           input_size):
     if model_name == LANG_DETECT_MODEL_APP_NAME:
         return driver_utils.HeavyNodeConfig(name=LANG_DETECT_MODEL_APP_NAME,
-                                            input_type="strings",
+                                            input_type="bytes",
                                             model_image=LANG_DETECT_IMAGE_NAME,
                                             allocated_cpus=allocated_cpus,
                                             cpus_per_replica=cpus_per_replica,
@@ -89,7 +89,7 @@ def get_heavy_node_config(model_name,
 
     elif model_name == NMT_MODEL_APP_NAME:
         return driver_utils.HeavyNodeConfig(name=NMT_MODEL_APP_NAME,
-                                            input_type="strings",
+                                            input_type="bytes",
                                             model_image=NMT_IMAGE_NAME,
                                             allocated_cpus=allocated_cpus,
                                             cpus_per_replica=cpus_per_replica,
@@ -103,7 +103,7 @@ def get_heavy_node_config(model_name,
 
     elif LSTM_MODEL_APP_NAME == LSTM_MODEL_APP_NAME:
         return driver_utils.HeavyNodeConfig(name=LSTM_MODEL_APP_NAME,
-                                    input_type="strings",
+                                    input_type="bytes",
                                     model_image=LSTM_IMAGE_NAME,
                                     allocated_cpus=allocated_cpus,
                                     cpus_per_replica=cpus_per_replica,
@@ -293,7 +293,9 @@ class ModelBenchmarker(object):
             inputs.append(" ".join(words))
             num_gen_inputs += 1
 
-        return inputs
+        byte_inputs = [np.frombuffer(bytearray(input_item), dtype=np.uint8) for input_item in inputs]
+
+        return byte_inputs
 
     def _get_load_text_fn(self):
         if self.model_app_name == NMT_MODEL_APP_NAME:
