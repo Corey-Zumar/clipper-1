@@ -92,7 +92,7 @@ class Predictor(object):
                                                                        mean=mean,
                                                                        thru=thru))
 
-    def predict(self, lstm_inputs, nmt_inputs)
+    def predict(self, lstm_inputs, nmt_inputs):
         """
         Parameters
         ------------
