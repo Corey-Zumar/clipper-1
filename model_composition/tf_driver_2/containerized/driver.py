@@ -196,7 +196,7 @@ class ModelBenchmarker(object):
         self.config = config
         self.queue = queue
         self.load_text_fn = self._get_load_text_fn(model_app_name=self.config.name)
-        self.loaded_docs = False
+        self.loaded_text = False
         base_inputs = self._gen_inputs(num_inputs=1000, input_length=input_length)
         self.inputs = [i for _ in range(40) for i in base_inputs]
 
