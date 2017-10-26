@@ -76,7 +76,7 @@ class TfLstmContainer(rpc.ModelContainerBase):
 
     def _create_model_graph(self, checkpoint_path):
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_MEM_FRAC)
-        sess = tf.Session(graph=infer_model.graph, config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True))
+        sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True))
 
         with tf.device("/gpu:0"):
             saver = tf.train.Saver()
