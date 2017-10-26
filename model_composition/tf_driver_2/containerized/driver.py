@@ -353,7 +353,7 @@ if __name__ == "__main__":
 
     default_batch_size_confs = [2]
     default_replica_num_confs = [1]
-    default_cpus_per_replica_confs = [None]
+    default_cpus_per_replica_confs = [1]
     default_input_length_confs = [20]
 
     batch_size_confs = args.batch_sizes if args.batch_sizes else default_batch_size_confs
