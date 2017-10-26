@@ -31,11 +31,11 @@ TF_LSTM_MODEL_PATH = os.path.join(MODELS_DIR, "tf_lstm_model_data")
 ########## Setup ##########
 
 def get_heavy_node_configs(batch_size, allocated_cpus, lstm_gpus=[], nmt_gpus=[]):
-    lstm_config = HeavyNodeConfig(model_name=LSTM_MODEL_NAME,
-                                  input_type="strings",
-                                  allocated_cpus=allocated_cpus,
-                                  gpus=[0],
-                                  batch_size=batch_size)
+    # lstm_config = HeavyNodeConfig(model_name=TF_LSTM_MODEL_NAME,
+    #                               input_type="strings",
+    #                               allocated_cpus=allocated_cpus,
+    #                               gpus=[0],
+    #                               batch_size=batch_size)
 
     nmt_config = HeavyNodeConfig(model_name=NMT_MODEL_NAME,
                                  input_type="bytes",
