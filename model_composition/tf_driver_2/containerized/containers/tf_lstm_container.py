@@ -29,7 +29,7 @@ class TfLstmContainer(rpc.ModelContainerBase):
         self.vocabulary = Vocabulary(vocab_dir_path)
         self.sess, self.input_data, self.sentiment_preds = self._create_model_graph()
 
-    def predict_strings(self, inputs):
+    def predict_bytes(self, inputs):
         """
         Parameters
         ------------
