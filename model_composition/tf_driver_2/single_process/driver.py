@@ -234,7 +234,7 @@ if __name__ == "__main__":
     default_input_length_confs = [20]
     input_length_confs = args.input_lengths if args.input_lengths else default_input_length_confs
     
-    models_dict = load_models(args.lstm_gpu)
+    models_dict = load_models(args.lstm_gpu, args.nmt_gpu)
     benchmarker = DriverBenchmarker(models_dict, args.trial_length, args.process_number)
 
     for input_length in input_length_confs:
