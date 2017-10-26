@@ -84,6 +84,7 @@ def get_heavy_node_config(model_name,
                                             num_replicas=num_replicas,
                                             use_nvidia_docker=True,
                                             input_size=input_size,
+                                            no_diverge=True
                                             )
 
     elif model_name == NMT_MODEL_APP_NAME:
@@ -97,6 +98,7 @@ def get_heavy_node_config(model_name,
                                             num_replicas=num_replicas,
                                             use_nvidia_docker=True,
                                             input_size=input_size,
+                                            no_diverge=True
                                             )
 
     elif LSTM_MODEL_APP_NAME == LSTM_MODEL_APP_NAME:
@@ -110,6 +112,7 @@ def get_heavy_node_config(model_name,
                                     num_replicas=num_replicas,
                                     use_nvidia_docker=True,
                                     input_size=input_size,
+                                    no_diverge=True
                                     )
 
 ########## Benchmarking ##########
