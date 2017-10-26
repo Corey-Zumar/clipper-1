@@ -14,9 +14,6 @@ class Vocabulary:
         word_list_path = os.path.join(vocab_dir_path, RELATIVE_PATH_WORD_LIST)
         word_vectors_path = os.path.join(vocab_dir_path, RELATIVE_PATH_WORD_VECTORS)
 
-        print(word_list_path)
-        print(word_vectors_path)
-
         assert os.path.exists(word_list_path)
         assert os.path.exists(word_vectors_path)
 

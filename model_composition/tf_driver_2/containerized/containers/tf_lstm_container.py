@@ -146,7 +146,7 @@ if __name__ == "__main__":
         print("Connecting to Clipper with default port: 7000")
 
     input_type = "strings"
-    container = TfLstmContainer(model_checkpoint_path, model_vocab_path)
+    container = TfLstmContainer(model_vocab_path, model_checkpoint_path)
     rpc_service = rpc.RPCService()
     rpc_service.start(container, ip, port, model_name, model_version,
                       input_type)
