@@ -30,14 +30,20 @@ TF_LSTM_MODEL_PATH = os.path.join(MODELS_DIR, "tf_lstm_model_data")
 
 ########## Setup ##########
 
-def get_heavy_node_configs(batch_size, allocated_cpus, lstm_gpus=[]):
+def get_heavy_node_configs(batch_size, allocated_cpus, lstm_gpus=[], nmt_gpus=[]):
     lstm_config = HeavyNodeConfig(model_name=LSTM_MODEL_NAME,
                                   input_type="strings",
                                   allocated_cpus=allocated_cpus,
                                   gpus=[0],
                                   batch_size=batch_size)
 
-    return [lstm_config]
+    nmt_config = HeavyNodeConfig(model_name=NMT_MODEL_NAME,
+                                 input_type="bytes",
+                                 allocated_cpus=allocated_cpus,
+                                 gpus=[0],
+                                 batch_size=batch_size)
+
+    return [nmt_config]
 
 def create_lstm_model(model_path, gpu_num):
     return tf_lstm_model.TfLstm(model_path, gpu_num)
@@ -177,6 +183,8 @@ class DriverBenchmarker(object):
             words = words[:input_length]
             inputs.append(" ".join(words))
             num_gen_inputs += 1
+
+        bytes_inputs = [np.frombuffer(bytearray(input_item), dtype=np.uint8) for input_item in inputs]
 
         return inputs
 
