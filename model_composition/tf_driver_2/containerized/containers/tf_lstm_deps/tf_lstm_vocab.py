@@ -27,7 +27,7 @@ class Vocabulary:
 
     def get_word_idx(self, word):
         try:
-            return self.vocab.index(word)
+            return self.word_list.index(word)
         except ValueError:
             return WORD_VAL_UNKNOWN
 
