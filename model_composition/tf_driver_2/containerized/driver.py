@@ -297,14 +297,14 @@ class ModelBenchmarker(object):
 
         return byte_inputs
 
-    def _get_load_text_fn(self):
-        if self.model_app_name == NMT_MODEL_APP_NAME:
+    def _get_load_text_fn(self, model_app_name):
+        if model_app_name == NMT_MODEL_APP_NAME:
             return self._load_nmt_text
 
-        elif self.model_app_name == LANG_DETECT_MODEL_APP_NAME:
+        elif model_app_name == LANG_DETECT_MODEL_APP_NAME:
             return self._load_detect_text
 
-        elif self.model_app_name == LSTM_MODEL_APP_NAME:
+        elif model_app_name == LSTM_MODEL_APP_NAME:
             return self._load_lstm_text
 
     def _load_nmt_text(self):
