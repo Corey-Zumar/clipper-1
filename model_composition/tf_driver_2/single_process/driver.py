@@ -196,7 +196,7 @@ class DriverBenchmarker(object):
         elif model_name == LANG_DETECT_MODEL_NAME:
             return self._load_detect_text
 
-        elif model_name == LSTM_MODEL_APP_NAME:
+        elif model_name == TF_LSTM_MODEL_NAME:
             return self._load_lstm_text
 
     def _load_nmt_text(self):
