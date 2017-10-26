@@ -88,7 +88,7 @@ class TfLstm(ModelBase):
         with tf.device("/gpu:{}".format(gpu_num)):
             input_data = tf.placeholder(tf.int32, [None, MAX_SEQ_LENGTH])
 
-            data = tf.nn.embedding_lookup(self.vocabulary.get_word_vecs, input_data)
+            data = tf.nn.embedding_lookup(self.vocabulary.get_word_vecs(), input_data)
 
             lstm_cell = tf.contrib.rnn.BasicLSTMCell(LSTM_UNITS)
             lstm_cell = tf.contrib.rnn.DropoutWrapper(cell=lstm_cell, output_keep_prob=0.25)
