@@ -367,7 +367,8 @@ if __name__ == "__main__":
                                                          num_replicas=num_replicas,
                                                          cpus_per_replica=cpus_per_replica,
                                                          allocated_cpus=args.model_cpus,                               
-                                                         allocated_gpus=args.model_gpus)
+                                                         allocated_gpus=args.model_gpus,
+                                                         input_size=input_lenght)
                     setup_clipper(model_config)
                     queue = Queue()
                     benchmarker = ModelBenchmarker(model_config, queue, input_length)
