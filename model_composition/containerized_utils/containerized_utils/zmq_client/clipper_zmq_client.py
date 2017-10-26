@@ -173,7 +173,7 @@ class Client:
             return str
 
     def _dtype_to_clipper_type(self, dtype):
-        if dtype == np.int8:
+        if dtype == np.uint8:
             return DATA_TYPE_BYTES
         elif dtype == np.int32:
             return DATA_TYPE_INTS
