@@ -28,6 +28,9 @@ TF_LSTM_MODEL_NAME = "tf-lstm"
 NMT_MODEL_PATH = os.path.join(MODELS_DIR, "nmt_model_data")
 TF_LSTM_MODEL_PATH = os.path.join(MODELS_DIR, "tf_lstm_model_data")
 
+NMT_WORKLOAD_RELATIVE_PATH = "nmt_workload"
+LSTM_WORKLOAD_RELATIVE_PATH = "lstm_workload"
+
 ########## Setup ##########
 
 def get_heavy_node_configs(batch_size, allocated_cpus, lstm_gpus=[], nmt_gpus=[]):
