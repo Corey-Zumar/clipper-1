@@ -9,8 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from single_proc_utils import HeavyNodeConfig, save_results
-from models import tf_lstm_model
-from models.deps import kernel_svm_utils
+from models import tf_lstm_model, nmt_model
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -26,6 +25,7 @@ LANG_DETECT_MODEL_NAME = "tf-lang-detect"
 NMT_MODEL_NAME = "tf-nmt"
 TF_LSTM_MODEL_NAME = "tf-lstm"
 
+NMT_MODEL_PATH = os.path.join(MODELS_DIR, "nmt_model_data")
 TF_LSTM_MODEL_PATH = os.path.join(MODELS_DIR, "tf_lstm_model_data")
 
 ########## Setup ##########
@@ -42,9 +42,13 @@ def get_heavy_node_configs(batch_size, allocated_cpus, lstm_gpus=[]):
 def create_lstm_model(model_path, gpu_num):
     return tf_lstm_model.TfLstm(model_path, gpu_num)
 
-def load_models(lstm_gpu):
+def create_nmt_model(model_path, gpu_num):
+    return nmt_model.NMTModel(model_path, gpu_num)
+
+def load_models(lstm_gpu, nmt_gpu):
     models_dict = {
-        TF_LSTM_MODEL_NAME : create_lstm_model(TF_LSTM_MODEL_PATH, gpu_num=lstm_gpu)
+        TF_LSTM_MODEL_NAME : create_lstm_model(TF_LSTM_MODEL_PATH, gpu_num=lstm_gpu),
+        NMT_MODEL_NAME : create_nmt_model(NMT_MODEL_PATH, gpu_num=nmt_gpu)
     }
     return models_dict
 
@@ -67,6 +71,7 @@ class Predictor(object):
 
         # Models
         self.lstm_model = models_dict[TF_LSTM_MODEL_NAME]
+        self.nmt_model = models_dict[NMT_MODEL_NAME]
 
     def init_stats(self):
         self.latencies = []
@@ -87,7 +92,7 @@ class Predictor(object):
                                                                        mean=mean,
                                                                        thru=thru))
 
-    def predict(self, lstm_inputs):
+    def predict(self, lstm_inputs, nmt_inputs)
         """
         Parameters
         ------------
@@ -95,16 +100,19 @@ class Predictor(object):
             A list of text items on which to perform sentiment analysis
         """
 
-        # TODO(czumar): Change this when there are more models / inputs
-        assert len(lstm_inputs) == len(lstm_inputs)
+        assert len(lstm_inputs) == len(nmt_inputs)
 
         batch_size = len(lstm_inputs)
 
         begin_time = datetime.now()
 
-        lstm_future = self.thread_pool.submit(self.tf_lstm_model.predict, lstm_inputs)
+        # lstm_future = self.thread_pool.submit(self.tf_lstm_model.predict, lstm_inputs)
 
-        lstm_classes = lstm_future.result()
+        # lstm_classes = lstm_future.result()
+
+        nmt_future = self.thread_pool.submit(self.nmt_model.predict, nmt_inputs)
+
+        nmt_preds = nmt_future.result()
 
         end_time = datetime.now()
 
@@ -129,8 +137,11 @@ class DriverBenchmarker(object):
         predictor = Predictor(self.models_dict, trial_length=self.trial_length)
 
         logger.info("Generating random inputs")
-        lstm_inputs = self._gen_inputs(LSTM_MODEL_NAME, 1000, input_length=input_length)
+        lstm_inputs = self._gen_inputs(LSTM_MODEL_NAME, num_inputs=1000, input_length=input_length)
         lstm_inputs = [i for _ in range(40) for i in lstm_inputs]
+
+        nmt_inputs = self._gen_inputs(NMT_MODEL_NAME, num_inputs=1000, input_length=input_length)
+        nmt_inputs = [i for _ in range(40) for i in nmt_inputs]
 
         # TODO(czumar): Change this when there are more models / inputs
         assert len(lstm_inputs) == len(lstm_inputs)
@@ -139,13 +150,14 @@ class DriverBenchmarker(object):
         while True:
             batch_idx = np.random.randint(len(lstm_inputs) - batch_size)
             lstm_batch = lstm_inputs[batch_idx : batch_idx + batch_size]
+            nmt_batch = nmt_inputs[bathc_idx : batch_idx + batch_size]
 
-            predictor.predict(lstm_batch)
+            predictor.predict(lstm_batch, nmt_batch)
 
             if len(predictor.stats["thrus"]) > num_trials:
                 break
 
-        save_results(self.configs, [predictor.stats], "lstm_single_proc_experiments", self.process_num)
+        save_results(self.configs, [predictor.stats], "nmt_single_proc_exps", self.process_num)
 
     def _gen_inputs(self, model_name, num_inputs=1000, input_length=20):
         if not self.loaded_text:
@@ -205,6 +217,7 @@ if __name__ == "__main__":
     parser.add_argument('-b',  '--batch_sizes', type=int, nargs='+', help="The batch size configurations to benchmark for the driver. Each configuration will be benchmarked separately.")
     parser.add_argument('-c',  '--cpus', type=int, nargs='+', help="The set of cpu cores on which to run the single process driver")
     parser.add_argument('-lg',  '--lstm_gpu', type=int, default=0, help="The GPU on which to run the Tensorflow LSTM")
+    parser.add_argument('-ng',  '--lstm_gpu', type=int, default=1, help="The GPU on which to run the NMT model")
     parser.add_argument('-t',  '--num_trials', type=int, default=15, help="The number of trials to run")
     parser.add_argument('-tl', '--trial_length', type=int, default=200, help="The length of each trial, in requests")
     parser.add_argument('-p',  '--process_number', type=int, default=0)
@@ -227,6 +240,7 @@ if __name__ == "__main__":
         for batch_size in batch_size_confs:
             configs = get_heavy_node_configs(batch_size=batch_size,
                                              allocated_cpus=args.cpus,
-                                             lstm_gpus=[args.lstm_gpu])
+                                             lstm_gpus=[args.lstm_gpu],
+                                             nmt_gpus=[args.nmt_gpu])
             benchmarker.set_configs(configs)
             benchmarker.run(args.num_trials, batch_size, input_length)
