@@ -1,6 +1,5 @@
 FROM model-comp/tf-rpc:latest
 
-ENV CLIPPER_MODEL_CHECKPOINT_PATH=/model/checkpoint
 ENV CLIPPER_MODEL_VOCAB_PATH=/model/vocab
 
 COPY tf_lstm_model_data /model

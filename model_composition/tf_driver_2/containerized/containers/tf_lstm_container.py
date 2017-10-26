@@ -25,9 +25,9 @@ Adapted from https://github.com/adeshpande3/LSTM-Sentiment-Analysis
 """
 class TfLstmContainer(rpc.ModelContainerBase):
 
-    def __init__(self, vocab_dir_path, checkpoint_path):
+    def __init__(self, vocab_dir_path):
         self.vocabulary = Vocabulary(vocab_dir_path)
-        self.sess, self.input_data, self.sentiment_preds = self._create_model_graph(checkpoint_path)
+        self.sess, self.input_data, self.sentiment_preds = self._create_model_graph()
 
     def predict_strings(self, inputs):
         """
@@ -74,7 +74,7 @@ class TfLstmContainer(rpc.ModelContainerBase):
         input_str = input_str.lower().replace("<br />", " ")
         return re.sub(RE_SPECIAL_CHARS, "", input_str)
 
-    def _create_model_graph(self, checkpoint_path):
+    def _create_model_graph(self):
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_MEM_FRAC)
         sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True))
 
@@ -94,9 +94,6 @@ class TfLstmContainer(rpc.ModelContainerBase):
             
             sentiment_scores = tf.matmul(last, weight) + bias
 
-            saver = tf.train.Saver()
-            saver.restore(sess, tf.train.latest_checkpoint(checkpoint_path))
-
         return sess, input_data, sentiment_scores
 
 if __name__ == "__main__":
@@ -113,13 +110,6 @@ if __name__ == "__main__":
     except KeyError:
         print(
             "ERROR: CLIPPER_MODEL_VERSION environment variable must be set",
-            file=sys.stdout)
-        sys.exit(1)
-    try:
-        model_checkpoint_path = os.environ["CLIPPER_MODEL_CHECKPOINT_PATH"]
-    except KeyError:
-        print(
-            "ERROR: CLIPPER_MODEL_CHECKPOINT_PATH environment variable must be set",
             file=sys.stdout)
         sys.exit(1)
     try:
@@ -145,7 +135,7 @@ if __name__ == "__main__":
         print("Connecting to Clipper with default port: 7000")
 
     input_type = "strings"
-    container = TfLstmContainer(model_vocab_path, model_checkpoint_path)
+    container = TfLstmContainer(model_vocab_path)
     rpc_service = rpc.RPCService()
     rpc_service.start(container, ip, port, model_name, model_version,
                       input_type)
