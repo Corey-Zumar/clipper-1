@@ -135,7 +135,7 @@ class DriverBenchmarker(object):
         self.models_dict = models_dict
         self.trial_length = trial_length
         self.process_num = process_num
-        self.loaded_text = false
+        self.loaded_text = False
 
     def set_configs(self, configs):
         self.configs = configs
