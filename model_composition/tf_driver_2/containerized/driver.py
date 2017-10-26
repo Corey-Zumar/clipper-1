@@ -130,7 +130,7 @@ def get_batch_sizes(metrics_json):
 
 class Predictor(object):
 
-    def __init__(self, config, clipper_metrics):
+    def __init__(self, clipper_metrics):
         self.outstanding_reqs = {}
         self.client = Client(CLIPPER_ADDRESS, CLIPPER_SEND_PORT, CLIPPER_RECV_PORT)
         self.client.start()
