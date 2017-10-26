@@ -135,6 +135,7 @@ class DriverBenchmarker(object):
         self.models_dict = models_dict
         self.trial_length = trial_length
         self.process_num = process_num
+        self.loaded_text = false
 
     def set_configs(self, configs):
         self.configs = configs
@@ -167,7 +168,7 @@ class DriverBenchmarker(object):
 
     def _gen_inputs(self, model_name, num_inputs=1000, input_length=20):
         if not self.loaded_text:
-            self.text = self.load_text_fn(model_name)
+            self.text = self._get_load_text_fn(model_name)()
             self.loaded_text = True
 
         inputs = []
@@ -189,13 +190,13 @@ class DriverBenchmarker(object):
         return inputs
 
     def _get_load_text_fn(self, model_name):
-        if self.model_app_name == NMT_MODEL_NAME:
+        if model_name == NMT_MODEL_NAME:
             return self._load_nmt_text
 
-        elif self.model_app_name == LANG_DETECT_MODEL_NAME:
+        elif model_name == LANG_DETECT_MODEL_NAME:
             return self._load_detect_text
 
-        elif self.model_app_name == LSTM_MODEL_APP_NAME:
+        elif model_name == LSTM_MODEL_APP_NAME:
             return self._load_lstm_text
 
     def _load_nmt_text(self):
