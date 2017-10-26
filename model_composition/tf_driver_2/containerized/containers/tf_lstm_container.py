@@ -94,6 +94,8 @@ class TfLstmContainer(rpc.ModelContainerBase):
             
             sentiment_scores = tf.matmul(last, weight) + bias
 
+        sess.run(tf.global_variables_initializer())
+
         return sess, input_data, sentiment_scores
 
 if __name__ == "__main__":

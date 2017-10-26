@@ -45,6 +45,8 @@ class TfLstm(ModelBase):
         inputs : [str]
             A list of string inputs in one of 64 languages
         """
+        inputs = [str(input_item.tobytes()) for input_item in inputs]
+
         inputs_matrix = self._get_inputs_matrix(inputs)
         feed_dict = {
             self.input_data : inputs_matrix
@@ -81,11 +83,11 @@ class TfLstm(ModelBase):
         input_str = input_str.lower().replace("<br />", " ")
         return re.sub(RE_SPECIAL_CHARS, "", input_str)
 
-    def _create_model_graph(self, checkpoint_path, gpu_num):
+    def _create_model_graph(self):
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_MEM_FRAC)
         sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True))
 
-        with tf.device("/gpu:{}".format(gpu_num)):
+        with tf.device("/gpu:0"):
             input_data = tf.placeholder(tf.int32, [None, MAX_SEQ_LENGTH])
 
             data = tf.nn.embedding_lookup(self.vocabulary.get_word_vecs(), input_data)
@@ -101,7 +103,6 @@ class TfLstm(ModelBase):
             
             sentiment_scores = tf.matmul(last, weight) + bias
 
-            saver = tf.train.Saver()
-            saver.restore(sess, tf.train.latest_checkpoint(checkpoint_path))
+        sess.run(tf.global_variables_initializer())
 
         return sess, input_data, sentiment_scores
