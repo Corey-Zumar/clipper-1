@@ -187,7 +187,7 @@ class DriverBenchmarker(object):
 
         bytes_inputs = [np.frombuffer(bytearray(input_item), dtype=np.uint8) for input_item in inputs]
 
-        return inputs
+        return bytes_inputs
 
     def _get_load_text_fn(self, model_name):
         if model_name == NMT_MODEL_NAME:
