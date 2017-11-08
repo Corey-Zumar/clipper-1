@@ -227,7 +227,7 @@ class VocabLoader(object):
             pad_left = (max_sent_len - toks_len) / 2
             pad_right = int(np.ceil((max_sent_len - toks_len) / 2.0))
         else:
-            return None
+            return toks[:max_sent_len]
         toks_ids = [1 for _ in range(pad_left)] + \
                    [self.word2id[t] if t in self.word2id else 0 for t in toks] + \
                    [1 for _ in range(pad_right)]
