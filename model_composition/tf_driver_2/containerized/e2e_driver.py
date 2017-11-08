@@ -232,6 +232,7 @@ class Predictor(object):
 
 class DriverBenchmarker(object):
     def __init__(self, configs, queue, client_num, latency_upper_bound, input_size):
+        self.loaded_text = False
         self.configs = configs
         self.max_batch_size = np.max([config.batch_size for config in configs])
         self.queue = queue
@@ -241,7 +242,6 @@ class DriverBenchmarker(object):
         base_inputs = self._gen_inputs(num_inputs=1000, input_length=input_size)
         self.inputs = [i for _ in range(40) for i in base_inputs]
         self.latency_upper_bound = latency_upper_bound
-
     def run(self):
         self.initialize_request_rate()
         self.find_steady_state()
