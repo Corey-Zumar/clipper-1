@@ -22,13 +22,14 @@ class LangDetectContainer(rpc.ModelContainerBase):
         self.lang_codes = util.load_language_codes
 
 
-    def predict_strings(self, inputs):
+    def predict_bytes(self, inputs):
         """
         Parameters
         ------------
         inputs : [str]
             A list of string inputs in one of 64 languages
         """
+        inputs = [str(input_item.tobytes()) for input_item in inputs]
 
         ids_inputs = [self.vocab.text2id(input_text) for input_text in inputs]
         feed_dict = {
@@ -126,7 +127,7 @@ if __name__ == "__main__":
     else:
         print("Connecting to Clipper with default port: 7000")
 
-    input_type = "strings"
+    input_type = "bytes"
     container = LangDetectContainer(model_config_path,
                                     model_checkpoint_path,
                                     model_vocab_path)
