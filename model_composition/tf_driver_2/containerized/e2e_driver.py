@@ -204,7 +204,7 @@ class Predictor(object):
             if lang_classification == DEFAULT_OUTPUT:
                 return
             elif lang_classification == LANG_CLASSIFICATION_GERMAN:
-                return self.client.send_request(NMT_MODEL_APP_NAME, lang_input)
+                return self.client.send_request(NMT_MODEL_APP_NAME, lang_input) \
                                   .then(nmt_continuation) \
                                   .then(lstm_continuation)
             elif lang_classification == LANG_CLASSIFICATION_ENGLISH:
