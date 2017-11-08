@@ -19,8 +19,6 @@ class LangDetectContainer(rpc.ModelContainerBase):
     def __init__(self, config_path, checkpoint_path, vocab_path):
         self.sess, self.inputs_tensor, self.scores_tensor = self._load_model(config_path, checkpoint_path)
         self.vocab = self._load_vocab(vocab_path)
-        self.lang_codes = util.load_language_codes()
-
 
     def predict_bytes(self, inputs):
         """
@@ -41,8 +39,8 @@ class LangDetectContainer(rpc.ModelContainerBase):
         for score_dist in all_scores:
             parsed_dist = [float(str(i)) for i in score_dist]
             pred_class = self.vocab.class_names[int(np.argmax(parsed_dist))]
-            pred_lang = self.lang_codes[pred_class]
-            outputs.append(pred_lang)
+            print(pred_class)
+            outputs.append(str(pred_class.replace("#", "")))
 
         return outputs
         
