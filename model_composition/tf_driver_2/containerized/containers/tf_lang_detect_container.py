@@ -19,7 +19,7 @@ class LangDetectContainer(rpc.ModelContainerBase):
     def __init__(self, config_path, checkpoint_path, vocab_path):
         self.sess, self.inputs_tensor, self.scores_tensor = self._load_model(config_path, checkpoint_path)
         self.vocab = self._load_vocab(vocab_path)
-        self.lang_codes = util.load_language_codes
+        self.lang_codes = util.load_language_codes()
 
 
     def predict_bytes(self, inputs):
