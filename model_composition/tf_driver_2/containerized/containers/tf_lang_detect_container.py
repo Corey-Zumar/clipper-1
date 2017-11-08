@@ -29,7 +29,9 @@ class LangDetectContainer(rpc.ModelContainerBase):
         """
         inputs = [str(input_item.tobytes()) for input_item in inputs]
 
-        ids_inputs = [self.vocab.text2id(input_text) for input_text in inputs]
+        ids_inputs = np.array([self.vocab.text2id(input_text) for input_text in inputs])
+        print(ids_inputs.shape)
+
         feed_dict = {
             self.inputs_tensor : ids_inputs
         }
