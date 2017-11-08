@@ -231,14 +231,14 @@ class Predictor(object):
             .then(lang_detect_continuation)
 
 class DriverBenchmarker(object):
-    def __init__(self, configs, queue, client_num, latency_upper_bound):
+    def __init__(self, configs, queue, client_num, latency_upper_bound, input_size):
         self.configs = configs
         self.max_batch_size = np.max([config.batch_size for config in configs])
         self.queue = queue
         assert client_num == 0
         self.client_num = client_num
         logger.info("Generating random inputs")
-        base_inputs = self._gen_inputs(num_inputs=1000, input_length=20)
+        base_inputs = self._gen_inputs(num_inputs=1000, input_length=input_size)
         self.inputs = [i for _ in range(40) for i in base_inputs]
         self.latency_upper_bound = latency_upper_bound
 
@@ -360,6 +360,8 @@ if __name__ == "__main__":
     ## THIS IS FOR MAX THRU
     ## FORMAT IS (LANG_DETECT, NMT, LSTM)
 
+    input_size = 20
+
     max_thru_reps = [(1,1,1)]
 
     max_thru_batches = (4,4,4)
@@ -386,22 +388,25 @@ if __name__ == "__main__":
                               num_replicas=lang_detect_reps,
                               cpus_per_replica=1,
                               allocated_cpus=get_cpus(lang_detect_reps),
-                              allocated_gpus=get_gpus(lang_detect_reps)),
+                              allocated_gpus=get_gpus(lang_detect_reps),
+                              input_size=input_size),
             setup_nmt(batch_size=max_thru_batches[nmt_batch_idx],
                       num_replicas=nmt_reps,
                       cpus_per_replica=1,
                       allocated_cpus=get_cpus(nmt_reps),
-                      allocated_gpus=get_gpus(nmt_reps)),
+                      allocated_gpus=get_gpus(nmt_reps),
+                      input_size=input_size),
             setup_lstm(batch_size=max_thru_batches[lstm_batch_idx],
                        num_replicas=lstm_reps,
                        cpus_per_replica=1,
                        allocated_cpus=get_cpus(lstm_reps),
-                       allocated_gpus=get_gpus(lstm_reps))
+                       allocated_gpus=get_gpus(lstm_reps),
+                       input_size=input_size)
         ]
 
         client_num = 0
 
-        benchmarker = DriverBenchmarker(configs, queue, client_num, max_thru_latency_upper_bound)
+        benchmarker = DriverBenchmarker(configs, queue, client_num, max_thru_latency_upper_bound, input_size)
 
         p = Process(target=benchmarker.run)
         p.start()
