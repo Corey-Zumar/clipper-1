@@ -229,7 +229,7 @@ class VocabLoader(object):
         else:
             toks = toks[:max_sent_len]
             pad_left = 0
-            pad_right 0
+            pad_right = 0
         toks_ids = [1 for _ in range(pad_left)] + \
                    [self.word2id[t] if t in self.word2id else 0 for t in toks] + \
                    [1 for _ in range(pad_right)]
