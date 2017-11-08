@@ -5,6 +5,7 @@ import time
 import base64
 import logging
 import json
+import math
 
 from clipper_admin import ClipperConnection, DockerContainerManager
 from threading import Lock
