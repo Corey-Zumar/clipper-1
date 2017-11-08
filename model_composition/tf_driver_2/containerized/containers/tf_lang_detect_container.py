@@ -39,8 +39,8 @@ class LangDetectContainer(rpc.ModelContainerBase):
 
         outputs = []
         for score_dist in all_scores:
-            parsed_dist = [float(str(i)) for i in dist]
-            pred_class = class_names[int(np.argmax(parsed_dist))]
+            parsed_dist = [float(str(i)) for i in score_dist]
+            pred_class = self.vocab.class_names[int(np.argmax(parsed_dist))]
             pred_lang = self.lang_codes[pred_class]
             outputs.append(pred_lang)
 
