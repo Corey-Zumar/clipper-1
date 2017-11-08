@@ -35,7 +35,7 @@ class LangDetectContainer(rpc.ModelContainerBase):
         feed_dict = {
             self.inputs_tensor : ids_inputs
         }
-        all_scores = sess.run(self.scores_tensor, feed_dict=feed_dict)
+        all_scores = self.sess.run(self.scores_tensor, feed_dict=feed_dict)
 
         outputs = []
         for score_dist in all_scores:
