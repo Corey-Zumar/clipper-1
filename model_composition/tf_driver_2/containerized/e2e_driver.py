@@ -16,6 +16,8 @@ from containerized_utils import driver_utils
 from containerized_utils.driver_utils import INCREASING, DECREASING, CONVERGED_HIGH, CONVERGED, UNKNOWN
 from multiprocessing import Process, Queue
 
+CURR_DIR = os.path.dirname(os.path.realpath(__file__))
+
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
     datefmt='%y-%m-%d:%H:%M:%S',
