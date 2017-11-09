@@ -366,6 +366,10 @@ if __name__ == "__main__":
     ## THIS IS FOR MAX THRU
     ## FORMAT IS (LANG_DETECT, NMT, LSTM)
 
+    estimated_thru = 20 / (1.0 / 3)
+
+    initial_request_delay = (1.0 / estimated_thru) - .005
+
     input_size = 20
 
     max_thru_reps = [(1,1,1)]
@@ -412,7 +416,7 @@ if __name__ == "__main__":
 
         client_num = 0
 
-        benchmarker = DriverBenchmarker(configs, queue, client_num, max_thru_latency_upper_bound, input_size)
+        benchmarker = DriverBenchmarker(configs, queue, client_num, max_thru_latency_upper_bound, input_size, initial_request_delay)
 
         p = Process(target=benchmarker.run)
         p.start()
