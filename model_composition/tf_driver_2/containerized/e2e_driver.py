@@ -172,7 +172,7 @@ class Predictor(object):
         thru = float(self.batch_num_complete) / (end_time - self.start_time).total_seconds()
         self.stats["thrus"].append(thru)
         self.stats["p99_lats"].append(p99)
-        self.stats["all_lats"].append(lats)
+        self.stats["all_lats"].append(self.latencies)
         self.stats["mean_lats"].append(mean)
         if self.get_clipper_metrics:
             metrics = self.cl.inspect_instance()
@@ -234,7 +234,9 @@ class Predictor(object):
             .then(lang_detect_continuation)
 
 class DriverBenchmarker(object):
-    def __init__(self, configs, queue, client_num, latency_upper_bound, input_size):
+    def __init__(self, configs, queue, client_num, latency_upper_bound, input_size, delay=None):
+        if delay:
+            self.delay = delay
         self.loaded_text = False
         self.configs = configs
         self.max_batch_size = np.max([config.batch_size for config in configs])
@@ -246,7 +248,8 @@ class DriverBenchmarker(object):
         self.inputs = [i for _ in range(40) for i in base_inputs]
         self.latency_upper_bound = latency_upper_bound
     def run(self):
-        self.initialize_request_rate()
+        if not self.delay:
+            self.initialize_request_rate()
         self.find_steady_state()
         return
 

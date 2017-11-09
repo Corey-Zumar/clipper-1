@@ -14,7 +14,7 @@ GPU_MEM_FRAC = .95
 
 # Sentiment is either positive or negative
 NUM_CLASSES = 2
-MAX_SEQ_LENGTH = 30
+MAX_SEQ_LENGTH = 100
 NUM_DIMENSIONS = 300
 LSTM_UNITS = 64
 
