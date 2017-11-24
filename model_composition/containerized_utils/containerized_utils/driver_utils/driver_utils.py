@@ -99,7 +99,7 @@ def save_results(configs, clipper_conn, client_metrics, results_dir, prefix="res
 
     results_obj = {
         "node_configs": [c.__dict__ for c in configs],
-        # "clipper_metrics": clipper_conn.inspect_instance(),
+        "clipper_metrics": clipper_conn.inspect_instance(),
         "client_metrics": client_metrics,
     }
     results_file = os.path.join(results_dir, "{prefix}-{ts:%y%m%d_%H%M%S}.json".format(
