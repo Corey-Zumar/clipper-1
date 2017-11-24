@@ -284,7 +284,7 @@ class DockerContainerManager(ContainerManager):
                 else:
                     gpu_num = None
                 cpus = allocated_cpus[i*cpus_per_replica: (i+1)*cpus_per_replica]
-                cpus = get_virtual_cpus(cpus)
+                cpus = self.get_virtual_cpus(cpus)
                 cpus = [str(c) for c in cpus]
                 cpu_str = ",".join(cpus)
 
@@ -303,7 +303,7 @@ class DockerContainerManager(ContainerManager):
                 cur_container = current_replicas.pop()
                 cur_container.stop()
 
-    def get_virtual_cpus(pcpus):
+    def get_virtual_cpus(self, pcpus):
         """
         Given a list of physical cpus,
         obtains a list of corresponding virtual cpus.
