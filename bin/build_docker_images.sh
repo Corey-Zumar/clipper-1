@@ -19,8 +19,8 @@ tag=$(<VERSION.txt)
 # Build the Clipper Docker images
 time docker build -t clipper/clipper-base:$tag -f ClipperBaseDockerfile ./
 time docker build --build-arg CODE_VERSION=$tag -t clipper/zmq_frontend:$tag -f ZmqFrontendDockerfile ./
-exit
 time docker build --build-arg CODE_VERSION=$tag -t clipper/management_frontend:$tag -f ManagementFrontendDockerfile ./
+exit
 cd -
 
 

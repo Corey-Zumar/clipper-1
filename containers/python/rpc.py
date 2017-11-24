@@ -132,13 +132,10 @@ def handle_predictions(predict_fn, request_queue, response_queue):
         for each input included in the specified
         predict response
     """
-    t2 = datetime.now()
 
     while True:
         prediction_request = request_queue.get(block=True)
         t1 = datetime.now()
-
-        print("batch_delay: {} us".format((t1 - t2).microseconds))
 
         outputs = predict_fn(prediction_request.inputs)
         # Type check the outputs:
@@ -175,53 +172,33 @@ def handle_predictions(predict_fn, request_queue, response_queue):
         response_queue.put(response)
 
         t2 = datetime.now()
-        print("handle: {pred_time} us".format(pred_time=(t2 - t1).microseconds))
-        sys.stdout.flush()
-        sys.stderr.flush()
+        print("handle: {pred_time} us".format((t2 - t1).microseconds))
 
 
 
 
 class Server(threading.Thread):
-    def __init__(self, context, clipper_ip, send_port, recv_port):
+    def __init__(self, context, clipper_ip, clipper_port):
         threading.Thread.__init__(self)
         self.context = context
         self.clipper_ip = clipper_ip
-        self.send_port = send_port
-        self.recv_port = recv_port
+        self.clipper_port = clipper_port
         self.event_history = EventHistory(EVENT_HISTORY_BUFFER_SIZE)
         self.full_buffers = 0
         self.request_queue = Queue()
         self.response_queue = Queue()
 
-    def connect(self):
-        // 7000
-        recv_address = "tcp://{0}:{1}".format(self.clipper_ip,
-                                                 self.recv_port)
-        // 7001
-        send_address = "tcp://{0}:{1}".format(self.clipper_ip,
-                                                 self.send_port)
 
-        self.context = zmq.Context()
-        self.recv_socket = self.context.socket(zmq.DEALER)
-        self.recv_poller = zmq.Poller()
-        self.recv_poller.register(self.recv_socket, zmq.POLLIN)
-
-        self.recv_socket.connect(clipper_recv_address)
-        # Send a blank message to establish a connection
-        self.recv_socket.send("", zmq.SNDMORE)
-        self.recv_socket.send("")
-        receivable_sockets = dict(self.recv_poller.poll(0))
-        if not(self.recv_socket in receivable_sockets and receivable_sockets[self.recv_socket] == zmq.POLLIN):
-            raise RuntimeError
-
-        self.recv_socket.recv()
-        connection_id_bytes = self.recv_socket.recv()
-        self.connection_id = struct.unpack("<I", client_id_bytes)[0]
-        self.send_socket = self.context.socket(zmq.DEALER)
-        self.send_socket.connect(clipper_send_address)
-
-
+    def handle_feedback_request(self, feedback_request):
+        """
+        Returns
+        -------
+        FeedbackResponse
+            A feedback response corresponding
+            to the specified feedback request
+        """
+        response = FeedbackResponse(feedback_request.msg_id, "ACK")
+        return response
 
     def get_prediction_function(self):
         if self.model_input_type == DATA_TYPE_INTS:
@@ -243,88 +220,136 @@ class Server(threading.Thread):
     def get_event_history(self):
         return self.event_history.get_events()
 
-    def send_response(self):
-        if not self.response_queue.empty() or self.full_buffers == 2:
-            response = self.response_queue.get()
-            self.full_buffers -= 1
-            # t3 = datetime.now()
-            response.send(self.send_socket, self.connection_id)
-            sys.stdout.flush()
-            sys.stderr.flush()
-
-    def recv_request(self):
-        self.recv_socket.recv()
-        msg_type_bytes = self.recv_socket.recv()
-        msg_type = struct.unpack("<I", msg_type_bytes)[0]
-        if msg_type is not MESSAGE_TYPE_CONTAINER_CONTENT:
-            raise RuntimeError("Wrong message type: {}".format(msg_type))
-        self.event_history.insert(
-            EVENT_HISTORY_RECEIVED_CONTAINER_CONTENT)
-        msg_id_bytes = self.recv_socket.recv()
-        msg_id = int(struct.unpack("<I", msg_id_bytes)[0])
-
-        print("Got start of message %d " % msg_id)
-        # list of byte arrays
-        request_header = self.recv_socket.recv()
-        request_type = struct.unpack("<I", request_header)[0]
-
-        if request_type == REQUEST_TYPE_PREDICT:
-            input_header_size = self.recv_socket.recv()
-            input_header = self.recv_socket.recv()
-            parsed_input_header = np.frombuffer(input_header, dtype=np.uint32)
-            [
-                input_type,
-                num_inputs,
-                input_sizes
-            ] = [
-                parsed_input_header[0],
-                parsed_input_header[1],
-                parsed_input_header[2:]
-            ]
-
-            if int(input_type) != int(self.model_input_type):
-                print((
-                    "Received incorrect input. Expected {expected}, "
-                    "received {received}").format(
-                        expected=input_type_to_string(
-                            int(self.model_input_type)),
-                        received=input_type_to_string(
-                            int(input_type))))
-                raise
-
-            inputs = []
-            for _ in range(num_inputs):
-                input_item = self.recv_socket.recv()
-                input_item = np.frombuffer(input_item, dtype=input_type_to_dtype(input_type))
-                inputs.append(input_item)
-
-            t2 = datetime.now()
-
-            prediction_request = PredictionRequest(
-                msg_id_bytes, inputs)
-
-            self.request_queue.put(prediction_request)
-            self.full_buffers += 1
-
     def run(self):
         self.handler_thread = Thread(target=handle_predictions,
                                      args=(self.get_prediction_function(),
                                            self.request_queue,
                                            self.response_queue))
         self.handler_thread.start()
+
         print("Serving predictions for {0} input type.".format(
             input_type_to_string(self.model_input_type)))
-        self.connect()
+        connected = False
+        clipper_address = "tcp://{0}:{1}".format(self.clipper_ip,
+                                                 self.clipper_port)
+        poller = zmq.Poller()
         sys.stdout.flush()
         sys.stderr.flush()
         while True:
-            receivable_sockets = dict(self.recv_poller.poll(SOCKET_POLLING_TIMEOUT_MILLIS))
-            if self.recv_socket in receivable_sockets and receivable_sockets[self.recv_socket] == zmq.POLLIN:
-                self.recv_request()
-            self.send_response()
+            socket = self.context.socket(zmq.DEALER)
+            poller.register(socket, zmq.POLLIN)
+            socket.connect(clipper_address)
+            self.send_heartbeat(socket)
+            while True:
+                receivable_sockets = dict(
+                    poller.poll(SOCKET_POLLING_TIMEOUT_MILLIS))
+                if socket not in receivable_sockets or receivable_sockets[socket] != zmq.POLLIN:
+                    # Failed to receive a message before the specified polling timeout
+                    if connected:
+                        curr_time = datetime.now()
+                        time_delta = curr_time - last_activity_time_millis
+                        time_delta_millis = (time_delta.seconds * 1000) + (
+                            time_delta.microseconds / 1000)
+                        if time_delta_millis >= SOCKET_ACTIVITY_TIMEOUT_MILLIS:
+                            # Terminate the session
+                            print("Connection timed out, reconnecting...")
+                            sys.stdout.flush()
+                            sys.stderr.flush()
+                            connected = False
+                            poller.unregister(socket)
+                            socket.close()
+                            break
+                        else:
+                            self.send_heartbeat(socket)
+                    continue
 
-            sys.stdout.flush()
-            sys.stderr.flush()
+                # Received a message before the polling timeout
+                if not connected:
+                    connected = True
+                last_activity_time_millis = datetime.now()
+
+                t1 = datetime.now()
+                # Receive delimiter between routing identity and content
+                socket.recv()
+                msg_type_bytes = socket.recv()
+                msg_type = struct.unpack("<I", msg_type_bytes)[0]
+                if msg_type == MESSAGE_TYPE_HEARTBEAT:
+                    self.event_history.insert(EVENT_HISTORY_RECEIVED_HEARTBEAT)
+                    print("Received heartbeat!")
+                    heartbeat_type_bytes = socket.recv()
+                    heartbeat_type = struct.unpack("<I",
+                                                   heartbeat_type_bytes)[0]
+                    if heartbeat_type == HEARTBEAT_TYPE_REQUEST_CONTAINER_METADATA:
+                        self.send_container_metadata(socket)
+                    continue
+                elif msg_type == MESSAGE_TYPE_NEW_CONTAINER:
+                    self.event_history.insert(
+                        EVENT_HISTORY_RECEIVED_CONTAINER_METADATA)
+                    print(
+                        "Received erroneous new container message from Clipper!"
+                    )
+                    continue
+                elif msg_type == MESSAGE_TYPE_CONTAINER_CONTENT:
+                    self.event_history.insert(
+                        EVENT_HISTORY_RECEIVED_CONTAINER_CONTENT)
+                    msg_id_bytes = socket.recv()
+                    msg_id = int(struct.unpack("<I", msg_id_bytes)[0])
+
+                    print("Got start of message %d " % msg_id)
+                    # list of byte arrays
+                    request_header = socket.recv()
+                    request_type = struct.unpack("<I", request_header)[0]
+
+                    if request_type == REQUEST_TYPE_PREDICT:
+                        input_header_size = socket.recv()
+                        input_header = socket.recv()
+                        parsed_input_header = np.frombuffer(input_header, dtype=np.uint32)
+                        [
+                            input_type,
+                            num_inputs,
+                            input_sizes
+                        ] = [
+                            parsed_input_header[0],
+                            parsed_input_header[1],
+                            parsed_input_header[2:]
+                        ]
+
+                        if int(input_type) != int(self.model_input_type):
+                            print((
+                                "Received incorrect input. Expected {expected}, "
+                                "received {received}").format(
+                                    expected=input_type_to_string(
+                                        int(self.model_input_type)),
+                                    received=input_type_to_string(
+                                        int(input_type))))
+                            raise
+
+                        inputs = []
+                        for _ in range(num_inputs):
+                            input_item = socket.recv()
+                            input_item = np.frombuffer(input_item, dtype=input_type_to_dtype(input_type))
+                            inputs.append(input_item)
+
+                        t2 = datetime.now()
+
+                        prediction_request = PredictionRequest(
+                            msg_id_bytes, inputs)
+
+                        self.request_queue.put(prediction_request)
+                        self.full_buffers += 1
+
+                        if not self.response_queue.empty() or self.full_buffers == 2:
+                            response = self.response_queue.get()
+                            self.full_buffers -= 1
+                            # t3 = datetime.now()
+                            response.send(socket, self.event_history)
+
+                        sys.stdout.flush()
+                        sys.stderr.flush()
+
+
+                sys.stdout.flush()
+                sys.stderr.flush()
 
     def send_container_metadata(self, socket):
         socket.send("", zmq.SNDMORE)
@@ -404,11 +429,8 @@ class PredictionResponse:
                      self.content_end_position + output_len] = output
         self.content_end_position += output_len
 
-    def send(self, socket, connection_id):
+    def send(self, socket, event_history):
         socket.send("", flags=zmq.SNDMORE)
-        socket.send(
-            struct.pack("<I", self.connection_id),
-            flags=zmq.SNDMORE)
         socket.send(
             struct.pack("<I", MESSAGE_TYPE_CONTAINER_CONTENT),
             flags=zmq.SNDMORE)
@@ -417,6 +439,7 @@ class PredictionResponse:
         socket.send(
             struct.pack("<I", self.content_end_position), flags=zmq.SNDMORE)
         socket.send(self.output_buffer[0:self.content_end_position])
+        event_history.insert(EVENT_HISTORY_SENT_CONTAINER_CONTENT)
 
     def expand_buffer_if_necessary(self, num_outputs, content_length_bytes):
         new_size_bytes = BYTES_PER_INT + (
@@ -476,7 +499,7 @@ class RPCService:
             print("Cannot retrieve message history for inactive RPC service!")
             raise
 
-    def start(self, model, host, send_port, recv_port, model_name, model_version, input_type):
+    def start(self, model, host, port, model_name, model_version, input_type):
         """
         Args:
             model (object): The loaded model object ready to make predictions.
@@ -493,12 +516,14 @@ class RPCService:
             print("Error resolving %s: %s" % (host, e))
             sys.exit(1)
         context = zmq.Context()
-        self.server = Server(context, ip, send_port, recv_port)
+        self.server = Server(context, ip, port)
         model_input_type = string_to_input_type(input_type)
         self.server.model_name = model_name
         self.server.model_version = model_version
         self.server.model_input_type = model_input_type
         self.server.model = model
+        print("Starting RPC Server. Model: {}:{}, host: {}, port: {}".format(
+            model_name, model_version, host, port))
         self.server.run()
 
 

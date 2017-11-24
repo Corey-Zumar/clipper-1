@@ -36,9 +36,7 @@ DataType parse_input_type(std::string type_string);
 
 class VersionedModelId {
  public:
-  VersionedModelId() = default;
-
-  VersionedModelId(std::string name, std::string id);
+  VersionedModelId(const std::string name, const std::string id);
 
   std::string get_name() const;
   std::string get_id() const;
