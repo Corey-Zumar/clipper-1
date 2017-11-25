@@ -51,7 +51,7 @@ def setup_clipper(configs):
         query_frontend_image="clipper/zmq_frontend:develop",
         redis_cpu_str="0",
         mgmt_cpu_str="0",
-        query_cpu_str="0,16,1,17,2,18")
+        query_cpu_str="0,16,1,17,2,18,3,19")
     time.sleep(10)
     for config in configs:
         driver_utils.setup_heavy_node(cl, config, DEFAULT_OUTPUT)
@@ -430,7 +430,7 @@ if __name__ == "__main__":
 
     for inception_reps, log_reg_reps, resnet_reps, ksvm_reps in max_thru_reps:
         # Note: These are PHYSICAL CPU numbers
-        total_cpus = range(3,13)
+        total_cpus = range(4,14)
 
         def get_cpus(num_cpus):
             return [total_cpus.pop() for _ in range(num_cpus)]
