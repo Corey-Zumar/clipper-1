@@ -428,7 +428,8 @@ if __name__ == "__main__":
     ksvm_batch_idx = 3
 
     for inception_reps, log_reg_reps, resnet_reps, ksvm_reps in min_lat_reps:
-        total_cpus = range(9,29)
+        # Note: These are PHYSICAL CPU numbers
+        total_cpus = range(4,15)
 
         def get_cpus(num_cpus):
             return [total_cpus.pop() for _ in range(num_cpus)]
@@ -438,8 +439,11 @@ if __name__ == "__main__":
         def get_gpus(num_gpus):
             return [total_gpus.pop() for _ in range(num_gpus)]
 
-        inception_cpus_per_replica = 2
-        resnet_cpus_per_replica = 3
+        # Note: cpus_per_replica refers to PHYSICAL CPUs per replica
+
+        inception_cpus_per_replica = 1
+        resnet_cpus_per_replica = 1
+
 
         configs = [
             setup_inception(batch_size=min_lat_batches[inception_batch_idx],
