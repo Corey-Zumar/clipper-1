@@ -307,7 +307,7 @@ class DriverBenchmarker(object):
         idx = 0
         done = False
         # start checking for steady state after 7 trials
-        last_checked_length = 6
+        last_checked_length = 10
         while not done:
             resnet_input, inception_input = self.inputs[idx]
             predictor.predict(resnet_input, inception_input)
