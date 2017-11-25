@@ -430,7 +430,7 @@ if __name__ == "__main__":
 
     for inception_reps, log_reg_reps, resnet_reps, ksvm_reps in max_thru_reps:
         # Note: These are PHYSICAL CPU numbers
-        total_cpus = range(4,16)
+        total_cpus = range(4,15)
 
         def get_cpus(num_cpus):
             return [total_cpus.pop() for _ in range(num_cpus)]
