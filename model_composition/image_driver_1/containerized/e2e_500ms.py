@@ -373,14 +373,14 @@ if __name__ == "__main__":
     reps = [(1, 1, 1, 1),
             (1, 1, 2, 1),
             (1, 1, 3, 1),
-            (2, 1, 3, 1),
+            (1, 1, 4, 1),
             (2, 1, 4, 1),
             (2, 1, 5, 1),
-            (3, 1, 5, 1)]
+            (2, 1, 6, 1)]
 
 
     ## FORMAT IS (INCEPTION, LOG REG, RESNET, KSVM)
-    batches = (10, 1, 7, 6)
+    batches = (4, 2, 2, 14)
 
     latency_upper_bound = 1.0
 
@@ -428,7 +428,8 @@ if __name__ == "__main__":
     ksvm_batch_idx = 3
 
     for inception_reps, log_reg_reps, resnet_reps, ksvm_reps in reps:
-        total_cpus = range(9,29)
+        # Note: These are PHYSICAL CPU numbers
+        total_cpus = range(4,15)
 
         def get_cpus(num_cpus):
             return [total_cpus.pop() for _ in range(num_cpus)]
@@ -437,6 +438,8 @@ if __name__ == "__main__":
 
         def get_gpus(num_gpus):
             return [total_gpus.pop() for _ in range(num_gpus)]
+
+        # Note: cpus_per_replica refers to PHYSICAL CPUs per replica
 
         configs = [
             setup_inception(batch_size=batches[inception_batch_idx],
