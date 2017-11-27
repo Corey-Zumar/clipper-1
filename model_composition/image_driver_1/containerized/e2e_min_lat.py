@@ -268,8 +268,10 @@ class DriverBenchmarker(object):
         self.delay = request_delay
 
     def run(self):
-        if not self.delay
+        if not self.delay:
             self.initialize_request_rate()
+        else:
+            self.delay = float(self.delay)
         self.find_steady_state()
         return
 
