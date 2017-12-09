@@ -476,7 +476,7 @@ if __name__ == "__main__":
             #                 cpus_per_replica=1,
             #                 allocated_cpus=get_cpus(resnet_reps),
             #                 allocated_gpus=get_gpus(resnet_reps))
-            setup_pytorch_resnet(batch_size=contention[resnet_batch_idx],
+            setup_pytorch_resnet(batch_size=contention_batches[resnet_batch_idx],
                                  num_replicas=resnet_reps,
                                  cpus_per_replica=1,
                                  allocated_cpus=get_cpus(resnet_reps),
