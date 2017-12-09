@@ -27,8 +27,8 @@ class TorchContainer(rpc.ModelContainerBase):
             self.model.cuda()
 
         self.model.eval()
-        self.height = 299
-        self.width = 299
+        self.height = 224
+        self.width = 224
 
         normalize = transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
