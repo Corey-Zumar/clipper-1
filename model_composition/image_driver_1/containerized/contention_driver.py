@@ -265,7 +265,7 @@ class Predictor(object):
                     update_perf_stats()
                 classifications_lock.release()
 
-        self.client.send_request(TF_RESNET_MODEL_APP_NAME, resnet_input) \
+        self.client.send_request(PYTORCH_RESNET_MODEL_APP_NAME, resnet_input) \
             .then(resnet_feats_continuation) \
             .then(svm_continuation)
 
