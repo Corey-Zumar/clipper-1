@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class TorchContainer(rpc.ModelContainerBase):
     def __init__(self):
         self.model = models.resnet152(pretrained=True)
-        layers = list(resnet.children())[:-1] # delete the last fc layer.
+        layers = list(self.model.children())[:-1] # delete the last fc layer.
         self.model = nn.Sequential(*layers)
 
         if torch.cuda.is_available():
