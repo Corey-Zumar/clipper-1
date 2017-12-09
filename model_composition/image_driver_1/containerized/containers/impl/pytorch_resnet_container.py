@@ -21,7 +21,7 @@ class TorchContainer(rpc.ModelContainerBase):
     def __init__(self):
         self.model = models.resnet152(pretrained=True)
         layers = list(self.model.children())[:-1] # delete the last fc layer.
-        self.model = nn.Sequential(*layers)
+        self.model = torch.nn.Sequential(*layers)
 
         if torch.cuda.is_available():
             self.model.cuda()
