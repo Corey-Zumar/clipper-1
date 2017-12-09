@@ -113,7 +113,7 @@ if __name__ == "__main__":
     else:
         print("Connecting to Clipper with default port: 7000")
 
-    input_type = "bytes"
+    input_type = "floats"
     if "CLIPPER_INPUT_TYPE" in os.environ:
         input_type = os.environ["CLIPPER_INPUT_TYPE"]
 
