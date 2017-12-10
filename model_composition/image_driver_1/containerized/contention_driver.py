@@ -458,18 +458,18 @@ if __name__ == "__main__":
         configs = [
             setup_inception(batch_size=contention_batches[inception_batch_idx],
                             num_replicas=inception_reps,
-                            cpus_per_replica=1,
-                            allocated_cpus=get_cpus(inception_reps),
+                            cpus_per_replica=2,
+                            allocated_cpus=[20,21],
                             allocated_gpus=get_gpus(inception_reps)),
             setup_log_reg(batch_size=contention_batches[log_reg_batch_idx],
                           num_replicas=log_reg_reps,
-                          cpus_per_replica=1,
-                          allocated_cpus=get_cpus(log_reg_reps),
+                          cpus_per_replica=2,
+                          allocated_cpus=[22,23],
                           allocated_gpus=[]),
             setup_kernel_svm(batch_size=contention_batches[ksvm_batch_idx],
                              num_replicas=ksvm_reps,
-                             cpus_per_replica=1,
-                             allocated_cpus=get_cpus(ksvm_reps),
+                             cpus_per_replica=2,
+                             allocated_cpus=[24,25],
                              allocated_gpus=[]),
             # setup_tf_resnet(batch_size=contention_batches[resnet_batch_idx],
             #                 num_replicas=resnet_reps,
@@ -478,8 +478,8 @@ if __name__ == "__main__":
             #                 allocated_gpus=get_gpus(resnet_reps))
             setup_pytorch_resnet(batch_size=contention_batches[resnet_batch_idx],
                                  num_replicas=resnet_reps,
-                                 cpus_per_replica=1,
-                                 allocated_cpus=get_cpus(resnet_reps),
+                                 cpus_per_replica=2,
+                                 allocated_cpus=[4,5],
                                  allocated_gpus=get_gpus(resnet_reps))            
         ]
 

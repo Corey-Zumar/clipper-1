@@ -310,15 +310,17 @@ class DockerContainerManager(ContainerManager):
 
         NOTE: This method assumes a p2.8xlarge instance
         """
-        vcpus_map = {}
-        for i in range(16):
-            vcpus_map[i] = (i, i + 16)
+        return pcpus
 
-        vcpus = []
-        for pcpu in pcpus:
-            vcpus += list(vcpus_map[pcpu])
+        # vcpus_map = {}
+        # for i in range(16):
+        #     vcpus_map[i] = (i, i + 16)
 
-        return vcpus
+        # vcpus = []
+        # for pcpu in pcpus:
+        #     vcpus += list(vcpus_map[pcpu])
+
+        # return vcpus
 
 
     def get_logs(self, logging_dir):
