@@ -44,10 +44,11 @@ class TorchContainer(rpc.ModelContainerBase):
 
     def predict_doubles(self, inputs):
         start = datetime.now()
-        input_arrs = []
+        inputs = []
         for t in inputs:
             i = t.reshape(3, self.height, self.width)
-            input_arrs.append(i)
+            img = Image.fromarray(i, mode="RGB")
+            inputs.append(self.preprocess(img))
 
         input_batch = Variable(torch.stack(inputs, dim=0))
         if torch.cuda.is_available():
