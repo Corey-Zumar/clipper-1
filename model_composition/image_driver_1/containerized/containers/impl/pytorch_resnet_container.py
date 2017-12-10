@@ -42,10 +42,10 @@ class TorchContainer(rpc.ModelContainerBase):
             normalize
         ])
 
-    def predict_doubles(self, inputs):
+    def predict_doubles(self, input_arrs):
         start = datetime.now()
         inputs = []
-        for t in inputs:
+        for t in input_arrs:
             i = t.reshape(3, self.height, self.width)
             img = Image.fromarray(i, mode="RGB")
             inputs.append(self.preprocess(img))
