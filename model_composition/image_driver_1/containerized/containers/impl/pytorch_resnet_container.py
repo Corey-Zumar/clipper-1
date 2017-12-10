@@ -56,7 +56,7 @@ class TorchContainer(rpc.ModelContainerBase):
 
         all_logits = self.model(input_batch)
         outputs = []
-        for logits in all_logits.data.numpy():
+        for logits in all_logits.data.cpu().numpy():
             outputs.append(np.array(np.squeeze(logits), dtype=np.float32).flatten())
 
         return outputs
