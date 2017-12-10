@@ -46,12 +46,18 @@ class TorchContainer(rpc.ModelContainerBase):
         start = datetime.now()
         input_arrs = []
         for t in inputs:
-            i = t.reshape(self.height, self.width, 3)
+            i = t.reshape(3, self.height, self.width)
             input_arrs.append(i)
-        pred_classes = self._predict_raw(input_arrs)
-        outputs = [str(l) for l in pred_classes]
-        end = datetime.now()
-        logger.info("BATCH TOOK %f seconds" % (end - start).total_seconds())
+
+        input_batch = Variable(torch.stack(inputs, dim=0))
+        if torch.cuda.is_available():
+            input_batch = input_batch.cuda()
+
+        all_logits = self.model(input_batch)
+        outputs = []
+        for logits in all_logits:
+            outputs.append(np.array(np.squeeze(logits), dtype=np.float32).flatten())
+
         return outputs
 
     def predict_floats(self, inputs):
