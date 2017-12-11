@@ -30,13 +30,14 @@ INCEPTION_FEATS_MODEL_APP_NAME = "inception"
 TF_KERNEL_SVM_MODEL_APP_NAME = "tf-kernel-svm"
 TF_LOG_REG_MODEL_APP_NAME = "tf-log-reg"
 TF_RESNET_MODEL_APP_NAME = "tf-resnet-feats"
-PYTORCH_RESNET_MODEL_APP_NAME = "pytorch-resnet-feats"
+RESNET102_MODEL_APP_NAME = "pytorch-resnet102-feats"
+RESNET152_MODEL_APP_NAME = "pytorch-resnet152-feats"
 
 INCEPTION_FEATS_IMAGE_NAME = "model-comp/inception-feats"
 TF_KERNEL_SVM_IMAGE_NAME = "model-comp/tf-kernel-svm"
 TF_LOG_REG_IMAGE_NAME = "model-comp/tf-log-reg"
-TF_RESNET_IMAGE_NAME = "model-comp/tf-resnet-feats"
-PYTORCH_RESNET_IMAGE_NAME = "model-comp/pytorch-resnet-feats"
+RESNET102_IMAGE_NAME = "model-comp/pytorch-resnet102-feats"
+RESNET152_IMAGE_NAME = "model-comp/pytorch-resnet152-feats"
 
 CLIPPER_ADDRESS = "localhost"
 CLIPPER_SEND_PORT = 4456
@@ -115,15 +116,15 @@ def setup_kernel_svm(batch_size,
                                         no_diverge=True,
                                         )
 
-def setup_tf_resnet(batch_size,
+def setup_resnet102(batch_size,
                     num_replicas,
                     cpus_per_replica,
                     allocated_cpus,
                     allocated_gpus):
 
-    return driver_utils.HeavyNodeConfig(name=TF_RESNET_MODEL_APP_NAME,
+    return driver_utils.HeavyNodeConfig(name=RESNET102_MODEL_APP_NAME,
                                         input_type="floats",
-                                        model_image=TF_RESNET_IMAGE_NAME,
+                                        model_image=RESNET102_IMAGE_NAME,
                                         allocated_cpus=allocated_cpus,
                                         cpus_per_replica=cpus_per_replica,
                                         gpus=allocated_gpus,
@@ -133,14 +134,14 @@ def setup_tf_resnet(batch_size,
                                         no_diverge=True,
                                         )
 
-def setup_pytorch_resnet(batch_size,
-                         num_replicas,
-                         cpus_per_replica,
-                         allocated_cpus,
-                         allocated_gpus):
-    return driver_utils.HeavyNodeConfig(name=PYTORCH_RESNET_MODEL_APP_NAME,
+def setup_resnet152(batch_size,
+                    num_replicas,
+                    cpus_per_replica,
+                    allocated_cpus,
+                    allocated_gpus):
+    return driver_utils.HeavyNodeConfig(name=RESNET152_MODEL_APP_NAME,
                                         input_type="floats",
-                                        model_image=PYTORCH_RESNET_IMAGE_NAME,
+                                        model_image=RESNET152_IMAGE_NAME,
                                         allocated_cpus=allocated_cpus,
                                         cpus_per_replica=cpus_per_replica,
                                         gpus=allocated_gpus,
@@ -215,7 +216,7 @@ class Predictor(object):
                                                                            mean=mean,
                                                                            thru=thru))
 
-    def predict(self, resnet_input, inception_input):
+    def predict(self, resnet_input):
         begin_time = datetime.now()
         classifications_lock = Lock()
         classifications = {}
@@ -232,7 +233,7 @@ class Predictor(object):
                 self.print_stats()
                 self.init_stats()
 
-        def resnet_feats_continuation(resnet_features):
+        def resnet102_feats_continuation(resnet_features):
             if resnet_features == DEFAULT_OUTPUT:
                 return
             return self.client.send_request(TF_KERNEL_SVM_MODEL_APP_NAME, resnet_features)
@@ -248,10 +249,10 @@ class Predictor(object):
                     update_perf_stats()
                 classifications_lock.release()
 
-        def inception_feats_continuation(inception_features):
-            if inception_features == DEFAULT_OUTPUT:
+        def resnet152_feats_continuation(resnet_features):
+            if resnet_features == DEFAULT_OUTPUT:
                 return
-            return self.client.send_request(TF_LOG_REG_MODEL_APP_NAME, inception_features)
+            return self.client.send_request(TF_LOG_REG_MODEL_APP_NAME, resnet_features)
 
 
         def log_reg_continuation(log_reg_vals):
@@ -265,12 +266,12 @@ class Predictor(object):
                     update_perf_stats()
                 classifications_lock.release()
 
-        self.client.send_request(PYTORCH_RESNET_MODEL_APP_NAME, resnet_input) \
-            .then(resnet_feats_continuation) \
+        self.client.send_request(RESNET102_MODEL_APP_NAME, resnet_input) \
+            .then(resnet102_feats_continuation) \
             .then(svm_continuation)
 
-        self.client.send_request(INCEPTION_FEATS_MODEL_APP_NAME, inception_input) \
-            .then(inception_feats_continuation) \
+        self.client.send_request(RESNET152_FEATS_MODEL_APP_NAME, resnet_input) \
+            .then(resnet152_feats_continuation) \
             .then(log_reg_continuation)
 
 class DriverBenchmarker(object):
@@ -281,7 +282,7 @@ class DriverBenchmarker(object):
         assert client_num == 0
         self.client_num = client_num
         logger.info("Generating random inputs")
-        base_inputs = [(self._get_resnet_input(), self._get_inception_input()) for _ in range(1000)]
+        base_inputs = [self._get_resnet_input() for _ in range(1000)]
         self.inputs = [i for _ in range(40) for i in base_inputs]
         self.latency_upper_bound = latency_upper_bound
 
@@ -300,8 +301,8 @@ class DriverBenchmarker(object):
         predictor = Predictor(clipper_metrics=True, batch_size=self.max_batch_size)
         idx = 0
         while len(predictor.stats["thrus"]) < 6:
-            resnet_input, inception_input = self.inputs[idx]
-            predictor.predict(resnet_input, inception_input)
+            resnet_input = self.inputs[idx]
+            predictor.predict(resnet_input)
             time.sleep(self.delay)
             idx += 1
             idx = idx % len(self.inputs)
@@ -328,8 +329,8 @@ class DriverBenchmarker(object):
         # start checking for steady state after 7 trials
         last_checked_length = 10
         while not done:
-            resnet_input, inception_input = self.inputs[idx]
-            predictor.predict(resnet_input, inception_input)
+            resnet_input = self.inputs[idx]
+            predictor.predict(resnet_input)
             time.sleep(self.delay)
             idx += 1
             idx = idx % len(self.inputs)
@@ -363,10 +364,6 @@ class DriverBenchmarker(object):
     def _get_resnet_input(self):
         resnet_input = np.array(np.random.rand(224, 224, 3) * 255, dtype=np.float32)
         return resnet_input.flatten()
-
-    def _get_inception_input(self):
-        inception_input = np.array(np.random.rand(299, 299, 3) * 255, dtype=np.float32)
-        return inception_input.flatten()
 
 class RequestDelayConfig:
     def __init__(self, request_delay):
@@ -456,11 +453,6 @@ if __name__ == "__main__":
         # Note: cpus_per_replica refers to PHYSICAL CPUs per replica
 
         configs = [
-            setup_inception(batch_size=contention_batches[inception_batch_idx],
-                            num_replicas=inception_reps,
-                            cpus_per_replica=2,
-                            allocated_cpus=[20,21],
-                            allocated_gpus=get_gpus(inception_reps)),
             setup_log_reg(batch_size=contention_batches[log_reg_batch_idx],
                           num_replicas=log_reg_reps,
                           cpus_per_replica=2,
@@ -471,16 +463,16 @@ if __name__ == "__main__":
                              cpus_per_replica=2,
                              allocated_cpus=[24,25],
                              allocated_gpus=[]),
-            # setup_tf_resnet(batch_size=contention_batches[resnet_batch_idx],
-            #                 num_replicas=resnet_reps,
-            #                 cpus_per_replica=1,
-            #                 allocated_cpus=get_cpus(resnet_reps),
-            #                 allocated_gpus=get_gpus(resnet_reps))
-            setup_pytorch_resnet(batch_size=contention_batches[resnet_batch_idx],
-                                 num_replicas=resnet_reps,
-                                 cpus_per_replica=2,
-                                 allocated_cpus=[4,5],
-                                 allocated_gpus=get_gpus(resnet_reps))            
+            setup_resnet102(batch_size=contention_batches[resnet_batch_idx],
+                            num_replicas=resnet_reps,
+                            cpus_per_replica=1,
+                            allocated_cpus=[5],
+                            allocated_gpus=get_gpus(resnet_reps))  
+            setup_resnet152(batch_size=contention_batches[resnet_batch_idx],
+                            num_replicas=resnet_reps,
+                            cpus_per_replica=1,
+                            allocated_cpus=[4],
+                            allocated_gpus=get_gpus(resnet_reps))            
         ]
 
         client_num = 0
