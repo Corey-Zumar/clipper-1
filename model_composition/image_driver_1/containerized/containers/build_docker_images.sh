@@ -19,7 +19,8 @@ time docker build -t model-comp/cuda-rpc -f CudaPyRpcDockerfile ./
 
 cd $DIR
 # Build model-specific images
-time docker build -t model-comp/pytorch-resnet-feats -f PyTorchResNetDockerfile ./
+time docker build -t model-comp/pytorch-resnet152-feats -f PyTorchResNet152Dockerfile ./
+time docker build -t model-comp/pytorch-resnet102-feats -f PyTorchResNet102Dockerfile ./
 time docker build -t model-comp/tf-kernel-svm -f TfKernelSvmDockerfile ./
 time docker build -t model-comp/tf-resnet-feats -f TfResNetDockerfile ./
 time docker build -t model-comp/tf-log-reg -f TfLogisticRegressionDockerfile ./
