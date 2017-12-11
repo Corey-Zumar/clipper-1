@@ -270,7 +270,7 @@ class Predictor(object):
             .then(resnet102_feats_continuation) \
             .then(svm_continuation)
 
-        self.client.send_request(RESNET152_FEATS_MODEL_APP_NAME, resnet_input) \
+        self.client.send_request(RESNET152_MODEL_APP_NAME, resnet_input) \
             .then(resnet152_feats_continuation) \
             .then(log_reg_continuation)
 
