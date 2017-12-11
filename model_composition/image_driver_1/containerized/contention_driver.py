@@ -467,7 +467,7 @@ if __name__ == "__main__":
                             num_replicas=resnet_reps,
                             cpus_per_replica=1,
                             allocated_cpus=[5],
-                            allocated_gpus=get_gpus(resnet_reps))  
+                            allocated_gpus=get_gpus(resnet_reps)), 
             setup_resnet152(batch_size=contention_batches[resnet_batch_idx],
                             num_replicas=resnet_reps,
                             cpus_per_replica=1,
