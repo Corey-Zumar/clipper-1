@@ -30,13 +30,13 @@ INCEPTION_FEATS_MODEL_APP_NAME = "inception"
 TF_KERNEL_SVM_MODEL_APP_NAME = "tf-kernel-svm"
 TF_LOG_REG_MODEL_APP_NAME = "tf-log-reg"
 TF_RESNET_MODEL_APP_NAME = "tf-resnet-feats"
-RESNET102_MODEL_APP_NAME = "pytorch-resnet102-feats"
+RESNET101_MODEL_APP_NAME = "pytorch-resnet101-feats"
 RESNET152_MODEL_APP_NAME = "pytorch-resnet152-feats"
 
 INCEPTION_FEATS_IMAGE_NAME = "model-comp/inception-feats"
 TF_KERNEL_SVM_IMAGE_NAME = "model-comp/tf-kernel-svm"
 TF_LOG_REG_IMAGE_NAME = "model-comp/tf-log-reg"
-RESNET102_IMAGE_NAME = "model-comp/pytorch-resnet102-feats"
+RESNET101_IMAGE_NAME = "model-comp/pytorch-resnet101-feats"
 RESNET152_IMAGE_NAME = "model-comp/pytorch-resnet152-feats"
 
 CLIPPER_ADDRESS = "localhost"
@@ -116,15 +116,15 @@ def setup_kernel_svm(batch_size,
                                         no_diverge=True,
                                         )
 
-def setup_resnet102(batch_size,
+def setup_resnet101(batch_size,
                     num_replicas,
                     cpus_per_replica,
                     allocated_cpus,
                     allocated_gpus):
 
-    return driver_utils.HeavyNodeConfig(name=RESNET102_MODEL_APP_NAME,
+    return driver_utils.HeavyNodeConfig(name=RESNET101_MODEL_APP_NAME,
                                         input_type="floats",
-                                        model_image=RESNET102_IMAGE_NAME,
+                                        model_image=RESNET101_IMAGE_NAME,
                                         allocated_cpus=allocated_cpus,
                                         cpus_per_replica=cpus_per_replica,
                                         gpus=allocated_gpus,
@@ -233,7 +233,7 @@ class Predictor(object):
                 self.print_stats()
                 self.init_stats()
 
-        def resnet102_feats_continuation(resnet_features):
+        def resnet101_feats_continuation(resnet_features):
             if resnet_features == DEFAULT_OUTPUT:
                 return
             return self.client.send_request(TF_KERNEL_SVM_MODEL_APP_NAME, resnet_features)
@@ -266,8 +266,8 @@ class Predictor(object):
                     update_perf_stats()
                 classifications_lock.release()
 
-        self.client.send_request(RESNET102_MODEL_APP_NAME, resnet_input) \
-            .then(resnet102_feats_continuation) \
+        self.client.send_request(RESNET101_MODEL_APP_NAME, resnet_input) \
+            .then(resnet101_feats_continuation) \
             .then(svm_continuation)
 
         self.client.send_request(RESNET152_MODEL_APP_NAME, resnet_input) \
@@ -463,7 +463,7 @@ if __name__ == "__main__":
                              cpus_per_replica=2,
                              allocated_cpus=[24,25],
                              allocated_gpus=[]),
-            setup_resnet102(batch_size=contention_batches[resnet_batch_idx],
+            setup_resnet101(batch_size=contention_batches[resnet_batch_idx],
                             num_replicas=resnet_reps,
                             cpus_per_replica=1,
                             allocated_cpus=[5],
