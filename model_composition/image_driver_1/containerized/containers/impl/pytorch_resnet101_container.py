@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class TorchContainer(rpc.ModelContainerBase):
     def __init__(self):
-        self.model = models.resnet102(pretrained=True)
+        self.model = models.resnet101(pretrained=True)
         layers = list(self.model.children())[:-1] # delete the last fc layer.
         self.model = torch.nn.Sequential(*layers)
 
