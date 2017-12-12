@@ -32,12 +32,14 @@ TF_LOG_REG_MODEL_APP_NAME = "tf-log-reg"
 TF_RESNET_MODEL_APP_NAME = "tf-resnet-feats"
 RESNET101_MODEL_APP_NAME = "pytorch-resnet101-feats"
 RESNET152_MODEL_APP_NAME = "pytorch-resnet152-feats"
+RANDOM_FOREST_MODEL_APP_NAME = "random-forest"
 
 INCEPTION_FEATS_IMAGE_NAME = "model-comp/inception-feats"
 TF_KERNEL_SVM_IMAGE_NAME = "model-comp/tf-kernel-svm"
 TF_LOG_REG_IMAGE_NAME = "model-comp/tf-log-reg"
 RESNET101_IMAGE_NAME = "model-comp/pytorch-resnet101-feats"
 RESNET152_IMAGE_NAME = "model-comp/pytorch-resnet152-feats"
+RANDOM_FOREST_IMAGE_NAME = "model-comp/random-forest"
 
 CLIPPER_ADDRESS = "localhost"
 CLIPPER_SEND_PORT = 4456
@@ -152,6 +154,24 @@ def setup_resnet152(batch_size,
                                         )
 
 
+
+def setup_random_forest(batch_size,
+                        num_replicas,
+                        cpus_per_replica,
+                        allocated_cpus,
+                        allocated_gpus):
+    return driver_utils.HeavyNodeConfig(name=RANDOM_FOREST_MODEL_APP_NAME,
+                                        input_type="floats",
+                                        model_image=RANDOM_FOREST_IMAGE_NAME,
+                                        allocated_cpus=allocated_cpus,
+                                        cpus_per_replica=cpus_per_replica,
+                                        gpus=allocated_gpus,
+                                        batch_size=batch_size,
+                                        num_replicas=num_replicas,
+                                        use_nvidia_docker=True,
+                                        no_diverge=True,
+                                        )
+
 ########## Benchmarking ##########
 
 def get_batch_sizes(metrics_json):
@@ -236,14 +256,14 @@ class Predictor(object):
         def resnet101_feats_continuation(resnet_features):
             if resnet_features == DEFAULT_OUTPUT:
                 return
-            return self.client.send_request(TF_KERNEL_SVM_MODEL_APP_NAME, resnet_features)
+            return self.client.send_request(RANDOM_FOREST_MODEL_APP_NAME, resnet_features)
 
         def svm_continuation(svm_classification):
             if svm_classification == DEFAULT_OUTPUT:
                 return
             else:
                 classifications_lock.acquire()
-                if TF_LOG_REG_MODEL_APP_NAME not in classifications:
+                if RANDOM_FOREST_MODEL_APP_NAME not in classifications:
                     classifications[TF_KERNEL_SVM_MODEL_APP_NAME] = svm_classification
                 else:
                     update_perf_stats()
@@ -252,8 +272,7 @@ class Predictor(object):
         def resnet152_feats_continuation(resnet_features):
             if resnet_features == DEFAULT_OUTPUT:
                 return
-            return self.client.send_request(TF_LOG_REG_MODEL_APP_NAME, resnet_features)
-
+            return self.client.send_request(TF_KERNEL_SVM_MODEL_APP_NAME, resnet_features)
 
         def log_reg_continuation(log_reg_vals):
             if log_reg_vals == DEFAULT_OUTPUT:
@@ -261,18 +280,18 @@ class Predictor(object):
             else:
                 classifications_lock.acquire()
                 if TF_KERNEL_SVM_MODEL_APP_NAME not in classifications:
-                    classifications[TF_LOG_REG_MODEL_APP_NAME] = log_reg_vals
+                    classifications[RANDOM_FOREST_MODEL_APP_NAME] = log_reg_vals
                 else:
                     update_perf_stats()
                 classifications_lock.release()
 
         self.client.send_request(RESNET101_MODEL_APP_NAME, resnet_input) \
             .then(resnet101_feats_continuation) \
-            .then(svm_continuation)
+            .then(log_reg_continuation)
 
         self.client.send_request(RESNET152_MODEL_APP_NAME, resnet_input) \
             .then(resnet152_feats_continuation) \
-            .then(log_reg_continuation)
+            .then(svm_continuation)
 
 class DriverBenchmarker(object):
     def __init__(self, configs, queue, client_num, latency_upper_bound):
@@ -368,7 +387,7 @@ class DriverBenchmarker(object):
 class RequestDelayConfig:
     def __init__(self, request_delay):
         self.request_delay = request_delay
-        
+
     def to_json(self):
         return json.dumps(self.__dict__)
 
@@ -453,26 +472,31 @@ if __name__ == "__main__":
         # Note: cpus_per_replica refers to PHYSICAL CPUs per replica
 
         configs = [
-            setup_log_reg(batch_size=contention_batches[log_reg_batch_idx],
-                          num_replicas=log_reg_reps,
-                          cpus_per_replica=2,
-                          allocated_cpus=[22,23],
-                          allocated_gpus=[]),
+            # setup_log_reg(batch_size=contention_batches[log_reg_batch_idx],
+            #               num_replicas=log_reg_reps,
+            #               cpus_per_replica=2,
+            #               allocated_cpus=[22,23],
+            #               allocated_gpus=[]),
             setup_kernel_svm(batch_size=contention_batches[ksvm_batch_idx],
                              num_replicas=ksvm_reps,
-                             cpus_per_replica=2,
-                             allocated_cpus=[24,25],
+                             cpus_per_replica=1,
+                             allocated_cpus=[24],
                              allocated_gpus=[]),
             setup_resnet101(batch_size=contention_batches[resnet_batch_idx],
                             num_replicas=resnet_reps,
                             cpus_per_replica=1,
-                            allocated_cpus=[5],
-                            allocated_gpus=get_gpus(resnet_reps)), 
+                            allocated_cpus=[28],
+                            allocated_gpus=get_gpus(resnet_reps)),
             setup_resnet152(batch_size=contention_batches[resnet_batch_idx],
                             num_replicas=resnet_reps,
                             cpus_per_replica=1,
-                            allocated_cpus=[4],
-                            allocated_gpus=get_gpus(resnet_reps))            
+                            allocated_cpus=[4,20],
+                            allocated_gpus=get_gpus(resnet_reps)),
+            setup_random_forest(batch_size=contention_batches[log_reg_batch_idx],
+                                num_replicas=log_reg_reps,
+                                cpus_per_replica=1,
+                                allocated_cpus=[29],
+                                allocated_gpus=[])
         ]
 
         client_num = 0
@@ -490,5 +514,5 @@ if __name__ == "__main__":
 
         fname = "incep_{}-logreg_{}-ksvm_{}-resnet_{}".format(inception_reps, log_reg_reps, ksvm_reps, resnet_reps)
         driver_utils.save_results(configs, cl, all_stats, "contention_img_driver_1", prefix=fname)
-    
+
     sys.exit(0)

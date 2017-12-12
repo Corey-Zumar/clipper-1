@@ -1,0 +1,10 @@
+FROM model-comp/py-rpc:latest
+
+WORKDIR /container
+
+COPY impl/random_forest_container.py /container/
+COPY random_forest_model_data/ /model
+
+ENV CLIPPER_MODEL_PATH=/model/random_forest_trained.sav
+
+CMD ["python", "/container/random_forest_container.py"]
