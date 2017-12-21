@@ -255,7 +255,7 @@ class Predictor(object):
             .then(log_reg_continuation)
 
 class DriverBenchmarker(object):
-    def __init__(self, configs, queue, client_num, latency_upper_bound):
+    def __init__(self, configs, queue, client_num, latency_upper_bound, request_delay=None):
         self.configs = configs
         self.max_batch_size = np.max([config.batch_size for config in configs])
         self.queue = queue
@@ -265,9 +265,13 @@ class DriverBenchmarker(object):
         base_inputs = [(self._get_resnet_input(), self._get_inception_input()) for _ in range(1000)]
         self.inputs = [i for _ in range(40) for i in base_inputs]
         self.latency_upper_bound = latency_upper_bound
+        self.delay = request_delay
 
     def run(self):
-        self.initialize_request_rate()
+        if not self.delay:
+            self.initialize_request_rate()
+        else:
+            self.delay = float(self.delay)
         self.find_steady_state()
         return
 
@@ -467,7 +471,7 @@ if __name__ == "__main__":
 
         client_num = 0
 
-        benchmarker = DriverBenchmarker(configs, queue, client_num, latency_upper_bound)
+        benchmarker = DriverBenchmarker(configs, queue, client_num, latency_upper_bound, args.request_delay)
 
         p = Process(target=benchmarker.run)
         p.start()
