@@ -255,7 +255,7 @@ class Predictor(object):
             .then(log_reg_continuation)
 
 class DriverBenchmarker(object):
-    def __init__(self, configs, queue, client_num, latency_upper_bound):
+    def __init__(self, configs, queue, client_num, latency_upper_bound, request_delay=None):
         self.configs = configs
         self.max_batch_size = np.max([config.batch_size for config in configs])
         self.queue = queue
@@ -265,9 +265,13 @@ class DriverBenchmarker(object):
         base_inputs = [(self._get_resnet_input(), self._get_inception_input()) for _ in range(1000)]
         self.inputs = [i for _ in range(40) for i in base_inputs]
         self.latency_upper_bound = latency_upper_bound
+        self.delay = request_delay
 
     def run(self):
-        self.initialize_request_rate()
+        if not self.delay:
+            self.initialize_request_rate()
+        else:
+            self.delay = float(self.delay)
         self.find_steady_state()
         return
 
@@ -361,7 +365,7 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--num_trials', type=int, default=30, help='The number of trials to complete for the benchmarking process')
     parser.add_argument('-b', '--batch_sizes', type=int, nargs='+', help="The batch size configurations to benchmark for the model. Each configuration will be benchmarked separately.")
     parser.add_argument('-c', '--model_cpus', type=int, nargs='+', help="The set of cpu cores on which to run replicas of the provided model")
-    parser.add_argument('-rd', '--request_delay', type=float, default=.015, help="The delay, in seconds, between requests")
+    parser.add_argument('-rd', '--request_delay', type=float, default=.015, help="The initial delay, in seconds, between requests")
     parser.add_argument('-l', '--trial_length', type=int, default=10, help="The length of each trial, in number of requests")
     parser.add_argument('-n', '--num_clients', type=int, default=1, help='number of clients')
 
@@ -467,7 +471,7 @@ if __name__ == "__main__":
 
         client_num = 0
 
-        benchmarker = DriverBenchmarker(configs, queue, client_num, max_thru_latency_upper_bound)
+        benchmarker = DriverBenchmarker(configs, queue, client_num, max_thru_latency_upper_bound, args.request_delay)
 
         p = Process(target=benchmarker.run)
         p.start()
