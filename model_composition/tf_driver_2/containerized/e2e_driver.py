@@ -1,20 +1,23 @@
 import sys
-# import os
+import os
 import numpy as np
 import time
-# import base64
+import base64
 import logging
+import json
+import math
 
 from clipper_admin import ClipperConnection, DockerContainerManager
+from threading import Lock
 from datetime import datetime
-# from io import BytesIO
-# from PIL import Image
+from io import BytesIO
+from PIL import Image
 from containerized_utils.zmq_client import Client
 from containerized_utils import driver_utils
 from containerized_utils.driver_utils import INCREASING, DECREASING, CONVERGED_HIGH, CONVERGED, UNKNOWN
 from multiprocessing import Process, Queue
-import json
-# import argparse
+
+CURR_DIR = os.path.dirname(os.path.realpath(__file__))
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -25,10 +28,17 @@ logger = logging.getLogger(__name__)
 
 # Models and applications for each heavy node
 # will share the same name
-RES50 = "res50"
-RES152 = "res152"
-ALEXNET = "alexnet"
+LANG_DETECT_MODEL_APP_NAME = "tf-lang-detect"
+NMT_MODEL_APP_NAME = "tf-nmt"
+LSTM_MODEL_APP_NAME = "tf-lstm"
 
+LANG_DETECT_IMAGE_NAME = "model-comp/tf-lang-detect"
+NMT_IMAGE_NAME = "model-comp/tf-nmt"
+LSTM_IMAGE_NAME = "model-comp/tf-lstm"
+
+LANG_DETECT_WORKLOAD_RELATIVE_PATH = "lang_detect_workload"
+NMT_WORKLOAD_RELATIVE_PATH = "nmt_workload"
+LSTM_WORKLOAD_RELATIVE_PATH = "lstm_workload"
 
 CLIPPER_ADDRESS = "localhost"
 CLIPPER_SEND_PORT = 4456
@@ -36,11 +46,13 @@ CLIPPER_RECV_PORT = 4455
 
 DEFAULT_OUTPUT = "TIMEOUT"
 
+LANG_CLASSIFICATION_ENGLISH = "en"
+LANG_CLASSIFICATION_GERMAN = "de"
+
+########## Setup ##########
 
 def setup_clipper(configs):
     cl = ClipperConnection(DockerContainerManager(redis_port=6380))
-    # cl.connect()
-    # print(get_batch_sizes(cl.inspect_instance()))
     cl.stop_all()
     cl.start_clipper(
         query_frontend_image="clipper/zmq_frontend:develop",
@@ -50,65 +62,69 @@ def setup_clipper(configs):
     time.sleep(10)
     for config in configs:
         driver_utils.setup_heavy_node(cl, config, DEFAULT_OUTPUT)
-    time.sleep(10)
+    time.sleep(20)
     logger.info("Clipper is set up!")
     return config
 
-
-def setup_alexnet(batch_size,
-                  num_replicas,
-                  cpus_per_replica,
-                  allocated_cpus,
-                  allocated_gpus):
-
-    return driver_utils.HeavyNodeConfig(name="alexnet",
-                                        input_type="floats",
-                                        model_image="model-comp/pytorch-alexnet",
+def setup_lang_detect(batch_size,
+                      num_replicas,
+                      cpus_per_replica,
+                      allocated_cpus,
+                      allocated_gpus,
+                      input_size):
+    return driver_utils.HeavyNodeConfig(name=LANG_DETECT_MODEL_APP_NAME,
+                                        input_type="bytes",
+                                        model_image=LANG_DETECT_IMAGE_NAME,
                                         allocated_cpus=allocated_cpus,
                                         cpus_per_replica=cpus_per_replica,
                                         gpus=allocated_gpus,
                                         batch_size=batch_size,
                                         num_replicas=num_replicas,
                                         use_nvidia_docker=True,
-                                        no_diverge=True,
+                                        input_size=input_size,
+                                        no_diverge=True
                                         )
 
-
-def setup_res50(batch_size,
-                num_replicas,
-                cpus_per_replica,
-                allocated_cpus,
-                allocated_gpus):
-    return driver_utils.HeavyNodeConfig(name="res50",
-                                        input_type="floats",
-                                        model_image="model-comp/pytorch-res50",
+def setup_nmt(batch_size,
+              num_replicas,
+              cpus_per_replica,
+              allocated_cpus,
+              allocated_gpus,
+              input_size):
+    return driver_utils.HeavyNodeConfig(name=NMT_MODEL_APP_NAME,
+                                        input_type="bytes",
+                                        model_image=NMT_IMAGE_NAME,
                                         allocated_cpus=allocated_cpus,
                                         cpus_per_replica=cpus_per_replica,
                                         gpus=allocated_gpus,
                                         batch_size=batch_size,
                                         num_replicas=num_replicas,
                                         use_nvidia_docker=True,
-                                        no_diverge=True,
+                                        input_size=input_size,
+                                        no_diverge=True
                                         )
 
-
-def setup_res152(batch_size,
-                 num_replicas,
-                 cpus_per_replica,
-                 allocated_cpus,
-                 allocated_gpus):
-    return driver_utils.HeavyNodeConfig(name="res152",
-                                        input_type="floats",
-                                        model_image="model-comp/pytorch-res152",
+def setup_lstm(batch_size,
+               num_replicas,
+               cpus_per_replica,
+               allocated_cpus,
+               allocated_gpus,
+               input_size):
+    return driver_utils.HeavyNodeConfig(name=LSTM_MODEL_APP_NAME,
+                                        input_type="bytes",
+                                        model_image=LSTM_IMAGE_NAME,
                                         allocated_cpus=allocated_cpus,
                                         cpus_per_replica=cpus_per_replica,
                                         gpus=allocated_gpus,
                                         batch_size=batch_size,
                                         num_replicas=num_replicas,
                                         use_nvidia_docker=True,
-                                        no_diverge=True,
+                                        input_size=input_size,
+                                        no_diverge=True
                                         )
 
+
+########## Benchmarking ##########
 
 def get_batch_sizes(metrics_json):
     hists = metrics_json["histograms"]
@@ -121,23 +137,22 @@ def get_batch_sizes(metrics_json):
             mean_batch_sizes[model] = round(float(mean), 2)
     return mean_batch_sizes
 
-
 class Predictor(object):
 
-    def __init__(self, clipper_metrics):
+    def __init__(self, clipper_metrics, batch_size):
         self.outstanding_reqs = {}
         self.client = Client(CLIPPER_ADDRESS, CLIPPER_SEND_PORT, CLIPPER_RECV_PORT)
         self.client.start()
         self.init_stats()
         self.stats = {
             "thrus": [],
-            "all_lats": [],
             "p99_lats": [],
-            "mean_lats": [],
-        }
+            "all_lats": [],
+            "mean_lats": []}
         self.total_num_complete = 0
         self.cl = ClipperConnection(DockerContainerManager(redis_port=6380))
         self.cl.connect()
+        self.batch_size = batch_size
         self.get_clipper_metrics = clipper_metrics
         if self.get_clipper_metrics:
             self.stats["all_metrics"] = []
@@ -156,8 +171,8 @@ class Predictor(object):
         end_time = datetime.now()
         thru = float(self.batch_num_complete) / (end_time - self.start_time).total_seconds()
         self.stats["thrus"].append(thru)
-        self.stats["all_lats"].append(lats.tolist())
         self.stats["p99_lats"].append(p99)
+        self.stats["all_lats"].append(self.latencies)
         self.stats["mean_lats"].append(mean)
         if self.get_clipper_metrics:
             metrics = self.cl.inspect_instance()
@@ -173,59 +188,70 @@ class Predictor(object):
                                                                            mean=mean,
                                                                            thru=thru))
 
-    def predict(self, input_item):
+    def predict(self, lang_input):
         begin_time = datetime.now()
 
-        def complete():
+        def update_perf_stats():
             end_time = datetime.now()
             latency = (end_time - begin_time).total_seconds()
             self.latencies.append(latency)
             self.total_num_complete += 1
             self.batch_num_complete += 1
-            if self.batch_num_complete % 500 == 0:
+
+            trial_length = max(300, 10 * self.batch_size)
+            if self.batch_num_complete % trial_length == 0:
                 self.print_stats()
                 self.init_stats()
 
-        def res152_cont(output):
-            if output == DEFAULT_OUTPUT:
+        def lang_detect_continuation(lang_classification):
+            if lang_classification == DEFAULT_OUTPUT:
+                return
+            elif lang_classification == LANG_CLASSIFICATION_GERMAN:
+                return self.client.send_request(NMT_MODEL_APP_NAME, lang_input) \
+                                  .then(nmt_continuation) \
+                                  .then(lstm_continuation)
+            elif lang_classification == LANG_CLASSIFICATION_ENGLISH:
+                return self.client.send_request(LSTM_MODEL_APP_NAME, lang_input) \
+                                  .then(lstm_continuation)
+            else:
+                update_perf_stats()
+
+        def nmt_continuation(translation):
+            if translation == DEFAULT_OUTPUT:
                 return
             else:
-                complete()
+                translation_bytes = np.frombuffer(bytearray(translation), dtype=np.uint8)
+                return self.client.send_request(LSTM_MODEL_APP_NAME, translation_bytes)
 
-        def res50_cont(output):
-            if output == DEFAULT_OUTPUT:
+        def lstm_continuation(classification):
+            if classification == DEFAULT_OUTPUT:
                 return
             else:
-                idk = np.random.random() > 0.4633
-                # idk = True
-                if idk:
-                    self.client.send_request("res152", input_item).then(res152_cont)
-                else:
-                    complete()
-
-        def alex_cont(output):
-            if output == DEFAULT_OUTPUT:
-                return
-            else:
-                idk = np.random.random() > 0.192
-                if idk:
-                    self.client.send_request("res50", input_item).then(res50_cont)
-                else:
-                    complete()
-
-        return self.client.send_request("alexnet", input_item).then(alex_cont)
+                update_perf_stats()
 
 
-class ModelBenchmarker(object):
-    def __init__(self, configs, queue, client_num, latency_upper_bound):
+        self.client.send_request(LANG_DETECT_MODEL_APP_NAME, lang_input) \
+            .then(lang_detect_continuation)
+
+class DriverBenchmarker(object):
+    def __init__(self, configs, queue, client_num, latency_upper_bound, input_size, delay=None):
+        if delay:
+            self.delay = delay
+        self.loaded_text = False
         self.configs = configs
+        self.max_batch_size = np.max([config.batch_size for config in configs])
         self.queue = queue
         assert client_num == 0
         self.client_num = client_num
         logger.info("Generating random inputs")
-        base_inputs = [np.array(np.random.rand(299*299*3), dtype=np.float32) for _ in range(1000)]
-        self.inputs = [i for _ in range(60) for i in base_inputs]
+        base_inputs = self._gen_inputs(num_inputs=1000, input_length=input_size)
+        self.inputs = [i for _ in range(40) for i in base_inputs]
         self.latency_upper_bound = latency_upper_bound
+    def run(self):
+        if not self.delay:
+            self.initialize_request_rate()
+        self.find_steady_state()
+        return
 
     # start with an overly aggressive request rate
     # then back off
@@ -234,10 +260,11 @@ class ModelBenchmarker(object):
         self.delay = 0.001
         setup_clipper(self.configs)
         time.sleep(5)
-        predictor = Predictor(clipper_metrics=True)
+        predictor = Predictor(clipper_metrics=True, batch_size=self.max_batch_size)
         idx = 0
         while len(predictor.stats["thrus"]) < 6:
-            predictor.predict(input_item=self.inputs[idx])
+            lang_input = self.inputs[idx]
+            predictor.predict(lang_input)
             time.sleep(self.delay)
             idx += 1
             idx = idx % len(self.inputs)
@@ -258,13 +285,14 @@ class ModelBenchmarker(object):
     def find_steady_state(self):
         setup_clipper(self.configs)
         time.sleep(7)
-        predictor = Predictor(clipper_metrics=True)
+        predictor = Predictor(clipper_metrics=True, batch_size=self.max_batch_size)
         idx = 0
         done = False
         # start checking for steady state after 7 trials
         last_checked_length = 6
         while not done:
-            predictor.predict(input_item=self.inputs[idx])
+            lang_input = self.inputs[idx]
+            predictor.predict(lang_input)
             time.sleep(self.delay)
             idx += 1
             idx = idx % len(self.inputs)
@@ -295,40 +323,67 @@ class ModelBenchmarker(object):
                     logger.error("Unknown convergence state: {}".format(convergence_state))
                     sys.exit(1)
 
-    def run(self):
-        self.initialize_request_rate()
-        self.find_steady_state()
-        return
+    def _gen_inputs(self, num_inputs=1000, input_length=20):
+        if not self.loaded_text:
+            self.text = self._load_detect_text()
+            self.loaded_text = True
 
+        inputs = []
+        num_gen_inputs = 0
+        while num_gen_inputs < num_inputs:
+            idx = np.random.randint(len(self.text))
+            text = self.text[idx]
+            words = text.split()
+            if len(words) < input_length:
+                expansion_factor = int(math.ceil(float(input_length)/len(text)))
+                for i in range(expansion_factor):
+                    words = words + words
+            words = words[:input_length]
+            inputs.append(" ".join(words))
+            num_gen_inputs += 1
+
+        byte_inputs = [np.frombuffer(bytearray(input_item), dtype=np.uint8) for input_item in inputs]
+
+        return byte_inputs
+
+    def _load_detect_text(self):
+        detect_data_path = os.path.join(CURR_DIR, LANG_DETECT_WORKLOAD_RELATIVE_PATH, "workload.txt")
+        detect_data_file = open(detect_data_path, "rb")
+        detect_text = detect_data_file.readlines()
+        np.random.shuffle(detect_text)
+        return detect_text
+
+class RequestDelayConfig:
+    def __init__(self, request_delay):
+        self.request_delay = request_delay
+        
+    def to_json(self):
+        return json.dumps(self.__dict__)
 
 if __name__ == "__main__":
-
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('-d', '--delay', type=float, help='inter-request delay')
-    # parser.add_argument('-c', '--num_clients', type=int, help='number of clients')
-    #
-    # args = parser.parse_args()
-
     queue = Queue()
 
-    alex_batch = 35
-    res50_batch = 27
-    res152_batch = 14
+    ## THIS IS FOR MAX THRU
+    ## FORMAT IS (LANG_DETECT, NMT, LSTM)
 
-    latency_upper_bound = None
+    estimated_thru = 20 / (1.0 / 3)
 
-    # alexnet_reps = 1
-    # res50_reps = 1
-    # res152_reps = 1
-    reps = [(1, 1, 1),
-            (1, 1, 2),
-            (1, 2, 2),
-            (2, 2, 2),
-            (2, 2, 3),
-            (2, 3, 3)]
+    initial_request_delay = (1.0 / estimated_thru) - .005
 
-    for alexnet_reps, res50_reps, res152_reps in reps:
-        total_cpus = range(9, 32)
+    input_size = 20
+
+    max_thru_reps = [(1,1,1)]
+
+    max_thru_batches = (4,4,4)
+
+    max_thru_latency_upper_bound = 7.0
+
+    lang_detect_batch_idx = 0
+    nmt_batch_idx = 1
+    lstm_batch_idx = 2
+
+    for lang_detect_reps, nmt_reps, lstm_reps in max_thru_reps:
+        total_cpus = range(9,29)
 
         def get_cpus(num_cpus):
             return [total_cpus.pop() for _ in range(num_cpus)]
@@ -339,38 +394,40 @@ if __name__ == "__main__":
             return [total_gpus.pop() for _ in range(num_gpus)]
 
         configs = [
-            setup_alexnet(batch_size=alex_batch,
-                          num_replicas=alexnet_reps,
-                          cpus_per_replica=1,
-                          allocated_cpus=get_cpus(alexnet_reps),
-                          allocated_gpus=get_gpus(alexnet_reps)),
-            setup_res50(batch_size=res50_batch,
-                        num_replicas=res50_reps,
-                        cpus_per_replica=1,
-                        allocated_cpus=get_cpus(res50_reps),
-                        allocated_gpus=get_gpus(res50_reps)),
-            setup_res152(batch_size=res152_batch,
-                         num_replicas=res152_reps,
-                         cpus_per_replica=1,
-                         allocated_cpus=get_cpus(res152_reps),
-                         allocated_gpus=get_gpus(res152_reps))
+            setup_lang_detect(batch_size=max_thru_batches[lang_detect_batch_idx],
+                              num_replicas=lang_detect_reps,
+                              cpus_per_replica=1,
+                              allocated_cpus=get_cpus(lang_detect_reps),
+                              allocated_gpus=get_gpus(lang_detect_reps),
+                              input_size=input_size),
+            setup_nmt(batch_size=max_thru_batches[nmt_batch_idx],
+                      num_replicas=nmt_reps,
+                      cpus_per_replica=1,
+                      allocated_cpus=get_cpus(nmt_reps),
+                      allocated_gpus=get_gpus(nmt_reps),
+                      input_size=input_size),
+            setup_lstm(batch_size=max_thru_batches[lstm_batch_idx],
+                       num_replicas=lstm_reps,
+                       cpus_per_replica=1,
+                       allocated_cpus=get_cpus(lstm_reps),
+                       allocated_gpus=get_gpus(lstm_reps),
+                       input_size=input_size)
         ]
 
         client_num = 0
-        benchmarker = ModelBenchmarker(configs, queue, client_num, latency_upper_bound)
+
+        benchmarker = DriverBenchmarker(configs, queue, client_num, max_thru_latency_upper_bound, input_size, initial_request_delay)
+
         p = Process(target=benchmarker.run)
         p.start()
 
         all_stats = []
         all_stats.append(queue.get())
-        p.join()
 
         cl = ClipperConnection(DockerContainerManager(redis_port=6380))
         cl.connect()
-        fname = "alex_{}-r50_{}-r152_{}".format(alexnet_reps, res50_reps, res152_reps)
-        driver_utils.save_results(configs, cl, all_stats, "e2e_max_thru_resnet-cascade", prefix=fname)
-        # driver_utils.save_results(configs, cl, all_stats, "e2e_min_lat_resnet-cascade", prefix=fname)
-        # driver_utils.save_results(configs, cl, all_stats, "e2e_500_slo_resnet-cascade", prefix=fname)
-        # driver_utils.save_results(configs, cl, all_stats,
-        #                           "e2e_alex_no_gpu_resnet-cascade", prefix=fname)
+
+        fname = "langdetect_{}-nmt_{}-lstm_{}".format(lang_detect_reps, nmt_reps, lstm_reps)
+        driver_utils.save_results(configs, cl, all_stats, "e2e_max_thru_tf_text_driver", prefix=fname)
+    
     sys.exit(0)

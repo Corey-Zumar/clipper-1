@@ -1,28 +1,33 @@
 from __future__ import print_function
 import sys
 import os
-import rpc
 import json
 
 import tensorflow as tf
 import numpy as np
 
-import gnmt_model
-import model_helper
-import misc_utils as utils
-import hparam_utils
+from nmt_deps import gnmt_model, model_helper, hparam_utils
+from nmt_deps import misc_utils as utils
+
+from single_proc_utils import ModelBase
 
 GPU_MEM_FRAC = .95
 
 NMT_TEXT_END = "</s>"
 NUM_TRANSLATIONS_PER_INPUT = 1
 
+CHECKPOINT_RELATIVE_PATH = "translate.ckpt"
+DEFAULT_HPARAMS_RELATIVE_PATH = "default_hparams.json"
+MODEL_HPARAMS_RELATIVE_PATH = "model_hparams.json"
+SOURCE_VOCAB_RELATIVE_PATH = "source_vocab.de"
+TARGET_VOCAB_RELATIVE_PATH = "target_vocab.en"
+
 # These hyperparameters are required for inference and are not specified
 # by the provided set of JSON-formatted GNMT model hyperparameters
 
-class NMTContainer(rpc.ModelContainerBase):
+class NMTModel(ModelBase):
 
-  def __init__(self, checkpoint_path, default_hparams_path, model_hparams_path, source_vocab_path, target_vocab_path):
+  def __init__(self, model_data_path, gpu_num):
     """
     Initializes the container
 
@@ -40,15 +45,31 @@ class NMTContainer(rpc.ModelContainerBase):
     target_vocab_path : str
       The path of the vocabulary associated with the target text (English)
     """
+
+    ModelBase.__init__(self)
+
+    checkpoint_path = os.path.join(model_data_path, CHECKPOINT_RELATIVE_PATH)
+    default_hparams_path = os.path.join(model_data_path, DEFAULT_HPARAMS_RELATIVE_PATH)
+    model_hparams_path = os.path.join(model_data_path, MODEL_HPARAMS_RELATIVE_PATH)
+    source_vocab_path = os.path.join(model_data_path, SOURCE_VOCAB_RELATIVE_PATH)
+    target_vocab_path = os.path.join(model_data_path, TARGET_VOCAB_RELATIVE_PATH)
+
+    assert os.path.exists(default_hparams_path)
+    assert os.path.exists(model_hparams_path)
+    assert os.path.exists(source_vocab_path)
+    assert os.path.exists(target_vocab_path)
+
+
     self.sess, self.nmt_model, self.infer_model, self.hparams = \
     self._load_model(checkpoint_path,
                      default_hparams_path,
                      model_hparams_path,
                      source_vocab_path,
-                     target_vocab_path)
+                     target_vocab_path,
+                     gpu_num)
 
 
-  def predict_bytes(self, inputs):
+  def predict(self, inputs):
     """
     Parameters
     -------------
@@ -81,14 +102,14 @@ class NMTContainer(rpc.ModelContainerBase):
 
     return outputs
 
-  def _create_hparams(self, default_hparams_path, model_hparams_path, source_vocab_path, target_vocab_path):
+  def _create_hparams(self, default_hparams_path, model_hparams_path, source_vocab_path, target_vocab_path, gpu_num):
     partial_hparams = tf.contrib.training.HParams()
     default_hparams_file = open(default_hparams_path, "rb")
     default_hparams = json.load(default_hparams_file)
     default_hparams_file.close()
     for param in default_hparams:
       partial_hparams.add_hparam(param, default_hparams[param])
-    partial_hparams.set_hparam("num_gpus", 1)
+    partial_hparams.set_hparam("num_gpus", gpu_num)
 
     hparams = hparam_utils.load_hparams(model_hparams_path, partial_hparams)
     hparams = hparam_utils.extend_hparams(hparams, source_vocab_path, target_vocab_path)
@@ -99,8 +120,9 @@ class NMTContainer(rpc.ModelContainerBase):
                   default_hparams_path,
                   model_hparams_path,
                   source_vocab_path,
-                  target_vocab_path):
-    hparams = self._create_hparams(default_hparams_path, model_hparams_path, source_vocab_path, target_vocab_path)
+                  target_vocab_path,
+                  gpu_num):
+    hparams = self._create_hparams(default_hparams_path, model_hparams_path, source_vocab_path, target_vocab_path, gpu_num)
 
     model_creator = gnmt_model.GNMTModel
     infer_model = model_helper.create_infer_model(model_creator, hparams, scope=None)
@@ -132,80 +154,3 @@ class NMTContainer(rpc.ModelContainerBase):
       translation = utils.format_spm_text(output)
 
     return translation
-
-
-if __name__ == "__main__":
-    print("Starting NMT Container")
-    try:
-        model_name = os.environ["CLIPPER_MODEL_NAME"]
-    except KeyError:
-        print(
-            "ERROR: CLIPPER_MODEL_NAME environment variable must be set",
-            file=sys.stdout)
-        sys.exit(1)
-    try:
-        model_version = os.environ["CLIPPER_MODEL_VERSION"]
-    except KeyError:
-        print(
-            "ERROR: CLIPPER_MODEL_VERSION environment variable must be set",
-            file=sys.stdout)
-        sys.exit(1)
-    try:
-        model_checkpoint_path = os.environ["CLIPPER_MODEL_CHECKPOINT_PATH"]
-    except KeyError:
-        print(
-            "ERROR: CLIPPER_MODEL_CHECKPOINT_PATH environment variable must be set",
-            file=sys.stdout)
-        sys.exit(1)
-    try:
-        model_default_hparams_path = os.environ["CLIPPER_DEFAULT_HPARAMS_PATH"]
-    except KeyError:
-        print(
-            "ERROR: CLIPPER_DEFAULT_HPARAMS_PATH environment variable must be set",
-            file=sys.stdout)
-        sys.exit(1)
-    try:
-        model_hparams_path = os.environ["CLIPPER_MODEL_HPARAMS_PATH"]
-    except KeyError:
-        print(
-            "ERROR: CLIPPER_MODEL_HPARAMS_PATH environment variable must be set",
-            file=sys.stdout)
-        sys.exit(1)
-    try:
-        model_source_vocab_path = os.environ["CLIPPER_SOURCE_VOCAB_PATH"]
-    except KeyError:
-        print(
-            "ERROR: CLIPPER_SOURCE_VOCAB_PATH environment variable must be set",
-            file=sys.stdout)
-        sys.exit(1)
-    try:
-        model_target_vocab_path = os.environ["CLIPPER_TARGET_VOCAB_PATH"]
-    except KeyError:
-        print(
-            "ERROR: CLIPPER_TARGET_VOCAB_PATH environment variable must be set",
-            file=sys.stdout)
-        sys.exit(1)
-
-    ip = "127.0.0.1"
-    if "CLIPPER_IP" in os.environ:
-        ip = os.environ["CLIPPER_IP"]
-    else:
-        print("Connecting to Clipper on localhost")
-
-    print("CLIPPER IP: {}".format(ip))
-
-    port = 7000
-    if "CLIPPER_PORT" in os.environ:
-        port = int(os.environ["CLIPPER_PORT"])
-    else:
-        print("Connecting to Clipper with default port: 7000")
-
-    input_type = "bytes"
-    container = NMTContainer(model_checkpoint_path,
-                             model_default_hparams_path,
-                             model_hparams_path,
-                             model_source_vocab_path,
-                             model_target_vocab_path)
-    rpc_service = rpc.RPCService()
-    rpc_service.start(container, ip, port, model_name, model_version,
-                      input_type)

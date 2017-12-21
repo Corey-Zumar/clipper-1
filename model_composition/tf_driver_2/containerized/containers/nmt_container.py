@@ -55,8 +55,8 @@ class NMTContainer(rpc.ModelContainerBase):
     inputs : [string]
       A list of strings of German text
     """
-
     inputs = [str(input_item.tobytes()) for input_item in inputs]
+
     infer_batch_size = len(inputs)
     self.sess.run(
         self.infer_model.iterator.initializer,
@@ -114,7 +114,7 @@ class NMTContainer(rpc.ModelContainerBase):
 
   def _get_translation(self, nmt_outputs, sent_id, tgt_eos, subword_option):
     """Given batch decoding outputs, select a sentence and turn to text."""
-    if tgt_eos:
+    if tgt_eos: 
       tgt_eos = tgt_eos.encode("utf-8")
     # Select a sentence
     output = nmt_outputs[sent_id, :].tolist()
