@@ -381,7 +381,7 @@ if __name__ == "__main__":
 
 
     ## FORMAT IS (INCEPTION, LOG REG, RESNET, KSVM)
-    batches = (4, 2, 2, 14)
+    batches = (4, 1, 4, 1)
 
     latency_upper_bound = 1.0
 
