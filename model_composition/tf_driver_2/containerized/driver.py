@@ -60,7 +60,7 @@ def setup_clipper(config):
         query_frontend_image="clipper/zmq_frontend:develop",
         redis_cpu_str="0",
         mgmt_cpu_str="0",
-        query_cpu_str="1-4")
+        query_cpu_str="0,16,1,17,2,18,3,19")
     time.sleep(10)
     driver_utils.setup_heavy_node(cl, config, DEFAULT_OUTPUT)
     time.sleep(10)
