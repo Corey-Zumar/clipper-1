@@ -80,7 +80,7 @@ def get_heavy_node_config(model_name,
                                             model_image=LANG_DETECT_IMAGE_NAME,
                                             allocated_cpus=allocated_cpus,
                                             cpus_per_replica=cpus_per_replica,
-                                            gpus=[0],
+                                            gpus=[],
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
                                             use_nvidia_docker=True,
@@ -94,7 +94,7 @@ def get_heavy_node_config(model_name,
                                             model_image=NMT_IMAGE_NAME,
                                             allocated_cpus=allocated_cpus,
                                             cpus_per_replica=cpus_per_replica,
-                                            gpus=[0],
+                                            gpus=[],
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
                                             use_nvidia_docker=True,
@@ -108,7 +108,7 @@ def get_heavy_node_config(model_name,
                                     model_image=LSTM_IMAGE_NAME,
                                     allocated_cpus=allocated_cpus,
                                     cpus_per_replica=cpus_per_replica,
-                                    gpus=[0],
+                                    gpus=[],
                                     batch_size=batch_size,
                                     num_replicas=num_replicas,
                                     use_nvidia_docker=True,
@@ -223,13 +223,13 @@ class ModelBenchmarker(object):
         time.sleep(5)
         predictor = Predictor(clipper_metrics=True)
         idx = 0
-        while len(predictor.stats["thrus"]) < 15:
+        while len(predictor.stats["thrus"]) < 20:
             predictor.predict(model_app_name=self.config.name, input_item=self.inputs[idx])
             time.sleep(self.delay)
             idx += 1
             idx = idx % len(self.inputs)
 
-        max_thruput = np.mean(predictor.stats["thrus"][4:])
+        max_thruput = np.mean(predictor.stats["thrus"][15:])
         self.delay = 1.0 / max_thruput
         logger.info("Initializing delay to {}".format(self.delay))
 
