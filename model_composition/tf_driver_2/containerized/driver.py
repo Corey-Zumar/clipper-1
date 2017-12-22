@@ -196,17 +196,21 @@ class Predictor(object):
         return self.client.send_request(model_app_name, input_item).then(continuation)
 
 class ModelBenchmarker(object):
-    def __init__(self, config, queue, input_length=20):
+    def __init__(self, config, queue, input_length=20, request_delay=None):
         self.config = config
         self.queue = queue
         self.load_text_fn = self._get_load_text_fn(model_app_name=self.config.name)
         self.loaded_text = False
         base_inputs = self._gen_inputs(num_inputs=1000, input_length=input_length)
         self.inputs = [i for _ in range(40) for i in base_inputs]
+        self.delay = request_delay
 
     def run(self, client_num=0):
         assert client_num == 0
-        self.initialize_request_rate()
+        if not self.delay:
+            self.initialize_request_rate()
+        else:
+            self.delay = float(self.delay)
         self.find_steady_state()
         return
 
@@ -219,21 +223,21 @@ class ModelBenchmarker(object):
         time.sleep(5)
         predictor = Predictor(clipper_metrics=True)
         idx = 0
-        while len(predictor.stats["thrus"]) < 5:
+        while len(predictor.stats["thrus"]) < 15:
             predictor.predict(model_app_name=self.config.name, input_item=self.inputs[idx])
             time.sleep(self.delay)
             idx += 1
             idx = idx % len(self.inputs)
 
-        max_thruput = np.mean(predictor.stats["thrus"][1:])
+        max_thruput = np.mean(predictor.stats["thrus"][4:])
         self.delay = 1.0 / max_thruput
         logger.info("Initializing delay to {}".format(self.delay))
 
     def increase_delay(self):
         if self.delay < 0.005:
-            self.delay += 0.0002
+            self.delay += 0.00005
         else:
-            self.delay += 0.0005
+            self.delay += 0.0001
 
     def find_steady_state(self):
         setup_clipper(self.config)
@@ -346,6 +350,7 @@ if __name__ == "__main__":
     parser.add_argument('-g', '--model_gpus', type=int, nargs='+', help="The set of gpus on which to run replicas of the provided model. Each replica of a gpu model must have its own gpu!")
     parser.add_argument('-n', '--num_clients', type=int, default=1, help="The number of concurrent client processes. This can help increase the request rate in order to saturate high throughput models.")
     parser.add_argument('-l', '--input_lengths', type=int, nargs='+', help="Input length configurations to benchmark")
+    parser.add_argument('-rd', '--request_delay', type=float, default=.015, help="The initial delay, in seconds, between requests")
     
     args = parser.parse_args()
 
@@ -376,7 +381,7 @@ if __name__ == "__main__":
                                                          allocated_gpus=args.model_gpus,
                                                          input_size=input_length)
                     queue = Queue()
-                    benchmarker = ModelBenchmarker(model_config, queue, input_length)
+                    benchmarker = ModelBenchmarker(model_config, queue, input_length, args.request_delay)
 
                     processes = []
                     all_stats = []
