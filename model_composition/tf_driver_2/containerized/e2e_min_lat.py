@@ -410,7 +410,7 @@ if __name__ == "__main__":
     for i in range(len(min_lat_reps)):
         lang_detect_reps, nmt_reps, lstm_reps = min_lat_reps[i]
 
-        request_delay = 1.0 / (min_lat_est_thrus[i] + 10)
+        request_delay = 1.0 / (min_lat_est_thrus[i] * 1.1)
 
         total_cpus = range(4,14)
 

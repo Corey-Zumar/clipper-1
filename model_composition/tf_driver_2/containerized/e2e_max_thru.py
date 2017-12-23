@@ -376,16 +376,18 @@ class RequestDelayConfig:
 if __name__ == "__main__":
     queue = Queue()
 
-    ## THIS IS FOR MAX THRU
-    ## FORMAT IS (LANG_DETECT, NMT, LSTM)
+    max_thru_est_thrus = [54, 84, 108, 
+                         162, 166, 216, 
+                         250, 270, 324, 
+                         332, 378, 416,
+                         432]
 
-    estimated_thru = 100
-
-    #initial_request_delay = (1.0 / estimated_thru) - .005
     initial_request_delay = None
 
     input_size = 20
 
+    ## THIS IS FOR MAX THRU
+    ## FORMAT IS (LANG_DETECT, NMT, LSTM)
     max_thru_reps = [(1,1,1),
                      (2,1,1),
                      (2,2,1),
@@ -404,7 +406,11 @@ if __name__ == "__main__":
     nmt_batch_idx = 1
     lstm_batch_idx = 2
 
-    for lang_detect_reps, nmt_reps, lstm_reps in max_thru_reps:
+    for i in range(len(max_thru_reps)):
+        lang_detect_reps, nmt_reps, lstm_reps = max_thru_reps[i]
+
+        request_delay = 1.0 / (max_thru_est_thrus[i] * 1.1)
+
         total_cpus = range(4,14)
 
         def get_cpus(num_cpus):
@@ -438,7 +444,7 @@ if __name__ == "__main__":
 
         client_num = 0
 
-        benchmarker = DriverBenchmarker(configs, queue, client_num, max_thru_latency_upper_bound, input_size, initial_request_delay)
+        benchmarker = DriverBenchmarker(configs, queue, client_num, max_thru_latency_upper_bound, input_size, request_delay)
 
         p = Process(target=benchmarker.run)
         p.start()
