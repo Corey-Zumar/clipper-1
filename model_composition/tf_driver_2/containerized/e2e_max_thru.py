@@ -208,7 +208,7 @@ class Predictor(object):
             self.total_num_complete += 1
             self.batch_num_complete += 1
 
-            trial_length = max(300, 10 * self.batch_size)
+            trial_length = max(300, 50 * self.batch_size)
             if self.batch_num_complete % trial_length == 0:
                 self.print_stats()
                 self.init_stats()
@@ -249,8 +249,7 @@ class Predictor(object):
 
 class DriverBenchmarker(object):
     def __init__(self, configs, queue, client_num, latency_upper_bound, input_size, delay=None):
-        if delay:
-            self.delay = delay
+        self.delay = delay
         self.loaded_text = False
         self.configs = configs
         self.max_batch_size = np.max([config.batch_size for config in configs])
@@ -276,7 +275,7 @@ class DriverBenchmarker(object):
         time.sleep(5)
         predictor = Predictor(clipper_metrics=True, batch_size=self.max_batch_size)
         idx = 0
-        while len(predictor.stats["thrus"]) < 6:
+        while len(predictor.stats["thrus"]) < 10:
             lang_input = self.inputs[idx]
             predictor.predict(lang_input)
             time.sleep(self.delay)
@@ -303,7 +302,7 @@ class DriverBenchmarker(object):
         idx = 0
         done = False
         # start checking for steady state after 7 trials
-        last_checked_length = 6
+        last_checked_length = 10
         while not done:
             lang_input = self.inputs[idx]
             predictor.predict(lang_input)
@@ -382,23 +381,24 @@ if __name__ == "__main__":
 
     estimated_thru = 100
 
-    initial_request_delay = (1.0 / estimated_thru) - .005
+    #initial_request_delay = (1.0 / estimated_thru) - .005
+    initial_request_delay = None
 
     input_size = 20
 
     max_thru_reps = [(1,1,1),
-                     (1,2,1),
-                     (1,3,1),
-                     (1,4,1),
-                     (1,5,1),
-                     (2,5,1),
-                     (2,6,1),
-                     (2,7,1),
-                     (2,8,1)]
+                     (2,1,1),
+                     (2,2,1),
+                     (3,2,1),
+                     (3,3,1),
+                     (4,3,1),
+                     (5,3,1),
+                     (5,4,1),
+                     (6,4,1)]
 
     max_thru_batches = (31,64,21)
 
-    max_thru_latency_upper_bound = 7.0
+    max_thru_latency_upper_bound = 15.0
 
     lang_detect_batch_idx = 0
     nmt_batch_idx = 1
