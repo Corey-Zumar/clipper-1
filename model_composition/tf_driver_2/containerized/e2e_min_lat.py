@@ -58,7 +58,7 @@ def setup_clipper(configs):
         query_frontend_image="clipper/zmq_frontend:develop",
         redis_cpu_str="0",
         mgmt_cpu_str="0",
-        query_cpu_str="0,16,1,17,2,18")
+        query_cpu_str="0,16,1,17,2,18,3,19")
     time.sleep(10)
     for config in configs:
         driver_utils.setup_heavy_node(cl, config, DEFAULT_OUTPUT)
@@ -163,6 +163,10 @@ class Predictor(object):
         self.batch_num_complete = 0
         self.cur_req_id = 0
         self.start_time = datetime.now()
+        self.nmt_count = 0
+        self.lstm_count = 0
+        self.lang_detect_count = 0
+        self.total_count = 0
 
     def print_stats(self):
         lats = np.array(self.latencies)
@@ -188,6 +192,12 @@ class Predictor(object):
                                                                            mean=mean,
                                                                            thru=thru))
 
+        nmt_pct = float(self.nmt_count) / self.total_count
+        lstm_pct = float(self.lstm_count) / self.total_count
+        ld_pct = float(self.lang_detect_count) / self.total_count
+
+        logger.info("NMT: {}, LSTM: {}, LANG DETECT: {}".format(nmt_pct, lstm_pct, ld_pct))
+
     def predict(self, lang_input):
         begin_time = datetime.now()
 
@@ -198,12 +208,14 @@ class Predictor(object):
             self.total_num_complete += 1
             self.batch_num_complete += 1
 
-            trial_length = max(300, 10 * self.batch_size)
+            trial_length = max(300, 50 * self.batch_size)
             if self.batch_num_complete % trial_length == 0:
                 self.print_stats()
                 self.init_stats()
 
         def lang_detect_continuation(lang_classification):
+            self.total_count += 1
+            self.lang_detect_count += 1
             if lang_classification == DEFAULT_OUTPUT:
                 return
             elif lang_classification == LANG_CLASSIFICATION_GERMAN:
@@ -217,6 +229,7 @@ class Predictor(object):
                 update_perf_stats()
 
         def nmt_continuation(translation):
+            self.nmt_count += 1
             if translation == DEFAULT_OUTPUT:
                 return
             else:
@@ -224,6 +237,7 @@ class Predictor(object):
                 return self.client.send_request(LSTM_MODEL_APP_NAME, translation_bytes)
 
         def lstm_continuation(classification):
+            self.lstm_count += 1
             if classification == DEFAULT_OUTPUT:
                 return
             else:
@@ -235,8 +249,7 @@ class Predictor(object):
 
 class DriverBenchmarker(object):
     def __init__(self, configs, queue, client_num, latency_upper_bound, input_size, delay=None):
-        if delay:
-            self.delay = delay
+        self.delay = delay
         self.loaded_text = False
         self.configs = configs
         self.max_batch_size = np.max([config.batch_size for config in configs])
@@ -262,7 +275,7 @@ class DriverBenchmarker(object):
         time.sleep(5)
         predictor = Predictor(clipper_metrics=True, batch_size=self.max_batch_size)
         idx = 0
-        while len(predictor.stats["thrus"]) < 6:
+        while len(predictor.stats["thrus"]) < 10:
             lang_input = self.inputs[idx]
             predictor.predict(lang_input)
             time.sleep(self.delay)
@@ -289,7 +302,7 @@ class DriverBenchmarker(object):
         idx = 0
         done = False
         # start checking for steady state after 7 trials
-        last_checked_length = 6
+        last_checked_length = 10
         while not done:
             lang_input = self.inputs[idx]
             predictor.predict(lang_input)
@@ -363,26 +376,32 @@ class RequestDelayConfig:
 if __name__ == "__main__":
     queue = Queue()
 
-    ## THIS IS FOR MAX THRU
-    ## FORMAT IS (LANG_DETECT, NMT, LSTM)
-
-    estimated_thru = 20 / (1.0 / 3)
-
-    initial_request_delay = (1.0 / estimated_thru) - .005
+    initial_request_delay = None
 
     input_size = 20
 
-    max_thru_reps = [(1,1,1)]
+    ## THIS IS FOR MIN_LAT
+    ## FORMAT IS (LANG_DETECT, NMT, LSTM)
+    min_lat_reps = [(1,1,1),
+                    (1,2,1),
+                    (1,3,1),
+                    (1,4,1),
+                    (1,5,1),
+                    (2,5,1),
+                    (2,6,1),
+                    (2,7,1),
+                    (2,7,2),
+                    (2,8,2)]
 
-    max_thru_batches = (4,4,4)
+    min_lat_batches = (1,1,1)
 
-    max_thru_latency_upper_bound = 7.0
+    min_lat_latency_upper_bound = 7.0
 
     lang_detect_batch_idx = 0
     nmt_batch_idx = 1
     lstm_batch_idx = 2
 
-    for lang_detect_reps, nmt_reps, lstm_reps in max_thru_reps:
+    for lang_detect_reps, nmt_reps, lstm_reps in min_lat_reps:
         total_cpus = range(4,14)
 
         def get_cpus(num_cpus):
@@ -394,29 +413,29 @@ if __name__ == "__main__":
             return [total_gpus.pop() for _ in range(num_gpus)]
 
         configs = [
-            setup_lang_detect(batch_size=max_thru_batches[lang_detect_batch_idx],
+            setup_lang_detect(batch_size=min_lat_batches[lang_detect_batch_idx],
                               num_replicas=lang_detect_reps,
                               cpus_per_replica=1,
                               allocated_cpus=get_cpus(lang_detect_reps),
-                              allocated_gpus=get_gpus(lang_detect_reps),
+                              allocated_gpus=[],
                               input_size=input_size),
-            setup_nmt(batch_size=max_thru_batches[nmt_batch_idx],
+            setup_nmt(batch_size=min_lat_batches[nmt_batch_idx],
                       num_replicas=nmt_reps,
                       cpus_per_replica=1,
                       allocated_cpus=get_cpus(nmt_reps),
                       allocated_gpus=get_gpus(nmt_reps),
                       input_size=input_size),
-            setup_lstm(batch_size=max_thru_batches[lstm_batch_idx],
+            setup_lstm(batch_size=min_lat_batches[lstm_batch_idx],
                        num_replicas=lstm_reps,
                        cpus_per_replica=1,
                        allocated_cpus=get_cpus(lstm_reps),
-                       allocated_gpus=get_gpus(lstm_reps),
+                       allocated_gpus=[],
                        input_size=input_size)
         ]
 
         client_num = 0
 
-        benchmarker = DriverBenchmarker(configs, queue, client_num, max_thru_latency_upper_bound, input_size, initial_request_delay)
+        benchmarker = DriverBenchmarker(configs, queue, client_num, min_lat_latency_upper_bound, input_size, initial_request_delay)
 
         p = Process(target=benchmarker.run)
         p.start()
@@ -428,6 +447,6 @@ if __name__ == "__main__":
         cl.connect()
 
         fname = "langdetect_{}-nmt_{}-lstm_{}".format(lang_detect_reps, nmt_reps, lstm_reps)
-        driver_utils.save_results(configs, cl, all_stats, "e2e_max_thru_tf_text_driver", prefix=fname)
+        driver_utils.save_results(configs, cl, all_stats, "e2e_min_lat_tf_text_driver", prefix=fname)
     
     sys.exit(0)
