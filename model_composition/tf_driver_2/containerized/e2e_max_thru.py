@@ -166,6 +166,7 @@ class Predictor(object):
         self.nmt_count = 0
         self.lstm_count = 0
         self.lang_detect_count = 0
+        self.total_count = 0
 
     def print_stats(self):
         lats = np.array(self.latencies)
@@ -191,10 +192,9 @@ class Predictor(object):
                                                                            mean=mean,
                                                                            thru=thru))
 
-        total_count = self.nmt_count + self.lstm_count + self.lang_detect_count
-        nmt_pct = float(self.nmt_count) / total_count
-        lstm_pct = float(self.lstm_count) / total_count
-        ld_pct = float(self.lang_detect_count) / total_count
+        nmt_pct = float(self.nmt_count) / self.total_count
+        lstm_pct = float(self.lstm_count) / self.total_count
+        ld_pct = float(self.lang_detect_count) / self.total_count
 
         logger.info("NMT: {}, LSTM: {}, LANG DETECT: {}".format(nmt_pct, lstm_pct, ld_pct))
 
@@ -214,6 +214,7 @@ class Predictor(object):
                 self.init_stats()
 
         def lang_detect_continuation(lang_classification):
+            self.total_count += 1
             self.lang_detect_count += 1
             if lang_classification == DEFAULT_OUTPUT:
                 return
