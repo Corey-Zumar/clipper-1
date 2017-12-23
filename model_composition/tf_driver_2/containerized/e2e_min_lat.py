@@ -376,9 +376,15 @@ class RequestDelayConfig:
 if __name__ == "__main__":
     queue = Queue()
 
+    #initial_request_delay = (1.0 / estimated_thru) - .005
     initial_request_delay = None
 
     input_size = 20
+
+    min_lat_est_thrus = [16, 32, 48, 
+                         64, 76, 80, 
+                         94, 104, 
+                         110, 126]
 
     ## THIS IS FOR MIN_LAT
     ## FORMAT IS (LANG_DETECT, NMT, LSTM)
@@ -401,7 +407,11 @@ if __name__ == "__main__":
     nmt_batch_idx = 1
     lstm_batch_idx = 2
 
-    for lang_detect_reps, nmt_reps, lstm_reps in min_lat_reps:
+    for i in range(len(min_lat_reps)):
+        lang_detect_reps, nmt_reps, lstm_reps = min_lat_reps[i]
+
+        request_delay = 1.0 / (min_last_est_thrus[i] + 10)
+
         total_cpus = range(4,14)
 
         def get_cpus(num_cpus):
@@ -435,7 +445,7 @@ if __name__ == "__main__":
 
         client_num = 0
 
-        benchmarker = DriverBenchmarker(configs, queue, client_num, min_lat_latency_upper_bound, input_size, initial_request_delay)
+        benchmarker = DriverBenchmarker(configs, queue, client_num, min_lat_latency_upper_bound, input_size, request_delay)
 
         p = Process(target=benchmarker.run)
         p.start()
