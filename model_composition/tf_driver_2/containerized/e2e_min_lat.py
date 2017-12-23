@@ -145,6 +145,7 @@ class Predictor(object):
         self.client.start()
         self.init_stats()
         self.stats = {
+            "probabilities": [],
             "thrus": [],
             "p99_lats": [],
             "all_lats": [],
@@ -195,6 +196,8 @@ class Predictor(object):
         nmt_pct = float(self.nmt_count) / self.total_count
         lstm_pct = float(self.lstm_count) / self.total_count
         ld_pct = float(self.lang_detect_count) / self.total_count
+
+        self.stats["probabilities"].append((nmt_pct, lstm_pct, ld_pct))
 
         logger.info("NMT: {}, LSTM: {}, LANG DETECT: {}".format(nmt_pct, lstm_pct, ld_pct))
 
@@ -376,7 +379,6 @@ class RequestDelayConfig:
 if __name__ == "__main__":
     queue = Queue()
 
-    #initial_request_delay = (1.0 / estimated_thru) - .005
     initial_request_delay = None
 
     input_size = 20
