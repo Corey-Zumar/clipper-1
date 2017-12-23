@@ -376,11 +376,12 @@ class RequestDelayConfig:
 if __name__ == "__main__":
     queue = Queue()
 
-    max_thru_est_thrus = [54, 84, 108, 
-                         162, 166, 216, 
-                         250, 270, 324, 
-                         332, 378, 416,
-                         432]
+    max_thru_est_thrus = [#84,
+                         112, 166, 
+                         222, 250, 332, 
+                         334, 416, 446, 
+                         500, 558, 580,
+                         664]
 
     initial_request_delay = None
 
@@ -388,7 +389,7 @@ if __name__ == "__main__":
 
     ## THIS IS FOR MAX THRU
     ## FORMAT IS (LANG_DETECT, NMT, LSTM)
-    max_thru_reps = [(1,1,1),
+    max_thru_reps = [#(1,1,1),
                      (2,1,1),
                      (2,2,1),
                      (3,2,1),
@@ -396,7 +397,11 @@ if __name__ == "__main__":
                      (4,3,1),
                      (5,3,1),
                      (5,4,1),
-                     (6,4,1)]
+                     (6,4,1),
+                     (6,5,1),
+                     (7,5,1),
+                     (7,6,1),
+                     (8,6,1)]
 
     max_thru_batches = (31,64,21)
 
