@@ -163,6 +163,9 @@ class Predictor(object):
         self.batch_num_complete = 0
         self.cur_req_id = 0
         self.start_time = datetime.now()
+        self.nmt_count = 0
+        self.lstm_count = 0
+        self.lang_detect_count = 0
 
     def print_stats(self):
         lats = np.array(self.latencies)
@@ -188,6 +191,13 @@ class Predictor(object):
                                                                            mean=mean,
                                                                            thru=thru))
 
+        total_count = self.nmt_count + self.lstm_count + self.lang_detect_count
+        nmt_pct = float(self.nmt_count) / total_count
+        lstm_pct = float(self.lstm_count) / total_count
+        ld_pct = float(self.lang_detect_count) / total_count
+
+        logger.info("NMT: {}, LSTM: {}, LANG DETECT: {}".format(nmt_pct, lstm_pct, ld_pct))
+
     def predict(self, lang_input):
         begin_time = datetime.now()
 
@@ -204,6 +214,7 @@ class Predictor(object):
                 self.init_stats()
 
         def lang_detect_continuation(lang_classification):
+            self.lang_detect_count += 1
             if lang_classification == DEFAULT_OUTPUT:
                 return
             elif lang_classification == LANG_CLASSIFICATION_GERMAN:
@@ -217,6 +228,7 @@ class Predictor(object):
                 update_perf_stats()
 
         def nmt_continuation(translation):
+            self.nmt_count += 1
             if translation == DEFAULT_OUTPUT:
                 return
             else:
@@ -224,6 +236,7 @@ class Predictor(object):
                 return self.client.send_request(LSTM_MODEL_APP_NAME, translation_bytes)
 
         def lstm_continuation(classification):
+            self.lstm_count += 1
             if classification == DEFAULT_OUTPUT:
                 return
             else:
@@ -366,7 +379,7 @@ if __name__ == "__main__":
     ## THIS IS FOR MAX THRU
     ## FORMAT IS (LANG_DETECT, NMT, LSTM)
 
-    estimated_thru = 20 / (1.0 / 3)
+    estimated_thru = 100
 
     initial_request_delay = (1.0 / estimated_thru) - .005
 
@@ -406,7 +419,7 @@ if __name__ == "__main__":
                               num_replicas=lang_detect_reps,
                               cpus_per_replica=1,
                               allocated_cpus=get_cpus(lang_detect_reps),
-                              allocated_gpus=get_gpus(lang_detect_reps),
+                              allocated_gpus=[],
                               input_size=input_size),
             setup_nmt(batch_size=max_thru_batches[nmt_batch_idx],
                       num_replicas=nmt_reps,
@@ -418,7 +431,7 @@ if __name__ == "__main__":
                        num_replicas=lstm_reps,
                        cpus_per_replica=1,
                        allocated_cpus=get_cpus(lstm_reps),
-                       allocated_gpus=get_gpus(lstm_reps),
+                       allocated_gpus=[],
                        input_size=input_size)
         ]
 
