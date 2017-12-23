@@ -288,11 +288,11 @@ class DriverBenchmarker(object):
 
     def increase_delay(self):
         if self.delay < 0.005:
-            self.delay += 0.0002
+            self.delay += 0.00005
         elif self.delay < 0.01:
-            self.delay += 0.0005
+            self.delay += 0.0001
         else:
-            self.delay += 0.001
+            self.delay += 0.00025
 
 
     def find_steady_state(self):
