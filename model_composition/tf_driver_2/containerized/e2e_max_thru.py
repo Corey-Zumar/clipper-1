@@ -14,7 +14,7 @@ from io import BytesIO
 from PIL import Image
 from containerized_utils.zmq_client import Client
 from containerized_utils import driver_utils
-from containerized_utils.driver_utils import INCREASING, DECREASING, CONVERGED_HIGH, CONVERGED, UNKNOWN
+from containerized_utils.driver_utils import INCREASING, DECREASING, CONVERGED_HIGH, CONVERGED, UNKNOWN, MAXBATCH
 from multiprocessing import Process, Queue
 
 CURR_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -211,7 +211,7 @@ class Predictor(object):
             self.total_num_complete += 1
             self.batch_num_complete += 1
 
-            trial_length = max(300, 50 * self.batch_size)
+            trial_length = max(300, 15 * self.batch_size)
             if self.batch_num_complete % trial_length == 0:
                 self.print_stats()
                 self.init_stats()
@@ -289,13 +289,13 @@ class DriverBenchmarker(object):
         self.delay = 1.0 / max_thruput
         logger.info("Initializing delay to {}".format(self.delay))
 
-    def increase_delay(self):
+    def increase_delay(self, factor=1):
         if self.delay < 0.005:
-            self.delay += 0.0002
+            self.delay += (0.00005 * factor)
         elif self.delay < 0.01:
-            self.delay += 0.0005
+            self.delay += (0.0001 * factor)
         else:
-            self.delay += 0.001
+            self.delay += (0.00025 * factor)
 
 
     def find_steady_state(self):
@@ -305,7 +305,7 @@ class DriverBenchmarker(object):
         idx = 0
         done = False
         # start checking for steady state after 7 trials
-        last_checked_length = 10
+        last_checked_length = 25
         while not done:
             lang_input = self.inputs[idx]
             predictor.predict(lang_input)
@@ -335,10 +335,22 @@ class DriverBenchmarker(object):
                     return self.find_steady_state()
                 elif convergence_state == DECREASING or convergence_state == UNKNOWN:
                     logger.info("Not converged yet. Still waiting")
+                elif convergence_state == MAXBATCH:
+                    self.increase_delay(.4)
+                    logger.info("Increasing delay to {}".format(self.delay))
+                    done = True
+                    return self.find_steady_state()
                 else:
                     logger.error("Unknown convergence state: {}".format(convergence_state))
                     sys.exit(1)
-
+            # elif len(predictor.stats["thrus"]) == 8:
+            #     slope = driver_utils.check_slope(predictor.stats, self.configs)
+            #     if slope > 0.1:
+            #         self.increase_delay()
+            #         logger.info("Increasing delay to {}".format(self.delay))
+            #         done = True
+            #         return self.find_steady_state()
+            #
     def _gen_inputs(self, num_inputs=1000, input_length=20):
         if not self.loaded_text:
             self.text = self._load_detect_text()
@@ -372,7 +384,7 @@ class DriverBenchmarker(object):
 class RequestDelayConfig:
     def __init__(self, request_delay):
         self.request_delay = request_delay
-        
+
     def to_json(self):
         return json.dumps(self.__dict__)
 
@@ -380,9 +392,10 @@ if __name__ == "__main__":
     queue = Queue()
 
     max_thru_est_thrus = [#84,
-                         112, 166, 
-                         222, 250, 332, 
-                         334, 416, 446, 
+                         #112, 166,
+                         #222, 250, 332,
+                         #250, 332,
+                         334, 416, 446,
                          500, 558, 580,
                          664]
 
@@ -392,19 +405,20 @@ if __name__ == "__main__":
 
     ## THIS IS FOR MAX THRU
     ## FORMAT IS (LANG_DETECT, NMT, LSTM)
-    max_thru_reps = [#(1,1,1),
-                     (2,1,1),
-                     (2,2,1),
-                     (3,2,1),
-                     (3,3,1),
-                     (4,3,1),
-                     (5,3,1),
-                     (5,4,1),
-                     (6,4,1),
-                     (6,5,1),
-                     (7,5,1),
-                     (7,6,1),
-                     (8,6,1)]
+    max_thru_reps = [#(1,1,1)]
+                     #(1,1,1),
+                     #(2,1,1),
+                     #(2,2,1),
+                     #(3,2,1),
+                     #(3,3,1),
+                     #(4,3,1),
+                     (5,3,1)]
+                     #(5,4,1),
+                     #(6,4,1),
+                     #(6,5,1),
+                     #(7,5,1),
+                     #(7,6,1),
+                     #(8,6,1)]
 
     max_thru_batches = (31,64,21)
 
@@ -417,7 +431,7 @@ if __name__ == "__main__":
     for i in range(len(max_thru_reps)):
         lang_detect_reps, nmt_reps, lstm_reps = max_thru_reps[i]
 
-        request_delay = 1.0 / (max_thru_est_thrus[i] * 1.1)
+        request_delay = 1.0 / (max_thru_est_thrus[i] * 1.05)
 
         total_cpus = range(4,14)
 
@@ -465,5 +479,5 @@ if __name__ == "__main__":
 
         fname = "langdetect_{}-nmt_{}-lstm_{}".format(lang_detect_reps, nmt_reps, lstm_reps)
         driver_utils.save_results(configs, cl, all_stats, "e2e_max_thru_tf_text_driver", prefix=fname)
-    
+
     sys.exit(0)
