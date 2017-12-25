@@ -291,11 +291,11 @@ class DriverBenchmarker(object):
 
     def increase_delay(self, factor=1):
         if self.delay < 0.005:
-            self.delay += (0.00005 * factor)
+            self.delay += (0.00001 * factor)
         elif self.delay < 0.01:
-            self.delay += (0.0001 * factor)
+            self.delay += (0.00005 * factor)
         else:
-            self.delay += (0.00025 * factor)
+            self.delay += (0.00015 * factor)
 
 
     def find_steady_state(self):
@@ -343,10 +343,10 @@ class DriverBenchmarker(object):
                 else:
                     logger.error("Unknown convergence state: {}".format(convergence_state))
                     sys.exit(1)
-            # elif len(predictor.stats["thrus"]) == 8:
+            # if len(predictor.stats["thrus"]) == 15:
             #     slope = driver_utils.check_slope(predictor.stats, self.configs)
             #     if slope > 0.1:
-            #         self.increase_delay()
+            #         self.increase_delay(.2)
             #         logger.info("Increasing delay to {}".format(self.delay))
             #         done = True
             #         return self.find_steady_state()
@@ -391,7 +391,8 @@ class RequestDelayConfig:
 if __name__ == "__main__":
     queue = Queue()
 
-    est_thrus = [78, 84, 156,
+    est_thrus = [#78,
+                 84, 156,
                  167, 234, 250,
                  312, 333, 390]
 
@@ -401,7 +402,7 @@ if __name__ == "__main__":
 
     ## THIS IS FOR 3000MS
     ## FORMAT IS (LANG_DETECT, NMT, LSTM)
-    all_reps = [(1,1,1),
+    all_reps = [#(1,1,1),
                 (1,2,1),
                 (2,2,1),
                 (2,3,1),
@@ -424,7 +425,7 @@ if __name__ == "__main__":
     for i in range(len(all_reps)):
         lang_detect_reps, nmt_reps, lstm_reps = all_reps[i]
 
-        request_delay = 1.0 / (est_thrus[i] * 1.05)
+        request_delay = 1.0 / (est_thrus[i] * 1.1)
 
         total_cpus = range(4,14)
 
@@ -471,6 +472,6 @@ if __name__ == "__main__":
         cl.connect()
 
         fname = "langdetect_{}-nmt_{}-lstm_{}".format(lang_detect_reps, nmt_reps, lstm_reps)
-        driver_utils.save_results(configs, cl, all_stats, "e2e_3000ms_tf_text_driver", prefix=fname)
+        driver_utils.save_results(configs, cl, all_stats, "e2e_5000ms_tf_text_driver", prefix=fname)
 
     sys.exit(0)
