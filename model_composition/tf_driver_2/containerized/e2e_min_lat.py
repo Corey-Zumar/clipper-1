@@ -372,7 +372,7 @@ class DriverBenchmarker(object):
 class RequestDelayConfig:
     def __init__(self, request_delay):
         self.request_delay = request_delay
-        
+
     def to_json(self):
         return json.dumps(self.__dict__)
 
@@ -383,23 +383,24 @@ if __name__ == "__main__":
 
     input_size = 20
 
-    min_lat_est_thrus = [16, 32, 48, 
-                         64, 76, 80, 
-                         94, 104, 
+    min_lat_est_thrus = [#16, 32, 48,
+                         #64, 76, 80,
+                         76,
+                         94, 104,
                          110, 126]
 
     ## THIS IS FOR MIN_LAT
     ## FORMAT IS (LANG_DETECT, NMT, LSTM)
-    min_lat_reps = [(1,1,1),
-                    (1,2,1),
-                    (1,3,1),
-                    (1,4,1),
-                    (1,5,1),
-                    (2,5,1),
-                    (2,6,1),
-                    (2,7,1),
-                    (2,7,2),
-                    (2,8,2)]
+    min_lat_reps = [#(1,1,1),
+                    #(1,2,1),
+                    #(1,3,1),
+                    (1,4,1)]
+                    #(1,5,1)]
+                    #(2,5,1),
+                    #(2,6,1),
+                    #(2,7,1),
+                    #(2,7,2),
+                    #(2,8,2)]
 
     min_lat_batches = (1,1,1)
 
@@ -412,7 +413,7 @@ if __name__ == "__main__":
     for i in range(len(min_lat_reps)):
         lang_detect_reps, nmt_reps, lstm_reps = min_lat_reps[i]
 
-        request_delay = 1.0 / (min_lat_est_thrus[i] * 1.1)
+        request_delay = 1.0 / (min_lat_est_thrus[i] * 1.2)
 
         total_cpus = range(4,14)
 
@@ -460,5 +461,5 @@ if __name__ == "__main__":
 
         fname = "langdetect_{}-nmt_{}-lstm_{}".format(lang_detect_reps, nmt_reps, lstm_reps)
         driver_utils.save_results(configs, cl, all_stats, "e2e_min_lat_tf_text_driver", prefix=fname)
-    
+
     sys.exit(0)
