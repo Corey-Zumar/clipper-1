@@ -22,8 +22,7 @@ Adapted from https://github.com/may-/cnn-ld-tf
 class LangDetectModel(ModelBase):
 
     def __init__(self, model_data_path):
-        config_path, checkpoint_path, vocab_path
-        self.sess, self.inputs_tensor, self.scores_tensor = self._load_model(config_path, checkpoint_path)
+        self.sess, self.inputs_tensor, self.scores_tensor = self._load_model(model_data_path)
         self.vocab = self._load_vocab(model_data_path)
 
     def predict(self, inputs):
