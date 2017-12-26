@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from single_proc_utils import HeavyNodeConfig, save_results
-from models import tf_lstm_model, nmt_model
+from models import nmt_model, tf_lstm_model, tf_lang_detect_model
 
 LANG_CLASSIFICATION_ENGLISH = "en"
 LANG_CLASSIFICATION_GERMAN = "de"
