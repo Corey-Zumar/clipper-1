@@ -22,43 +22,53 @@ logger = logging.getLogger(__name__)
 CURR_DIR = os.path.dirname(os.path.realpath(__file__))
 MODELS_DIR = os.path.join(CURR_DIR, "models")
 
-LANG_DETECT_MODEL_NAME = "tf-lang-detect"
 NMT_MODEL_NAME = "tf-nmt"
-TF_LSTM_MODEL_NAME = "tf-lstm"
+LSTM_MODEL_NAME = "tf-lstm"
+LANG_DETECT_MODEL_NAME = "tf-lang-detect"
 
 NMT_MODEL_PATH = os.path.join(MODELS_DIR, "nmt_model_data")
-TF_LSTM_MODEL_PATH = os.path.join(MODELS_DIR, "tf_lstm_model_data")
+LSTM_MODEL_PATH = os.path.join(MODELS_DIR, "tf_lstm_model_data")
+LANG_DETECT_MODEL_PATH = os.path.join(MODELS_DIR, "tf_lang_detect_model_data")
 
-NMT_WORKLOAD_RELATIVE_PATH = "nmt_workload"
-LSTM_WORKLOAD_RELATIVE_PATH = "lstm_workload"
+WORKLOAD_RELATIVE_PATH = "workload"
 
 ########## Setup ##########
 
-def get_heavy_node_configs(batch_size, allocated_cpus, lstm_gpus=[], nmt_gpus=[]):
-    # lstm_config = HeavyNodeConfig(model_name=TF_LSTM_MODEL_NAME,
-    #                               input_type="strings",
-    #                               allocated_cpus=allocated_cpus,
-    #                               gpus=[0],
-    #                               batch_size=batch_size)
-
+def get_heavy_node_configs(batch_size, allocated_cpus, nmt_gpus=[]):
     nmt_config = HeavyNodeConfig(model_name=NMT_MODEL_NAME,
                                  input_type="bytes",
                                  allocated_cpus=allocated_cpus,
-                                 gpus=[0],
+                                 gpus=nmt_gpus,
                                  batch_size=batch_size)
 
-    return [nmt_config]
+    lstm_config = HeavyNodeConfig(model_name=LSTM_MODEL_NAME,
+                                  input_type="bytes",
+                                  allocated_cpus=allocated_cpus,
+                                  gpus=[],
+                                  batch_size=batch_size)
 
-def create_lstm_model(model_path, gpu_num):
-    return tf_lstm_model.TfLstm(model_path, gpu_num)
+    lang_detect_config = HeavyNodeConfig(model_name=LANG_DETECT_MODEL_NAME,
+                                         input_type="bytes",
+                                         allocated_cpus=allocated_cpus,
+                                         gpus=[],
+                                         batch_size=batch_size)
+
+    return [nmt_config]
 
 def create_nmt_model(model_path, gpu_num):
     return nmt_model.NMTModel(model_path, gpu_num)
 
+def create_lstm_model(model_path):
+    return tf_lstm_model.TfLstm(model_path)
+
+def create_lang_detect_model(model_path):
+    return tf_lang_detect_model.LangDetectModel(model_path)
+
 def load_models(lstm_gpu, nmt_gpu):
     models_dict = {
-        # TF_LSTM_MODEL_NAME : create_lstm_model(TF_LSTM_MODEL_PATH, gpu_num=lstm_gpu),
-        NMT_MODEL_NAME : create_nmt_model(NMT_MODEL_PATH, gpu_num=nmt_gpu)
+        NMT_MODEL_NAME : create_nmt_model(NMT_MODEL_PATH, gpu_num=nmt_gpu),
+        LSTM_MODEL_NAME : create_lstm_model(LSTM_MODEL_PATH),
+        LANG_DETECT_MODEL_NAME : create_lang_detect_model(LANG_DETECT_MODEL_PATH)
     }
     return models_dict
 
@@ -172,7 +182,7 @@ class DriverBenchmarker(object):
 
     def _gen_inputs(self, model_name, num_inputs=1000, input_length=20):
         if not self.loaded_text:
-            self.text = self._get_load_text_fn(model_name)()
+            self.text = self._load_text()
             self.loaded_text = True
 
         inputs = []
@@ -193,36 +203,12 @@ class DriverBenchmarker(object):
 
         return bytes_inputs
 
-    def _get_load_text_fn(self, model_name):
-        if model_name == NMT_MODEL_NAME:
-            return self._load_nmt_text
-
-        elif model_name == LANG_DETECT_MODEL_NAME:
-            return self._load_detect_text
-
-        elif model_name == TF_LSTM_MODEL_NAME:
-            return self._load_lstm_text
-
-    def _load_nmt_text(self):
-        nmt_data_path = os.path.join(CURR_DIR, NMT_WORKLOAD_RELATIVE_PATH, "workload.txt")
-        nmt_data_file = open(nmt_data_path, "rb")
-        nmt_text = nmt_data_file.readlines()
-        np.random.shuffle(nmt_text)
-        return nmt_text
-
-    def _load_detect_text(self):
-        detect_data_path = os.path.join(CURR_DIR, LANG_DETECT_WORKLOAD_RELATIVE_PATH, "workload.txt")
-        detect_data_file = open(detect_data_path, "rb")
-        detect_text = detect_data_file.readlines()
-        np.random.shuffle(detect_text)
-        return detect_text
-
-    def _load_lstm_text(self):
-        lstm_data_path = os.path.join(CURR_DIR, LSTM_WORKLOAD_RELATIVE_PATH, "workload.txt")
-        lstm_data_file = open(lstm_data_path, "rb")
-        lstm_text = lstm_data_file.readlines()
-        np.random.shuffle(lstm_text)
-        return lstm_text
+    def _load_text(self):
+        workload_data_path = os.path.join(CURR_DIR, WORKLOAD_RELATIVE_PATH, "workload.txt")
+        workload_data_file = open(workload_data_path, "rb")
+        workload_text = workload_data_file.readlines()
+        np.random.shuffle(workload_text)
+        return workload_text
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Single Process Image Driver 1')
