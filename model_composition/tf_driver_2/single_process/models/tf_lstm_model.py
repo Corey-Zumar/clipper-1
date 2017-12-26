@@ -29,14 +29,14 @@ Adapted from https://github.com/adeshpande3/LSTM-Sentiment-Analysis
 """
 class TfLstm(ModelBase):
 
-    def __init__(self, model_data_path, gpu_num):
+    def __init__(self, model_data_path):
         ModelBase.__init__(self)
 
         vocab_dir_path = os.path.join(model_data_path, VOCAB_RELATIVE_PATH)
         checkpoint_dir_path = os.path.join(model_data_path, CHECKPOINT_RELATIVE_PATH)
 
         self.vocabulary = Vocabulary(vocab_dir_path)
-        self.sess, self.input_data, self.sentiment_scores = self._create_model_graph(gpu_num)
+        self.sess, self.input_data, self.sentiment_scores = self._create_model_graph()
 
     def predict(self, inputs):
         """
@@ -85,7 +85,8 @@ class TfLstm(ModelBase):
 
     def _create_model_graph(self):
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GPU_MEM_FRAC)
-        sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True))
+        sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, 
+            allow_soft_placement=True, device_count = {'GPU': 0}))
 
         with tf.device("/gpu:0"):
             input_data = tf.placeholder(tf.int32, [None, MAX_SEQ_LENGTH])
