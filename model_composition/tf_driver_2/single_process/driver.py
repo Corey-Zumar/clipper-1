@@ -12,6 +12,9 @@ from datetime import datetime
 from single_proc_utils import HeavyNodeConfig, save_results
 from models import tf_lstm_model, nmt_model
 
+LANG_CLASSIFICATION_ENGLISH = "en"
+LANG_CLASSIFICATION_GERMAN = "de"
+
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
     datefmt='%y-%m-%d:%H:%M:%S',
@@ -31,6 +34,9 @@ LSTM_MODEL_PATH = os.path.join(MODELS_DIR, "tf_lstm_model_data")
 LANG_DETECT_MODEL_PATH = os.path.join(MODELS_DIR, "tf_lang_detect_model_data")
 
 WORKLOAD_RELATIVE_PATH = "workload"
+
+LANG_CLASSIFICATION_ENGLISH = "en"
+LANG_CLASSIFICATION_GERMAN = "de"
 
 ########## Setup ##########
 
@@ -90,8 +96,9 @@ class Predictor(object):
         self.trial_length = trial_length
 
         # Models
-        #self.tf_lstm_model = models_dict[TF_LSTM_MODEL_NAME]
         self.nmt_model = models_dict[NMT_MODEL_NAME]
+        self.lstm_model = models_dict[LSTM_MODEL_NAME]
+        self.lang_detect_model = models_dict[LANG_DETECT_MODEL_NAME]
 
     def init_stats(self):
         self.latencies = []
@@ -112,7 +119,7 @@ class Predictor(object):
                                                                        mean=mean,
                                                                        thru=thru))
 
-    def predict(self, lstm_inputs, nmt_inputs):
+    def predict(self, inputs):
         """
         Parameters
         ------------
@@ -120,29 +127,58 @@ class Predictor(object):
             A list of text items on which to perform sentiment analysis
         """
 
-        assert len(lstm_inputs) == len(nmt_inputs)
-
-        batch_size = len(lstm_inputs)
-
         begin_time = datetime.now()
 
-        # lstm_future = self.thread_pool.submit(self.tf_lstm_model.predict, lstm_inputs)
+        def update_stats(lats, num_completed):
+            self.latencies += lats
+            self.total_num_complete += num_completed
+            self.trial_num_complete += num_completed
 
-        # lstm_classes = lstm_future.result()
+            if self.trial_num_complete >= self.trial_length:
+                self.print_stats()
+                self.init_stats()
 
-        nmt_future = self.thread_pool.submit(self.nmt_model.predict, nmt_inputs)
+        def lang_detect_fn(inputs):
+            langs = self.lang_detect_model.predict(inputs)
+            unk_count = 0
+            english_inps = []
+            german_inps = []
+            for i in range(len(langs)):
+                if lang == LANG_CLASSIFICATION_ENGLISH:
+                    english_inps.append(inputs[i])
+                elif lang == LANG_CLASSIFICATION_GERMAN:
+                    german_inps.append(inputs[i])
+                else:
+                    unk_count += 1
 
-        nmt_preds = nmt_future.result()
+            unk_end_time = datetime.now()
+            latency = (end_time - begin_time).total_seconds()
 
-        end_time = datetime.now()
+            update_stats([latency for _ in range(unk_count)], unk_count)
 
-        latency = (end_time - begin_time).total_seconds()
-        self.latencies.append(latency)
-        self.total_num_complete += batch_size
-        self.trial_num_complete += batch_size
-        if self.trial_num_complete % self.trial_length == 0:
-            self.print_stats()
-            self.init_stats()
+            return english_inps, german_inps
+
+        def lstm_fn(inputs):
+            sentiments = self.lstm_model.predict(inputs)
+            num_completed = len(sentiments)
+
+            lstm_end_time = datetime.now()
+            latency = (lstm_end_time - begin_time).total_seconds()
+
+            update_stats([latency for _ in range(num_completed)], num_completed)
+
+            return sentiments
+
+        lang_detect_future = self.thread_pool.submit(lang_detect_fn, inputs)
+        english_inps, german_inps = lang_detect_future.result()
+
+        lstm_future = self.thread_pool.submit(lstm_fn, english_inps)
+
+        nmt_future = self.thread_pool.submit(
+            lambda inputs : lstm_fn(self.nmt_model.predict(inputs)), german_inps)
+
+        lstm_future.result()
+        nmt_future.result()
 
 class DriverBenchmarker(object):
     def __init__(self, models_dict, trial_length, process_num):
@@ -158,29 +194,23 @@ class DriverBenchmarker(object):
         predictor = Predictor(self.models_dict, trial_length=self.trial_length)
 
         logger.info("Generating random inputs")
-        lstm_inputs = self._gen_inputs(TF_LSTM_MODEL_NAME, num_inputs=1000, input_length=input_length)
-        lstm_inputs = [i for _ in range(40) for i in lstm_inputs]
 
-        nmt_inputs = self._gen_inputs(NMT_MODEL_NAME, num_inputs=1000, input_length=input_length)
-        nmt_inputs = [i for _ in range(40) for i in nmt_inputs]
-
-        # TODO(czumar): Change this when there are more models / inputs
-        assert len(lstm_inputs) == len(lstm_inputs)
+        inputs = self._gen_inputs(num_inputs=1000, input_length=input_length)
+        inputs = [i for _ in range(40) for i in inputs]
         
         logger.info("Starting predictions")
         while True:
             batch_idx = np.random.randint(len(lstm_inputs) - batch_size)
-            lstm_batch = lstm_inputs[batch_idx : batch_idx + batch_size]
-            nmt_batch = nmt_inputs[batch_idx : batch_idx + batch_size]
+            inputs_batch = inputs[batch_idx : batch_idx + batch_size]
 
-            predictor.predict(lstm_batch, nmt_batch)
+            predictor.predict(inputs_batch)
 
             if len(predictor.stats["thrus"]) > num_trials:
                 break
 
         save_results(self.configs, [predictor.stats], "nmt_single_proc_exps", self.process_num)
 
-    def _gen_inputs(self, model_name, num_inputs=1000, input_length=20):
+    def _gen_inputs(self, num_inputs=1000, input_length=20):
         if not self.loaded_text:
             self.text = self._load_text()
             self.loaded_text = True
