@@ -35,7 +35,6 @@ class LangDetectModel(ModelBase):
         inputs = [str(input_item.tobytes()) for input_item in inputs]
 
         ids_inputs = np.array([self.vocab.text2id(input_text) for input_text in inputs])
-        print(ids_inputs.shape)
 
         feed_dict = {
             self.inputs_tensor : ids_inputs
@@ -46,7 +45,6 @@ class LangDetectModel(ModelBase):
         for score_dist in all_scores:
             parsed_dist = [float(str(i)) for i in score_dist]
             pred_class = self.vocab.class_names[int(np.argmax(parsed_dist))]
-            print(pred_class)
             outputs.append(str(pred_class.replace("#", "")))
 
         return outputs

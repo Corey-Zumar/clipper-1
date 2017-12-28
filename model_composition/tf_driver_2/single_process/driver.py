@@ -172,6 +172,8 @@ class Predictor(object):
 
         lang_detect_future = self.thread_pool.submit(lang_detect_fn, inputs)
         english_inps, german_inps = lang_detect_future.result()
+        english_inps = [np.frombuffer(bytearray(input_item), dtype=np.uint8) for input_item in english_inps]
+        german_inps = [np.frombuffer(bytearray(input_item), dtype=np.uint8) for input_item in german_inps]
 
         lstm_future = self.thread_pool.submit(lstm_fn, english_inps)
 
