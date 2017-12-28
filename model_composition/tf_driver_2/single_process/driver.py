@@ -138,6 +138,9 @@ class Predictor(object):
                 self.print_stats()
                 self.init_stats()
 
+        def to_bytes(str_inputs):
+            return [np.frombuffer(bytearray(input_item), dtype=np.uint8) for input_item in str_inputs]
+
         def lang_detect_fn(inputs):
             langs = self.lang_detect_model.predict(inputs)
             unk_count = 0
@@ -170,10 +173,14 @@ class Predictor(object):
 
             return sentiments
 
+        def nmt_fn(inputs):
+            translations = self.nmt_model.predict(inputs)
+            return to_bytes(translations)
+
         lang_detect_future = self.thread_pool.submit(lang_detect_fn, inputs)
         english_inps, german_inps = lang_detect_future.result()
-        english_inps = [np.frombuffer(bytearray(input_item), dtype=np.uint8) for input_item in english_inps]
-        german_inps = [np.frombuffer(bytearray(input_item), dtype=np.uint8) for input_item in german_inps]
+        english_inps = to_bytes(english_inps)
+        german_inps = to_bytes(german_inps)
 
         lstm_future = self.thread_pool.submit(lstm_fn, english_inps)
 
