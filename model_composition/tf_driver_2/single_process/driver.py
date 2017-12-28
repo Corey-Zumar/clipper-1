@@ -185,7 +185,7 @@ class Predictor(object):
         lstm_future = self.thread_pool.submit(lstm_fn, english_inps)
 
         nmt_future = self.thread_pool.submit(
-            lambda inputs : lstm_fn(self.nmt_model.predict(inputs)), german_inps)
+            lambda inputs : lstm_fn(nmt_fn(inputs)), german_inps)
 
         lstm_future.result()
         nmt_future.result()
