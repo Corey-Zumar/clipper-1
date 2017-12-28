@@ -182,13 +182,21 @@ class Predictor(object):
         english_inps = to_bytes(english_inps)
         german_inps = to_bytes(german_inps)
 
-        lstm_future = self.thread_pool.submit(lstm_fn, english_inps)
+        if len(english_inps) > 0:
+            lstm_future = self.thread_pool.submit(lstm_fn, english_inps)
+        else:
+            lstm_future = None
 
-        nmt_future = self.thread_pool.submit(
-            lambda inputs : lstm_fn(nmt_fn(inputs)), german_inps)
+        if len(german_inps) > 0:
+            nmt_future = self.thread_pool.submit(
+                lambda inputs : lstm_fn(nmt_fn(inputs)), german_inps)
+        else:
+            nmt_future = None
 
-        lstm_future.result()
-        nmt_future.result()
+        if lstm_future:
+            lstm_future.result()
+        if nmt_future:
+            nmt_future.result()
 
 class DriverBenchmarker(object):
     def __init__(self, models_dict, trial_length, process_num):
