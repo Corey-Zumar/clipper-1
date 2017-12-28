@@ -144,6 +144,7 @@ class Predictor(object):
             english_inps = []
             german_inps = []
             for i in range(len(langs)):
+                lang = langs[i]
                 if lang == LANG_CLASSIFICATION_ENGLISH:
                     english_inps.append(inputs[i])
                 elif lang == LANG_CLASSIFICATION_GERMAN:
