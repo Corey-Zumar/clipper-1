@@ -290,5 +290,5 @@ if __name__ == "__main__":
             benchmarker.set_configs(configs)
             trial_length = args.trial_length
             if not trial_length:
-                trial_length = batch_size * 15
+                trial_length = max(200, batch_size * 15)
             benchmarker.run(args.num_trials, trial_length, batch_size, input_length)
