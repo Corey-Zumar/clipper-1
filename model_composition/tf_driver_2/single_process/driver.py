@@ -153,7 +153,7 @@ class Predictor(object):
                     unk_count += 1
 
             unk_end_time = datetime.now()
-            latency = (end_time - begin_time).total_seconds()
+            latency = (unk_end_time - begin_time).total_seconds()
 
             update_stats([latency for _ in range(unk_count)], unk_count)
 
