@@ -73,8 +73,8 @@ def create_lang_detect_model(model_path):
 def load_models(nmt_gpu):
     models_dict = {
         NMT_MODEL_NAME : create_nmt_model(NMT_MODEL_PATH, gpu_num=nmt_gpu),
-        LSTM_MODEL_NAME : create_lstm_model(LSTM_MODEL_PATH),
-        LANG_DETECT_MODEL_NAME : create_lang_detect_model(LANG_DETECT_MODEL_PATH)
+        LANG_DETECT_MODEL_NAME : create_lang_detect_model(LANG_DETECT_MODEL_PATH),
+        LSTM_MODEL_NAME : create_lstm_model(LSTM_MODEL_PATH)
     }
     return models_dict
 
@@ -200,7 +200,7 @@ class DriverBenchmarker(object):
         
         logger.info("Starting predictions")
         while True:
-            batch_idx = np.random.randint(len(lstm_inputs) - batch_size)
+            batch_idx = np.random.randint(len(inputs) - batch_size)
             inputs_batch = inputs[batch_idx : batch_idx + batch_size]
 
             predictor.predict(inputs_batch)
