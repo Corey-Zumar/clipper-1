@@ -201,7 +201,6 @@ class Predictor(object):
 class DriverBenchmarker(object):
     def __init__(self, models_dict, process_num):
         self.models_dict = models_dict
-        self.trial_length = trial_length
         self.process_num = process_num
         self.loaded_text = False
 
