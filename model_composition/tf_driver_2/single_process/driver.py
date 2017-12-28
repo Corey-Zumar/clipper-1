@@ -199,7 +199,7 @@ class Predictor(object):
             nmt_future.result()
 
 class DriverBenchmarker(object):
-    def __init__(self, models_dict, trial_length, process_num):
+    def __init__(self, models_dict, process_num):
         self.models_dict = models_dict
         self.trial_length = trial_length
         self.process_num = process_num
@@ -208,8 +208,8 @@ class DriverBenchmarker(object):
     def set_configs(self, configs):
         self.configs = configs
 
-    def run(self, num_trials, batch_size, input_length):
-        predictor = Predictor(self.models_dict, trial_length=self.trial_length)
+    def run(self, num_trials, trial_length, batch_size, input_length):
+        predictor = Predictor(self.models_dict, trial_length=trial_length)
 
         logger.info("Generating random inputs")
 
@@ -226,7 +226,7 @@ class DriverBenchmarker(object):
             if len(predictor.stats["thrus"]) > num_trials:
                 break
 
-        save_results(self.configs, [predictor.stats], "nmt_single_proc_exps", self.process_num)
+        save_results(self.configs, [predictor.stats], "tf_driver2_single_proc_exps", self.process_num)
 
     def _gen_inputs(self, num_inputs=1000, input_length=20):
         if not self.loaded_text:
@@ -281,7 +281,7 @@ if __name__ == "__main__":
     input_length_confs = args.input_lengths if args.input_lengths else default_input_length_confs
     
     models_dict = load_models(args.nmt_gpu)
-    benchmarker = DriverBenchmarker(models_dict, args.trial_length, args.process_number)
+    benchmarker = DriverBenchmarker(models_dict, args.process_number)
 
     for input_length in input_length_confs:
         for batch_size in batch_size_confs:
@@ -289,4 +289,7 @@ if __name__ == "__main__":
                                              allocated_cpus=args.cpus,
                                              nmt_gpus=[args.nmt_gpu])
             benchmarker.set_configs(configs)
-            benchmarker.run(args.num_trials, batch_size, input_length)
+            trial_length = args.trial_length
+            if not trial_length:
+                trial_length = batch_size * 15
+            benchmarker.run(args.num_trials, trial_length, batch_size, input_length)
