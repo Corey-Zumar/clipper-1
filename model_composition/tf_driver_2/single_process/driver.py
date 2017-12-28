@@ -264,7 +264,7 @@ if __name__ == "__main__":
     parser.add_argument('-c',  '--cpus', type=int, nargs='+', help="The set of cpu cores on which to run the single process driver")
     parser.add_argument('-ng',  '--nmt_gpu', type=int, default=1, help="The GPU on which to run the NMT model")
     parser.add_argument('-t',  '--num_trials', type=int, default=15, help="The number of trials to run")
-    parser.add_argument('-tl', '--trial_length', type=int, default=200, help="The length of each trial, in requests")
+    parser.add_argument('-tl', '--trial_length', type=int, help="The length of each trial, in requests")
     parser.add_argument('-p',  '--process_number', type=int, default=0)
     parser.add_argument('-l', '--input_lengths', type=int, nargs='+')
     
