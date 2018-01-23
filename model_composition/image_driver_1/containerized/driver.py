@@ -32,6 +32,7 @@ VGG_KERNEL_SVM_MODEL_APP_NAME = "kernel-svm"
 VGG_ELASTIC_NET_MODEL_APP_NAME = "elastic-net"
 INCEPTION_FEATS_MODEL_APP_NAME = "inception"
 LGBM_MODEL_APP_NAME = "lgbm"
+PYTORCH_RESNET_MODEL_APP_NAME = "pytorch-resnet-feats"
 
 TF_KERNEL_SVM_MODEL_APP_NAME = "tf-kernel-svm"
 TF_LOG_REG_MODEL_APP_NAME = "tf-log-reg"
@@ -47,6 +48,7 @@ LGBM_IMAGE_NAME = "model-comp/lgbm"
 TF_KERNEL_SVM_IMAGE_NAME = "model-comp/tf-kernel-svm"
 TF_LOG_REG_IMAGE_NAME = "model-comp/tf-log-reg"
 TF_RESNET_IMAGE_NAME = "model-comp/tf-resnet-feats"
+PYTORCH_RESNET_IMAGE_NAME = "model-comp/pytorch-resnet-feats"
 
 VALID_MODEL_NAMES = [
     VGG_FEATS_MODEL_APP_NAME,
@@ -57,7 +59,8 @@ VALID_MODEL_NAMES = [
     LGBM_MODEL_APP_NAME,
     TF_KERNEL_SVM_MODEL_APP_NAME,
     TF_LOG_REG_MODEL_APP_NAME,
-    TF_RESNET_MODEL_APP_NAME
+    TF_RESNET_MODEL_APP_NAME,
+    PYTORCH_RESNET_MODEL_APP_NAME
 ]
 
 CLIPPER_ADDRESS = "localhost"
@@ -173,7 +176,7 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
                                             use_nvidia_docker=False,
-                                            no_diverge=True)     
+                                            no_diverge=True)
 
 
     elif model_name == LGBM_MODEL_APP_NAME:
@@ -251,6 +254,26 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             num_replicas=num_replicas,
                                             use_nvidia_docker=True,
                                             no_diverge=True)
+
+    elif model_name == PYTORCH_RESNET_MODEL_APP_NAME:
+        if not cpus_per_replica:
+            cpus_per_replica = 1
+        if not allocated_cpus:
+            allocated_cpus = [20]
+        if not allocated_gpus:
+            allocated_gpus = [1]
+
+        return driver_utils.HeavyNodeConfig(name=PYTORCH_RESNET_MODEL_APP_NAME,
+                                            input_type="floats",
+                                            model_image=PYTORCH_RESNET_IMAGE_NAME,
+                                            allocated_cpus=allocated_cpus,
+                                            cpus_per_replica=cpus_per_replica,
+                                            gpus=allocated_gpus,
+                                            batch_size=batch_size,
+                                            num_replicas=num_replicas,
+                                            use_nvidia_docker=True,
+                                            no_diverge=True)
+
 
 
 ########## Benchmarking ##########
@@ -373,9 +396,9 @@ class ModelBenchmarker(object):
 
     def increase_delay(self):
         if self.delay < 0.005:
-            self.delay += 0.0002
+            self.delay += 0.0001
         else:
-            self.delay += 0.0005
+            self.delay += 0.00025
 
     def find_steady_state(self):
         setup_clipper(self.config)
@@ -384,7 +407,7 @@ class ModelBenchmarker(object):
         idx = 0
         done = False
         # start checking for steady state after 7 trials
-        last_checked_length = 6
+        last_checked_length = 20
         while not done:
             predictor.predict(model_app_name=self.config.name, input_item=self.inputs[idx])
             time.sleep(self.delay)
@@ -393,7 +416,7 @@ class ModelBenchmarker(object):
 
             if len(predictor.stats["thrus"]) > last_checked_length:
                 last_checked_length = len(predictor.stats["thrus"]) + 4
-                convergence_state = driver_utils.check_convergence(predictor.stats, [self.config], self.latency_upper_bound)
+                convergence_state, slope = driver_utils.check_convergence(predictor.stats, [self.config], self.latency_upper_bound)
                 # Diverging, try again with higher
                 # delay
                 if convergence_state == INCREASING or convergence_state == CONVERGED_HIGH:
@@ -416,6 +439,14 @@ class ModelBenchmarker(object):
                 else:
                     logger.error("Unknown convergence state: {}".format(convergence_state))
                     sys.exit(1)
+            elif len(predictor.stats["thrus"]) == 6:
+                convergence_state, slope = driver_utils.check_convergence(predictor.stats, [self.config], self.latency_upper_bound)
+                if convergence_state == INCREASING and abs(slope) > .1:
+                    self.increase_delay()
+                    logger.info("Increasing delay to {}".format(self.delay))
+                    done = True
+                    return self.find_steady_state()
+
 
     def _get_vgg_feats_input(self):
         input_img = np.array(np.random.rand(224, 224, 3) * 255, dtype=np.float32)
@@ -456,17 +487,21 @@ class ModelBenchmarker(object):
             return self._get_tf_log_reg_input
         elif model_app_name == TF_RESNET_MODEL_APP_NAME:
             return self._get_tf_resnet_input
+        elif model_app_name = PYTORCH_RESNET_MODEL_APP_NAME:
+            return self._get_tf_resnet_input
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Clipper image driver 1')
-    parser.add_argument('-m', '--model_name', type=str, help="The name of the model to benchmark. One of: 'vgg', 'kpca-svm', 'kernel-svm', 'elastic-net', 'inception', 'lgbm', 'tf-kernel-svm', 'tf-log-reg', 'tf-resnet-feats'")
+    parser.add_argument('-m', '--model_name', type=str, help="The name of the model to benchmark. One of: 'vgg',\
+        'kpca-svm', 'kernel-svm', 'elastic-net', 'inception', 'lgbm', 'tf-kernel-svm', 'tf-log-reg',\
+        'tf-resnet-feats', 'pytorch-resnet-feats'")
     parser.add_argument('-b', '--batch_sizes', type=int, nargs='+', help="The batch size configurations to benchmark for the model. Each configuration will be benchmarked separately.")
     parser.add_argument('-r', '--num_replicas', type=int, nargs='+', help="The replica number configurations to benchmark for the model. Each configuration will be benchmarked separately.")
     parser.add_argument('-c', '--model_cpus', type=int, nargs='+', help="The set of cpu cores on which to run replicas of the provided model")
     parser.add_argument('-p', '--cpus_per_replica_nums', type=int, nargs='+', help="Configurations for the number of cpu cores allocated to each replica of the model")
     parser.add_argument('-g', '--model_gpus', type=int, nargs='+', help="The set of gpus on which to run replicas of the provided model. Each replica of a gpu model must have its own gpu!")
     parser.add_argument('-n', '--num_clients', type=int, default=1, help="The number of concurrent client processes. This can help increase the request rate in order to saturate high throughput models.")
-    
+
     args = parser.parse_args()
 
     if args.model_name not in VALID_MODEL_NAMES:
@@ -484,14 +519,14 @@ if __name__ == "__main__":
     for num_replicas in replica_num_confs:
         for cpus_per_replica in cpus_per_replica_confs:
             for batch_size in batch_size_confs:
-                model_config = get_heavy_node_config(model_name=args.model_name, 
-                                                     batch_size=batch_size, 
+                model_config = get_heavy_node_config(model_name=args.model_name,
+                                                     batch_size=batch_size,
                                                      num_replicas=num_replicas,
                                                      cpus_per_replica=cpus_per_replica,
-                                                     allocated_cpus=args.model_cpus,                               
+                                                     allocated_cpus=args.model_cpus,
                                                      allocated_gpus=args.model_gpus)
 
-                resnet_latency_upper_bound = .4
+                resnet_latency_upper_bound = 1.2
 
                 queue = Queue()
                 benchmarker = ModelBenchmarker(model_config, queue, resnet_latency_upper_bound)

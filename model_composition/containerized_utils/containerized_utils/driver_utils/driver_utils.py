@@ -122,12 +122,12 @@ def check_convergence(stats, configs, latency_upper_bound=None):
         and we should quit and increase the delay.
 
     """
-    window_size = min(15, len(stats["p99_lats"]) - 1)
-    p99_lats = stats["p99_lats"][-1*window_size:]
+    window_size = min(6, len(stats["p99_lats"]) - 1)
+    p99_lats = stats["p99_lats"][-1*window_size:-1]
 
     mean_batch_sizes = {}
     for c in configs:
-        mean_batch_sizes[c.name] = np.mean([b[c.name] for b in stats["mean_batch_sizes"][-1*window_size:]])
+        mean_batch_sizes[c.name] = np.mean([b[c.name] for b in stats["mean_batch_sizes"][-1*window_size:-1]])
     lr = linregress(x=range(len(p99_lats)), y=p99_lats)
     logger.info(lr)
     # pvalue checks against the null hypothesis that the
@@ -137,9 +137,9 @@ def check_convergence(stats, configs, latency_upper_bound=None):
     # If pvalue less than 0.001, the line definitely has a slope
     if lr.pvalue < 0.001:
         if lr.slope > 0:
-            return INCREASING
+            return INCREASING, lr.slope
         else:
-            return DECREASING
+            return DECREASING, lr.slope
     elif lr.pvalue > 0.1:
         # Slope is 0, now check to see
         # if mean batch_sizes are less
@@ -151,22 +151,22 @@ def check_convergence(stats, configs, latency_upper_bound=None):
             if mean_p99_lats > latency_upper_bound:
                 logger.info("Slope is 0 but p99 latency ({lat} s) is too high for node {name}.".format(
                     lat=mean_p99_lats, name=c.name))
-                return CONVERGED_HIGH
+                return CONVERGED_HIGH, 0
 
         # If any of the nodes batch sizes are set to 1, skip the batch size check
         for c in configs:
             if c.batch_size == 1.0:
-                return CONVERGED
+                return CONVERGED, 0
 
         # We don't know which node is the bottleneck, so we check that all the nodes have batch
         # sizes slightly less than the configured batch size.
         for c in configs:
             if mean_batch_sizes[c.name] == c.batch_size:
                 logger.info("Slope is 0 but batch_sizes too big for node {name}.".format(name=c.name))
-                return CONVERGED_HIGH
-        return CONVERGED
+                return CONVERGED_HIGH, 0
+        return CONVERGED, 0
     else:
-        return UNKNOWN
+        return UNKNOWN, None
 
     # if lr.pvalue < 0.1:
     #     return (False, np.sign(lr.slope))
