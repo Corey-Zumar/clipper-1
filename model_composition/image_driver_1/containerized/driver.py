@@ -384,14 +384,14 @@ class ModelBenchmarker(object):
         time.sleep(5)
         predictor = Predictor(clipper_metrics=True, batch_size=self.config.batch_size)
         idx = 0
-        while len(predictor.stats["thrus"]) < 5:
+        while len(predictor.stats["thrus"]) < 8:
             predictor.predict(model_app_name=self.config.name, input_item=self.inputs[idx])
             time.sleep(self.delay)
             idx += 1
             idx = idx % len(self.inputs)
 
-        max_thruput = np.mean(predictor.stats["thrus"][1:])
-        self.delay = 1.0 / max_thruput
+        max_thruput = np.mean(predictor.stats["thrus"][1:-1])
+        self.delay = 1.0 / (max_thruput * 1.05)
         logger.info("Initializing delay to {}".format(self.delay))
 
     def increase_delay(self):
@@ -487,7 +487,7 @@ class ModelBenchmarker(object):
             return self._get_tf_log_reg_input
         elif model_app_name == TF_RESNET_MODEL_APP_NAME:
             return self._get_tf_resnet_input
-        elif model_app_name = PYTORCH_RESNET_MODEL_APP_NAME:
+        elif model_app_name == PYTORCH_RESNET_MODEL_APP_NAME:
             return self._get_tf_resnet_input
 
 if __name__ == "__main__":
