@@ -437,7 +437,7 @@ class ModelBenchmarker(object):
                     return self.find_steady_state()
                 elif convergence_state == DECREASING or convergence_state == UNKNOWN:
                     logger.info("Not converged yet. Still waiting")
-                else:
+                elif convergence_state != SLOPE_LIKELY:
                     logger.error("Unknown convergence state: {}".format(convergence_state))
                     sys.exit(1)
             elif (not checked_early_divergence) and len(predictor.stats["thrus"]) == 6:
