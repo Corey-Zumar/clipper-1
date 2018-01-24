@@ -414,6 +414,7 @@ class ModelBenchmarker(object):
             idx += 1
             idx = idx % len(self.inputs)
 
+            checked_early_divergence = False
             if len(predictor.stats["thrus"]) > last_checked_length:
                 last_checked_length = len(predictor.stats["thrus"]) + 4
                 convergence_state, slope = driver_utils.check_convergence(predictor.stats, [self.config], self.latency_upper_bound)
@@ -439,9 +440,10 @@ class ModelBenchmarker(object):
                 else:
                     logger.error("Unknown convergence state: {}".format(convergence_state))
                     sys.exit(1)
-            elif len(predictor.stats["thrus"]) == 6:
+            elif (not checked_early_divergence) and len(predictor.stats["thrus"]) == 6:
+                checked_early_divergence = True
                 convergence_state, slope = driver_utils.check_convergence(predictor.stats, [self.config], self.latency_upper_bound)
-                if convergence_state == INCREASING and abs(slope) > .1:
+                if convergence_state == INCREASING and abs(slope) > .05:
                     self.increase_delay()
                     logger.info("Increasing delay to {}".format(self.delay))
                     done = True
