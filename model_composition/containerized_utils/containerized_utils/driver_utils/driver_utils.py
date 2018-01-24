@@ -165,6 +165,8 @@ def check_convergence(stats, configs, latency_upper_bound=None):
                 logger.info("Slope is 0 but batch_sizes too big for node {name}.".format(name=c.name))
                 return CONVERGED_HIGH, 0
         return CONVERGED, 0
+    elif lr.pvalue < .005:
+        return UNKNOWN, lr.slope
     else:
         return UNKNOWN, None
 
