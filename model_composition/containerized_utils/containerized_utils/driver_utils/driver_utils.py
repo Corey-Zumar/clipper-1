@@ -14,7 +14,7 @@ CONVERGED_HIGH = "converged_high"
 DECREASING = "decreasing"
 CONVERGED = "converged"
 UNKNOWN = "unknown"
-
+SLOPE_LIKELY = "slope_likely"
 
 class HeavyNodeConfig(object):
     def __init__(self,
@@ -166,7 +166,7 @@ def check_convergence(stats, configs, latency_upper_bound=None):
                 return CONVERGED_HIGH, 0
         return CONVERGED, 0
     elif lr.pvalue < .005:
-        return UNKNOWN, lr.slope
+        return SLOPE_LIKELY, lr.slope
     else:
         return UNKNOWN, None
 

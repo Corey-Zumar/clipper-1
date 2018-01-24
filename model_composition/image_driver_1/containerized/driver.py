@@ -12,7 +12,7 @@ from datetime import datetime
 from PIL import Image
 from containerized_utils.zmq_client import Client
 from containerized_utils import driver_utils
-from containerized_utils.driver_utils import INCREASING, DECREASING, CONVERGED_HIGH, CONVERGED, UNKNOWN
+from containerized_utils.driver_utils import INCREASING, DECREASING, CONVERGED_HIGH, CONVERGED, UNKNOWN, SLOPE_LIKELY
 from multiprocessing import Process, Queue
 
 
@@ -443,7 +443,7 @@ class ModelBenchmarker(object):
             elif (not checked_early_divergence) and len(predictor.stats["thrus"]) == 6:
                 checked_early_divergence = True
                 convergence_state, slope = driver_utils.check_convergence(predictor.stats, [self.config], self.latency_upper_bound)
-                if (convergence_state == INCREASING or convergence_state == UNKNOWN) and abs(slope) > .1:
+                if (convergence_state == INCREASING or convergence_state == SLOPE_LIKELY) and abs(slope) > .1:
                     self.increase_delay()
                     logger.info("Increasing delay to {}".format(self.delay))
                     done = True
