@@ -408,13 +408,13 @@ class ModelBenchmarker(object):
         done = False
         # start checking for steady state after 7 trials
         last_checked_length = 20
+        checked_early_divergence = False
         while not done:
             predictor.predict(model_app_name=self.config.name, input_item=self.inputs[idx])
             time.sleep(self.delay)
             idx += 1
             idx = idx % len(self.inputs)
 
-            checked_early_divergence = False
             if len(predictor.stats["thrus"]) > last_checked_length:
                 last_checked_length = len(predictor.stats["thrus"]) + 4
                 convergence_state, slope = driver_utils.check_convergence(predictor.stats, [self.config], self.latency_upper_bound)
