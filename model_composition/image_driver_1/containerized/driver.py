@@ -81,7 +81,7 @@ def setup_clipper(config):
         query_cpu_str="0,16,1,17,2,18,3,19")
     time.sleep(10)
     driver_utils.setup_heavy_node(cl, config, DEFAULT_OUTPUT)
-    time.sleep(10)
+    time.sleep(30)
     logger.info("Clipper is set up!")
     return config
 
