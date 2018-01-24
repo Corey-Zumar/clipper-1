@@ -81,7 +81,7 @@ def setup_clipper(config):
         query_cpu_str="0,16,1,17,2,18,3,19")
     time.sleep(10)
     driver_utils.setup_heavy_node(cl, config, DEFAULT_OUTPUT)
-    time.sleep(30)
+    time.sleep(10)
     logger.info("Clipper is set up!")
     return config
 
@@ -379,7 +379,7 @@ class ModelBenchmarker(object):
     # then back off
     def initialize_request_rate(self):
         # initialize delay to be very small
-        self.delay = 0.00001
+        self.delay = 0.0001
         setup_clipper(self.config)
         time.sleep(5)
         predictor = Predictor(clipper_metrics=True, batch_size=self.config.batch_size)
