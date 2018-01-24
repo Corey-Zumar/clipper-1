@@ -379,7 +379,7 @@ class ModelBenchmarker(object):
     # then back off
     def initialize_request_rate(self):
         # initialize delay to be very small
-        self.delay = 0.0001
+        self.delay = 0.001
         setup_clipper(self.config)
         time.sleep(5)
         predictor = Predictor(clipper_metrics=True, batch_size=self.config.batch_size)
