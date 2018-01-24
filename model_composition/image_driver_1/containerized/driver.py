@@ -443,7 +443,7 @@ class ModelBenchmarker(object):
             elif (not checked_early_divergence) and len(predictor.stats["thrus"]) == 6:
                 checked_early_divergence = True
                 convergence_state, slope = driver_utils.check_convergence(predictor.stats, [self.config], self.latency_upper_bound)
-                if (convergence_state == INCREASING or convergence_state == SLOPE_LIKELY) and abs(slope) > .1:
+                if (convergence_state == INCREASING or convergence_state == SLOPE_LIKELY) and slope > .1:
                     self.increase_delay()
                     logger.info("Increasing delay to {}".format(self.delay))
                     done = True
