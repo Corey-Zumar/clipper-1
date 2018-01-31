@@ -122,7 +122,13 @@ class ModelQueue {
                 name + ":lock_latency", "microseconds", 4096)),
         queue_size_hist_(
             metrics::MetricsRegistry::get_metrics().create_histogram(
-                name + ":queue_size", "microseconds", 1000)) {}
+                name + ":queue_size", "microseconds", 1000)),
+        queue_size_list_(
+            metrics::MetricsRegistry::get_metrics()
+                .create_data_list<size_t>(name + ":queue_sizes", "queue size")),
+        queue_arrivals_list_(
+            metrics::MetricsRegistry::get_metrics()
+                .create_data_list<long long>(name + ":queue_arrivals", "microseconds since last arrival")) {}
 
   // Disallow copy and assign
   ModelQueue(const ModelQueue &) = delete;
@@ -150,6 +156,11 @@ class ModelQueue {
     Deadline deadline =
         current_time + std::chrono::microseconds(task.latency_slo_micros_);
     queue_.emplace(deadline, std::move(task));
+
+    auto curr_time = std::chrono::system_clock::now();
+    queue_arrivals_list_->insert(curr_time);
+
+    queue_size_list_->insert(queue_.size());
     queue_not_empty_condition_.notify_one();
   }
 
@@ -170,6 +181,7 @@ class ModelQueue {
       queue_.pop();
     }
     queue_size_hist_->insert(static_cast<int64_t>(queue_.size()));
+    queue_size_list_->insert(queue_.size());
     return batch;
   }
 
@@ -185,6 +197,8 @@ class ModelQueue {
   std::condition_variable queue_not_empty_condition_;
   std::shared_ptr<metrics::Histogram> lock_latency_hist_;
   std::shared_ptr<metrics::Histogram> queue_size_hist_;
+  std::shared_ptr<metrics::DataList<size_t>> queue_size_list_;
+  std::shared_ptr<metrics::DataList<long long>> queue_arrivals_list_;
 
   // Deletes tasks with deadlines prior or equivalent to the
   // current system time. This method should only be called
@@ -462,8 +476,10 @@ class TaskExecutor {
         cur_batch.emplace_back(current_time, container->container_id_, b.model_,
                                container->replica_id_, b.input_, b.query_id_);
       }
-      int message_id = rpc_->send_message(construct_batch_message(batch_tasks),
-                                          container->container_id_);
+      std::string model_name = model_id.get_name();
+      int message_id = rpc_->send_model_message(model_name,
+                                                construct_batch_message(batch_tasks),
+                                                container->container_id_);
       inflight_messages_.emplace(message_id, std::move(cur_batch));
     } else {
       log_error_formatted(

@@ -76,6 +76,10 @@ class RPCService {
   int send_message(std::vector<zmq::message_t> msg,
                    const int zmq_connection_id);
 
+  int send_model_message(std::string model_name,
+                         std::vector<zmq::message_t> msg,
+                         const int zmq_connection_id);
+
  private:
   void manage_service(const string address);
   void send_messages(socket_t &socket,
@@ -107,6 +111,9 @@ class RPCService {
   int message_id_ = 0;
   std::unordered_map<VersionedModelId, int> replica_ids_;
   std::shared_ptr<metrics::Histogram> msg_queueing_hist_;
+  std::unordered_map<std::string, std::shared_ptr<metrics::DataList<long>>> model_processing_latencies_;
+  std::unordered_map<int, std::string> msg_id_models_map_;
+  std::unordered_map<int, std::chrono::time_point<std::chrono::system_clock>> msg_id_timestamp_map_;
 
   std::function<void(VersionedModelId, int)> container_ready_callback_;
   std::function<void(RPCResponse)> new_response_callback_;

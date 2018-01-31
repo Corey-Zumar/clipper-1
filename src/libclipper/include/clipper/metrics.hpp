@@ -8,6 +8,7 @@
 #include <vector>
 
 #include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
 
 namespace clipper {
 
@@ -21,7 +22,8 @@ enum class MetricType {
   Counter = 0,
   RatioCounter = 1,
   Meter = 2,
-  Histogram = 3
+  Histogram = 3,
+  DataList = 4
 };
 
 class Metric {
@@ -48,6 +50,61 @@ class Metric {
    */
   virtual void clear() = 0;
 };
+
+template <typename T>
+class DataList : public Metric {
+ public:
+  explicit DataList(const std::string name, const std::string unit)
+      : name_(name), unit_(unit) {}
+
+  // Disallow copy and move
+  DataList(DataList &other) = delete;
+  DataList &operator=(DataList &other) = delete;
+  DataList (DataList &&other) = delete;
+  DataList &operator=(DataList &&other) = delete;
+
+  void insert(T item) {
+    items_.push_back(item);
+  }
+
+  MetricType type() const override {
+    return MetricType::DataList;
+  }
+
+  const std::string name() const override {
+    return name_;
+  }
+
+  const boost::property_tree::ptree report_tree() override {
+    boost::property_tree::ptree report_tree;
+    boost::property_tree::ptree data_array;
+    for(auto &item : items_) {
+      boost::property_tree::ptree child;
+      child.put("", item);
+      data_array.push_back(std::make_pair("", child));
+    }
+    report_tree.add_child("items", data_array);
+    report_tree.put("units", unit_);
+    return report_tree;
+  }
+
+  const std::string report_str() override {
+    std::ostringstream ss;
+    boost::property_tree::ptree report = report_tree();
+    boost::property_tree::write_json(ss, report);
+    return ss.str();
+  }
+
+  void clear() override {
+    items_.clear();
+  }
+
+ private:
+  std::vector<T> items_;
+  std::string name_;
+  std::string unit_;
+};
+
 
 class Counter : public Metric {
  public:
@@ -360,6 +417,13 @@ class MetricsRegistry {
   std::shared_ptr<Histogram> create_histogram(const std::string name,
                                               const std::string unit,
                                               const size_t sample_size);
+
+  template <typename T>
+  std::shared_ptr<DataList<T>> create_data_list(const std::string name, const std::string unit) {
+    std::shared_ptr<DataList<T>> data_list = std::make_shared<DataList<T>>(name, unit);
+    metrics_->push_back(data_list);
+    return data_list;
+  }
 
  private:
   MetricsRegistry();
