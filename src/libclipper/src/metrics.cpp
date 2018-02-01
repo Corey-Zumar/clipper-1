@@ -45,6 +45,7 @@ const std::string get_metrics_category_name(MetricType type) {
     case MetricType::RatioCounter: return "ratio_counters";
     case MetricType::Meter: return "meters";
     case MetricType::Histogram: return "histograms";
+    case MetricType::DataList: return "data_lists";
     default:
       throw std::invalid_argument(std::to_string(static_cast<int>(type)) +
                                   " is unknown MetricType");
