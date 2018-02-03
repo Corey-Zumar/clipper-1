@@ -128,7 +128,7 @@ class ModelQueue {
                 .create_data_list<size_t>(name + ":queue_sizes", "queue size")),
         queue_arrivals_list_(
             metrics::MetricsRegistry::get_metrics()
-                .create_data_list<long long>(name + ":queue_arrivals", "microseconds since last arrival")),
+                .create_data_list<long long>(name + ":queue_arrivals", "timestamp")),
         system_start_(std::chrono::system_clock::now()) {}
 
   // Disallow copy and assign
