@@ -166,7 +166,8 @@ int RPCService::send_model_message(std::string model_name,
                      current_time_micros);
   auto model_metrics_search = model_processing_latencies_.find(model_name);
   if (model_metrics_search == model_processing_latencies_.end()) {
-    auto model_metric = metrics::MetricsRegistry::get_metrics().create_data_list<long>(model_name, "milliseconds");
+    auto model_metric = metrics::MetricsRegistry::get_metrics().create_data_list<long>(
+        model_name + ":processing_time", "milliseconds");
     model_processing_latencies_.emplace(model_name, model_metric);
   }
 

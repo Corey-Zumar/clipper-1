@@ -35,6 +35,9 @@ class AppMetrics {
             clipper::metrics::MetricsRegistry::get_metrics().create_histogram(
                 "app:" + app_name + ":prediction_latency", "microseconds",
                 4096)),
+        latency_list_(
+            clipper::metrics::MetricsRegistry::get_metrics().create_data_list(
+                "app:" + app_name + ":prediction_latency", "microseconds")),
         throughput_(
             clipper::metrics::MetricsRegistry::get_metrics().create_meter(
                 "app:" + app_name + ":prediction_throughput")),
@@ -261,6 +264,7 @@ class ServerImpl {
                     .count();
 
             app_metrics.latency_->insert(duration_micros);
+            app_metrics.latency_list_->insert(duration_micros);
             app_metrics.num_predictions_->increment(1);
 
             rpc_service_->send_response(
