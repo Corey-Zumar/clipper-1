@@ -36,7 +36,7 @@ class AppMetrics {
                 "app:" + app_name + ":prediction_latency", "microseconds",
                 4096)),
         latency_list_(
-            clipper::metrics::MetricsRegistry::get_metrics().create_data_list(
+            clipper::metrics::MetricsRegistry::get_metrics().create_data_list<long long>(
                 "app:" + app_name + ":prediction_latency", "microseconds")),
         throughput_(
             clipper::metrics::MetricsRegistry::get_metrics().create_meter(
