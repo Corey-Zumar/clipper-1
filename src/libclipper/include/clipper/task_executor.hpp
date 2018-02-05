@@ -34,6 +34,9 @@ class ModelMetrics {
         latency_(metrics::MetricsRegistry::get_metrics().create_histogram(
             "model:" + model.serialize() + ":prediction_latency",
             "microseconds", 4096)),
+        latency_list_(metrics::MetricsRegistry::get_metrics().create_data_list<long long>(
+            "model:" + model.serialize() + ":prediction_latencies_list"
+        )),
         throughput_(metrics::MetricsRegistry::get_metrics().create_meter(
             "model:" + model.serialize() + ":prediction_throughput")),
         num_predictions_(metrics::MetricsRegistry::get_metrics().create_counter(
@@ -52,6 +55,7 @@ class ModelMetrics {
 
   VersionedModelId model_;
   std::shared_ptr<metrics::Histogram> latency_;
+  std::shared_ptr<metrics::DataList<long long>> latency_list_;
   std::shared_ptr<metrics::Meter> throughput_;
   std::shared_ptr<metrics::Counter> num_predictions_;
   std::shared_ptr<metrics::RatioCounter> cache_hit_ratio_;
@@ -561,6 +565,8 @@ class TaskExecutor {
         (*cur_model_metric).batch_size_->insert(batch_size);
         (*cur_model_metric)
             .latency_->insert(static_cast<int64_t>(task_latency_micros));
+        (*cur_model_metric)
+            .latency_list_->insert(static_cast<int64_t>(task_latency_micros));
       }
       for (int batch_num = 0; batch_num < batch_size; ++batch_num) {
         InflightMessage completed_msg = keys[batch_num];
