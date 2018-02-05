@@ -59,6 +59,7 @@ class AppMetrics {
 
   std::string app_name_;
   std::shared_ptr<clipper::metrics::Histogram> latency_;
+  std::shared_ptr<clipper::metrics::DataList<long long>> latency_list_;
   std::shared_ptr<clipper::metrics::Meter> throughput_;
   std::shared_ptr<clipper::metrics::Counter> num_predictions_;
   std::shared_ptr<clipper::metrics::RatioCounter> default_pred_ratio_;
