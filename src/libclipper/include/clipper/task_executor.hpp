@@ -132,8 +132,7 @@ class ModelQueue {
                 .create_data_list<size_t>(name + ":queue_sizes", "queue size")),
         queue_arrivals_list_(
             metrics::MetricsRegistry::get_metrics()
-                .create_data_list<long long>(name + ":queue_arrivals", "timestamp")),
-        system_start_(std::chrono::system_clock::now()) {}
+                .create_data_list<long long>(name + ":queue_arrivals", "timestamp")) {}
 
   // Disallow copy and assign
   ModelQueue(const ModelQueue &) = delete;
@@ -162,10 +161,8 @@ class ModelQueue {
         current_time + std::chrono::microseconds(task.latency_slo_micros_);
     queue_.emplace(deadline, std::move(task));
 
-    auto curr_time = std::chrono::system_clock::now();
-    auto time_since_start = curr_time - system_start_;
-    long long curr_time_micros = std::chrono::duration_cast<std::chrono::microseconds>(time_since_start).count();
-    queue_arrivals_list_->insert(curr_time_micros);
+    long long curr_system_time = clock::ClipperClock::get_clock().get_uptime();
+    queue_arrivals_list_->insert(curr_system_time);
 
     queue_size_list_->insert(queue_.size());
     queue_not_empty_condition_.notify_one();
@@ -211,7 +208,6 @@ class ModelQueue {
   std::shared_ptr<metrics::Histogram> queue_size_hist_;
   std::shared_ptr<metrics::DataList<size_t>> queue_size_list_;
   std::shared_ptr<metrics::DataList<long long>> queue_arrivals_list_;
-  std::chrono::time_point<std::chrono::system_clock> system_start_;
 
   // Deletes tasks with deadlines prior or equivalent to the
   // current system time. This method should only be called

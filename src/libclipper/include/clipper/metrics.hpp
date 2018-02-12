@@ -9,6 +9,7 @@
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
+#include "clock.hpp"
 
 namespace clipper {
 
@@ -64,8 +65,9 @@ class DataList : public Metric {
   DataList &operator=(DataList &&other) = delete;
 
   void insert(T item) {
+    long long timestamp = clock::ClipperClock::get_clock().get_uptime();
     std::lock_guard<std::mutex> lock(mtx_);
-    items_.push_back(item);
+    items_.push_back(std::make_pair(timestamp, item));
   }
 
   MetricType type() const override {
@@ -82,7 +84,7 @@ class DataList : public Metric {
     boost::property_tree::ptree data_array;
     for(auto &item : items_) {
       boost::property_tree::ptree child;
-      child.put("", item);
+      child.put(std::to_string(item.first), item.second);
       data_array.push_back(std::make_pair("", child));
     }
     report_tree.add_child("items", data_array);
@@ -103,7 +105,7 @@ class DataList : public Metric {
   }
 
  private:
-  std::vector<T> items_;
+  std::vector<std::pair<long long, T>> items_;
   std::string name_;
   std::string unit_;
   std::mutex mtx_;

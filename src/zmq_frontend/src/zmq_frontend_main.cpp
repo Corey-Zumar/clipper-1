@@ -5,6 +5,7 @@
 #include <clipper/constants.hpp>
 #include <cxxopts.hpp>
 #include <server_http.hpp>
+#include <clipper/clock.hpp>
 
 using HttpServer = SimpleWeb::Server<SimpleWeb::HTTP>;
 
@@ -32,6 +33,10 @@ int main(int argc, char* argv[]) {
       ("rpc_send_max", "", cxxopts::value<int>()->default_value("-1"));
   // clang-format on
   options.parse(argc, argv);
+
+  // Request the system uptime so that a clock instance is created as
+  // soon as the frontend starts
+  clipper::clock::ClipperClock::get_clock().get_uptime();
 
   clipper::Config& conf = clipper::get_config();
   conf.set_redis_address(options["redis_ip"].as<std::string>());
