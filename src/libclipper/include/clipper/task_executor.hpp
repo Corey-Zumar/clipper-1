@@ -133,7 +133,10 @@ class ModelQueue {
                 .create_data_list<size_t>(name + ":queue_sizes", "queue size")),
         queue_arrivals_list_(
             metrics::MetricsRegistry::get_metrics()
-                .create_data_list<long long>(name + ":queue_arrivals", "timestamp")) {}
+                .create_data_list<long long>(name + ":queue_arrivals", "timestamp")),
+        processing_outs_list_(
+            metrics::MetricsRegistry::get_metrics()
+                .create_data_list<long long>(name + ":processing_outs", "timestamp")) {}
 
   // Disallow copy and assign
   ModelQueue(const ModelQueue &) = delete;
@@ -194,6 +197,10 @@ class ModelQueue {
     std::unique_lock<std::mutex> lock(queue_mutex_);
     queue_ = ModelPQueue{};
   }
+
+  // Making this public so that on_response_recv of TaskExecutor can add to this queue
+  // Bad design hope it won't bite me in the ass later
+  std::shared_ptr<metrics::DataList<long long>> processing_outs_list_;
 
  private:
   // Min PriorityQueue so that the task with the earliest
@@ -569,6 +576,16 @@ class TaskExecutor {
         (*cur_model_metric)
             .latency_list_->insert(static_cast<int64_t>(task_latency_micros));
       }
+
+      long long curr_system_time = clock::ClipperClock::get_clock().get_uptime();
+      boost::shared_lock<boost::shared_mutex> lock(model_queues_mutex_);
+      auto model_queue_entry = model_queues_.find(cur_model);
+      if (model_queue_entry != model_queues_.end()) {
+        for (int batch_num = 0; batch_num < batch_size; ++batch_num){
+          model_queue_entry->second->processing_outs_list_->insert(curr_system_time);
+        }
+      }
+
       for (int batch_num = 0; batch_num < batch_size; ++batch_num) {
         InflightMessage completed_msg = keys[batch_num];
         cache_->put(completed_msg.model_, completed_msg.query_id_,
