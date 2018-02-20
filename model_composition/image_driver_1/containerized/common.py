@@ -308,10 +308,63 @@ class Predictor(object):
             .then(try_catch(inception_feats_continuation)) \
             .then(try_catch(log_reg_continuation))
 
+class ArrivalProcess(object):
+    def __init__(self, process, batchsize, arg):
+        self.batchsize = batchsize
+        self._arg = arg
+        self.process = process
+        self.iteration = 0
+        self.base = self._init_random_base()
+        self.base_length = len(self.base)
+        self.iteration = 0
+    
+    def __str__(self):
+        if self.process == "constant":
+            process_str = "C"
+        elif self.process == "exponential":
+            process_str = "E"
+        else:
+            raise Exception("Unknown process type")
+        return process_str+"|"+str(self.batchsize)+"|"+str(self._arg)
+
+    def input_arg():
+        return self._arg
+
+    def _init_random_base(self):
+        if self.process == "constant":
+            return [self._arg]
+        elif self.process == "exponential":
+            return np.random.exponential(scale=self._arg, size=2000)
+        else:
+            raise Exception("Unknown process type")
+
+    # reduces the number of sleep calls, slightly batches results in two's though
+    def scale_delay(self):
+        if self._arg < 0.01:
+            self.batchsize*=2
+            self._arg = self._arg*2.0
+            self.base = self._init_random_base()
+
+    def increase_delay(self, multiple=1.0):
+        if self._arg < 0.01:
+            self._arg += 0.00005*multiple
+        elif self._arg < 0.02:
+            self._arg += 0.0002*multiple
+        else:
+            self._arg += 0.001*multiple
+        self.base = self._init_random_base()
+
+    def wait(self):
+        next_delay = self.base[self.iteration]
+        self.iteration+=1
+        self.iteration%=self.base_length
+        time.sleep(next_delay)
+        return self.batchsize
+
 class DriverBenchmarker(object):
-    def __init__(self, app_name, configs, queue, latency_upper_bound, input_delay=None):
+    def __init__(self, app_name, configs, queue, latency_upper_bound, input_delay_process=None):
         # provided delay to being with. If None attempts to converge to find a value.
-        self.input_delay = input_delay
+        self.input_delay_process = input_delay_process
         self.configs = configs
         self.max_batch_size = np.max([config.batch_size for config in configs])
         self.queue = queue
@@ -383,14 +436,14 @@ class DriverBenchmarker(object):
         self.predictor = Predictor(self.app_name, clipper_metrics=True, batch_size=self.max_batch_size)
 
     def run_predictor(self):
-        self.predictor.predict(self.inputs[self.iteration])
+        batchsize = self.delay.wait()
+        for i in range(batchsize):
+            self.predictor.predict(self.inputs[self.iteration])
         self.iteration+=1
         self.total_iterations+=1
-        if self.iteration % self.queries_per_sleep == 0:
-                time.sleep(self.delay)
         self.iteration = self.iteration % len(self.inputs)
         if self.total_iterations%1000 == 0:
-            logger.info("Sent for a total of {} predictions".format(self.total_iterations))
+            logger.info("Sent for a total of {} prediction batches".format(self.total_iterations))
 
     def reset_predictor(self, wait = True):
         logger.info("Draining and resetting system...")
@@ -399,6 +452,8 @@ class DriverBenchmarker(object):
         del self.predictor
         self.predictor = None
         if wait:
+            time.sleep(10)
+            self.cl.drain_queues()
             time.sleep(10)
     ########################################################################################################
 
@@ -416,35 +471,23 @@ class DriverBenchmarker(object):
             self.run_predictor()
         self.reset_predictor()
 
-    # reduces the number of sleep calls, slightly batches results in two's though
-    def scale_delay(self):
-        if self.delay < 0.01:
-            self.queries_per_sleep = 2
-            self.delay = self.delay*2.0 - 0.001
-
     # start with an overly aggressive request rate
     # then back off
     def initialize_request_rate(self):
         self.init_predictor()
-        while len(self.predictor.stats["thrus"]) < 10:
+        initialization_iterations = 50
+        while len(self.predictor.stats["thrus"]) < initialization_iterations:
             self.run_predictor()
         # Now initialize request rate
-        max_thruput = np.mean(self.predictor.stats["thrus"][1:])
-        self.delay = 1.0 / max_thruput
+        max_thruput = np.mean(self.predictor.stats["thrus"][int(initialization_iterations/2):])
+        logger.info("mean_throughput measured to be {}".format(max_thruput))
+        self.delay = ArrivalProcess("constant", 1, 1.0 / max_thruput)
         self.reset_predictor()
 
     def find_steady_state(self):
 
         self.init_predictor()
         time.sleep(10) # just to be extra sure I guess
-
-        def increase_delay(multiple=1.0):
-            if self.delay < 0.01:
-                self.delay += 0.00005*multiple
-            elif self.delay < 0.02:
-                self.delay += 0.0002*multiple
-            else:
-                self.delay += 0.001*multiple
 
         idx = 0
         done = False
@@ -459,7 +502,7 @@ class DriverBenchmarker(object):
                 # Diverging, try again with higher
                 # delay
                 if convergence_state == INCREASING or convergence_state == CONVERGED_HIGH:
-                    increase_delay()
+                    self.delay.increase_delay()
                     logger.info("Increasing delay to {}".format(self.delay))
                     done = True
                     self.reset_predictor(wait=False)
@@ -470,7 +513,7 @@ class DriverBenchmarker(object):
                     self.reset_predictor()
                     return
                 elif len(self.predictor.stats) > 40:
-                    increase_delay()
+                    self.delay.increase_delay()
                     logger.info("Increasing delay to {}".format(self.delay))
                     done = True
                     self.reset_predictor(wait=False)
@@ -490,7 +533,7 @@ class DriverBenchmarker(object):
 
     def run_more_predictions(self):
         self.init_predictor()
-        for i in xrange(20000):
+        for i in xrange(40000):
             if ((i+1) % 100) == 0:
                 logger.info("Iteration "+str(i)+"...")
             self.run_predictor()
@@ -500,7 +543,7 @@ class DriverBenchmarker(object):
     # new process
     def run(self):
         # initialize delay to be very small
-        self.delay = 0.001
+        self.delay = ArrivalProcess("constant", 1, 0.001)
         self.queries_per_sleep = 1
         self.clipper_address = setup_clipper(self.configs)
         self.cl = ClipperConnection(DockerContainerManager(redis_port=6380))
@@ -511,19 +554,18 @@ class DriverBenchmarker(object):
         time.sleep(230)
         logger.info("Waited 30 seconds to connect to clipper")
         self.warm_up_system()
-        if self.input_delay != None:
-            self.delay = self.input_delay
-            self.scale_delay()
+        if self.input_delay_process != None:
+            self.delay = self.input_delay_process
+            self.delay.scale_delay()
         else:
             logger.info("Initializing request rate (AKA delay)...")
             self.initialize_request_rate()
-            self.scale_delay()
-            logger.info("Initializing delay and queries_per_sleep to {delay} and {queries}".format(delay=self.delay,
-                                                                           queries=self.queries_per_sleep))
+            logger.info("Initializing delay {delay}".format(delay=self.delay))
+            self.delay.scale_delay()
+            logger.info("Scaling delay {delay}".format(delay=self.delay))
             self.find_steady_state()
             logger.info("Found steady state...")
-        logger.info("Final delay used: {delay}, queries_per_sleep: {queries}".format(delay=self.delay,
-                                                                           queries=self.queries_per_sleep))
+        logger.info("Initializing delay {delay}".format(delay=self.delay))
         final_stats = self.run_more_predictions()
         self.queue.put(final_stats)
         return
