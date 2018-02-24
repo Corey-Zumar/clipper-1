@@ -178,11 +178,14 @@ class Predictor(object):
             "p99_lats": [],
             "mean_lats": [],
             "all_lats": [],
+            "send_timestamps": [],
+            "receive_timestamps": []
         }
         self.cl = ClipperConnection(DockerContainerManager(redis_port=6380))
         self.cl.connect()
         self.batch_size = batch_size
         self.get_clipper_metrics = clipper_metrics
+        self.inception_time = datetime.now()
         if self.get_clipper_metrics:
             self.stats["all_metrics"] = []
             self.stats["mean_batch_sizes"] = []
@@ -212,9 +215,11 @@ class Predictor(object):
             self.stats["mean_queue_sizes"].append(queue_sizes)
             self.stats["all_metrics"].append(metrics)
             logger.info(("p99: {p99}, mean: {mean}, thruput: {thru}, "
-                         "batch_sizes: {batches}").format(p99=p99, mean=mean, thru=thru,
+                         "batch_sizes: {batches}, queue_sizes: {queues}").format(p99=p99, mean=mean, thru=thru,
                                                           batches=json.dumps(
-                                                              batch_sizes, sort_keys=True)))
+                                                              batch_sizes, sort_keys=True),
+                                                          queues=json.dumps(
+                                                              queue_sizes, sort_keys=True)))
         else:
             logger.info("p99: {p99}, mean: {mean}, thruput: {thru}".format(p99=p99,
                                                                            mean=mean,
@@ -225,6 +230,7 @@ class Predictor(object):
         latency = (end_time - begin_time).total_seconds()
         self.latencies.append(latency)
         self.trial_num_complete += 1
+        self.stats["receive_timestamps"].append((end_time - self.inception_time).total_seconds())
 
         trial_length = max(300, 10 * self.batch_size)
         if self.trial_num_complete % trial_length == 0:
@@ -245,6 +251,7 @@ class Predictor(object):
 
     def single_model_predict(self, input_item):
         begin_time = datetime.now()
+        self.stats["send_timestamps"].append((begin_time - self.inception_time).total_seconds())
         def continuation(output):
             if output == DEFAULT_OUTPUT:
                 return
@@ -479,7 +486,7 @@ class DriverBenchmarker(object):
         while len(self.predictor.stats["thrus"]) < initialization_iterations:
             self.run_predictor()
         # Now initialize request rate
-        max_thruput = np.mean(self.predictor.stats["thrus"][int(initialization_iterations/2):])
+        max_thruput = np.max(self.predictor.stats["thrus"])
         logger.info("mean_throughput measured to be {}".format(max_thruput))
         self.delay = ArrivalProcess("constant", 1, 1.0 / max_thruput)
         self.reset_predictor()
@@ -538,7 +545,9 @@ class DriverBenchmarker(object):
                 logger.info("Iteration "+str(i)+"...")
             self.run_predictor()
         time.sleep(10)
-        return self.predictor.stats
+        predictor_stats = self.predictor.stats
+        predictor_stats["used_delay"] = str(self.delay)
+        return predictor_stats
 
     # new process
     def run(self):
