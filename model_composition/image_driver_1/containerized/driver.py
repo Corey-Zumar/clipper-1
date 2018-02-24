@@ -288,7 +288,8 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--cpus_per_replica_nums', type=int, nargs='+', help="Configurations for the number of cpu cores allocated to each replica of the model")
     parser.add_argument('-g', '--model_gpus', type=int, nargs='+', help="The set of gpus on which to run replicas of the provided model. Each replica of a gpu model must have its own gpu!")
     parser.add_argument('-n', '--num_clients', type=int, default=1, help="The number of concurrent client processes. This can help increase the request rate in order to saturate high throughput models.")
-    parser.add_argument('-d', '--input_delay', type=float, default=None, help="Give a prespecified input delay instead of running convergence")
+    parser.add_argument('-d', '--delay_param', type=float, default=None, help="A delay parameter to use, interpreted differently depending on the arrival process (see -e)")
+    parser.add_argument('-a', '--arrival_process', type=str, default="constant", help="The arrival process. Can be 'constant' or 'exponential' for now")
 
     args = parser.parse_args()
 
@@ -317,7 +318,10 @@ if __name__ == "__main__":
                 latency_upper_bound = 1.2
 
                 queue = Queue()
-                benchmarker = DriverBenchmarker(args.model_name, [model_config], queue, latency_upper_bound, input_delay=args.input_delay)
+                inter_delay_process = None
+                if args.delay_param != None:
+                    inter_delay_process = ArrivalProcess(args.arrival_process, 1, args.delay_param)
+                benchmarker = DriverBenchmarker(args.model_name, [model_config], queue, latency_upper_bound, input_delay_process=inter_delay_process)
 
                 processes = []
                 all_stats = []
