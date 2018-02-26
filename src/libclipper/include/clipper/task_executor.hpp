@@ -581,11 +581,14 @@ class TaskExecutor {
       boost::shared_lock<boost::shared_mutex> lock(model_queues_mutex_);
       auto model_queue_entry = model_queues_.find(cur_model);
       if (model_queue_entry != model_queues_.end()) {
+        lock.unlock();
         for (int batch_num = 0; batch_num < batch_size; ++batch_num){
           model_queue_entry->second->processing_outs_list_->insert(curr_system_time);
         }
       }
-
+      else {
+        lock.unlock();
+      }
       for (int batch_num = 0; batch_num < batch_size; ++batch_num) {
         InflightMessage completed_msg = keys[batch_num];
         cache_->put(completed_msg.model_, completed_msg.query_id_,

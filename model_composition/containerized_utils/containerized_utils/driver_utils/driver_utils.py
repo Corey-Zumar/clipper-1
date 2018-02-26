@@ -216,6 +216,8 @@ def check_convergence_via_queue(stats, configs, latency_upper_bound=None):
     # Now check that none of the queues are overloaded
 
     for model_name, qs in queue_sizes.iteritems():
+        logger.info("From queue check:")
+        logger.info(qs)
         mean_queue_size = np.mean(qs)
         std_queue_size = np.std(qs)
         # Check if queue behavior has stabilized

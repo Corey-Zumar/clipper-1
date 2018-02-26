@@ -3,7 +3,7 @@ FROM model-comp/tf-rpc:latest
 WORKDIR /container
 
 COPY impl/inception_feats_container.py /container/
-COPY inception_feats_model_data/ /model
+COPY inception_feats_graph_def.pb /model
 
 ENV CLIPPER_MODEL_PATH=/model/inception_feats_graph_def.pb
 
