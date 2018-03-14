@@ -171,24 +171,24 @@ std::vector<rpc::RPCRequestItem> construct_batch_message(
   // serialized_request.push_back(
   //     std::make_pair(reinterpret_cast<void *>(input_metadata_size_buf),
   //                    input_metadata_size_buf_size));
-  messages.emplace_back(
-      std::make_pair(boost::optional<int>(),
-                     {reinterpret_cast<void *>(input_metadata_size_buf),
-                      input_metadata_size_buf_size, real_free}));
+  messages.emplace_back(std::make_pair(
+      boost::optional<int>(),
+      zmq::message_t(reinterpret_cast<void *>(input_metadata_size_buf),
+                     input_metadata_size_buf_size, real_free)));
   // serialized_request.push_back(std::make_pair(
   //     reinterpret_cast<void *>(input_metadata), input_metadata_size));
   messages.emplace_back(
       std::make_pair(boost::optional<int>(),
-                     {reinterpret_cast<void *>(input_metadata),
-                      input_metadata_size, real_free}));
+                     zmq::message_t(reinterpret_cast<void *>(input_metadata),
+                                    input_metadata_size, real_free)));
 
   for (size_t i = 0; i < tasks.size(); ++i) {
     // serialized_request.push_back(
     //     std::make_pair(inputs_[i]->get_data(), inputs_[i]->byte_size()));
-    messages.emplace_back(
-        std::make_pair(boost::optional<int>(tasks[i].query_id_),
-                       {reinterpret_cast<void *>(tasks[i].input_.data_),
-                        tasks[i].input_.size_bytes_, noop_free}));
+    messages.emplace_back(std::make_pair(
+        boost::optional<int>(tasks[i].query_id_),
+        zmq::message_t(reinterpret_cast<void *>(tasks[i].input_.data_),
+                       tasks[i].input_.size_bytes_, noop_free)));
   }
   return messages;
 }
