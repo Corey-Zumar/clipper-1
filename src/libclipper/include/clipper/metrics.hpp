@@ -441,9 +441,9 @@ class MetricsRegistry {
 };
 
 // Pair consisting of entry name and timestamp
-using LineageEntry = std::pair<std::string, long long>
+using LineageEntry = std::pair<std::string, long long>;
 
-    class TSLineageTracker {
+class TSLineageTracker {
  public:
   /**
    * Obtains an instance of the TSLineageTracker singleton
@@ -453,7 +453,8 @@ using LineageEntry = std::pair<std::string, long long>
 
   void add_entry(const int query_id, const std::string entry_name,
                  const long long timestamp);
-  const std::string report_lineages(const bool clear = false);
+  const boost::property_tree::ptree report_tree();
+  void clear();
 
  private:
   TSLineageTracker(const int lineages_per_query);
@@ -461,11 +462,6 @@ using LineageEntry = std::pair<std::string, long long>
   TSLineageTracker &operator=(TSLineageTracker &other) = delete;
   TSLineageTracker(TSLineageTracker &&other) = delete;
   TSLineageTracker &operator=(TSLineageTracker &&other) = delete;
-
-  // These methods assume that a lock on the lineages
-  // map is held prior to execution
-  const boost::property_tree::ptree report_tree();
-  void clear();
 
   std::map<int, std::vector<LineageEntry>> lineages_;
   std::mutex lineages_mtx_;

@@ -71,14 +71,15 @@ const std::string MetricsRegistry::report_metrics(const bool clear) {
     // Sorts the metrics by MetricType in order to output them by category
     std::sort(metrics_->begin(), metrics_->end(), compare_metrics);
     boost::property_tree::ptree main_tree;
+    boost::property_tree::ptree metrics_tree;
     boost::property_tree::ptree curr_category_tree;
     MetricType prev_type = metrics_->front()->type();
     for (int i = 0; i < (int)metrics_->size(); i++) {
       std::shared_ptr<Metric> metric = (*metrics_)[i];
       MetricType curr_type = metric->type();
       if (i > 0 && curr_type != prev_type) {
-        main_tree.put_child(get_metrics_category_name(prev_type),
-                            curr_category_tree);
+        metrics_tree.put_child(get_metrics_category_name(prev_type),
+                               curr_category_tree);
         curr_category_tree.clear();
       }
       boost::property_tree::ptree named_tree;
@@ -91,8 +92,17 @@ const std::string MetricsRegistry::report_metrics(const bool clear) {
       prev_type = curr_type;
     }
     // Tail case
-    main_tree.put_child(get_metrics_category_name(prev_type),
-                        curr_category_tree);
+    metrics_tree.put_child(get_metrics_category_name(prev_type),
+                           curr_category_tree);
+
+    auto lineage_tree = TSLineageTracker::get_tracker().report_tree();
+    if (clear) {
+      TSLineageTracker::get_tracker().clear();
+    }
+
+    main_tree.put_child("metrics", metrics_tree);
+    main_tree.put_child("lineages", lineage_tree);
+
     std::ostringstream ss;
     boost::property_tree::write_json(ss, main_tree);
     return ss.str();
@@ -167,20 +177,13 @@ TSLineageTracker::add_entry(const int query_id, const std::string &entry_name) {
   add_entry(query_id, timestamp, entry_name);
 }
 
-TSLineageTracker::clear() { lineages_.clear(); }
-
-TSLineageTracker::report_lineages(const bool clear = false) {
+TSLineageTracker::clear() {
   std::lock_guard<std::mutex> lineages_lock(lineages_mtx_);
-  auto lineages_tree = report_tree();
-  std::ostringstream ss;
-  boost::property_tree::write_json(ss, lineages_tree);
-  if (clear) {
-    clear();
-  }
-  return ss.str();
+  lineages_.clear();
 }
 
 const boost::property_tree::ptree TSLineageTracker::report_tree() {
+  std::lock_guard<std::mutex> lineages_lock(lineages_mtx_);
   boost::property_tree::ptree report_tree;
   boost::property_tree::ptree data_array;
   for (auto &lineage : lineages_) {
