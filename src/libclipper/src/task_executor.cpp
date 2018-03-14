@@ -166,8 +166,8 @@ std::vector<rpc::RPCRequestItem> construct_batch_message(
   //     reinterpret_cast<void *>(request_metadata), request_metadata_size));
   messages.emplace_back(
       std::make_pair(boost::optional<int>(),
-                     {reinterpret_cast<void *>(request_metadata),
-                      request_metadata_size, real_free}));
+                     zmq::message_t(reinterpret_cast<void *>(request_metadata),
+                                    request_metadata_size, real_free)));
   // serialized_request.push_back(
   //     std::make_pair(reinterpret_cast<void *>(input_metadata_size_buf),
   //                    input_metadata_size_buf_size));
