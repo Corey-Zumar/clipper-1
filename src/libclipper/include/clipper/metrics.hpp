@@ -451,6 +451,7 @@ class TSLineageTracker {
    */
   static TSLineageTracker &get_tracker();
 
+  void register_application(const int query_id, const std::string &application_name);
   void add_entry(const int query_id, const long long timestamp,
                  const std::string &entry_name);
   void add_entry(const int query_id, const std::string &entry_name);
@@ -464,7 +465,7 @@ class TSLineageTracker {
   TSLineageTracker(TSLineageTracker &&other) = delete;
   TSLineageTracker &operator=(TSLineageTracker &&other) = delete;
 
-  std::map<int, std::vector<LineageEntry>> lineages_;
+  std::map<int, std::pair<std::vector<LineageEntry>, boost::optional<std::string>>> lineages_;
   std::mutex lineages_mtx_;
   int lineages_per_query_;
 };

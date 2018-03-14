@@ -253,6 +253,8 @@ class ServerImpl {
       std::chrono::time_point<std::chrono::system_clock> create_time =
           std::chrono::system_clock::now();
 
+      clipper::metrics::TSLineageTracker::get_tracker().register_application(query_id, name); 
+
       clipper::metrics::TSLineageTracker::get_tracker().add_entry(
           query_id, "FRONTEND QUERY RECEIVED");
 

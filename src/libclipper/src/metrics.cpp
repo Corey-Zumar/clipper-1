@@ -167,6 +167,18 @@ TSLineageTracker &TSLineageTracker::get_tracker() {
 TSLineageTracker::TSLineageTracker(const int lineages_per_query)
     : lineages_per_query_(lineages_per_query) {}
 
+void TSLineageTracker::register_application(const int query_id, const std::string &application_name) {
+  std::lock_guard<std::mutex> lineages_lock(lineages_mtx_);
+  auto lineages_search = lineages_.find(query_id);
+  if (lineages_search == lineages_.end()) {
+    std::vector<LineageEntry> lineages;
+    lineages.reserve(lineages_per_query_);
+    lineages_.emplace(query_id, std::make_pair(std::move(lineages), boost::optional<std::string>(application_name)));
+  } else {
+    lineages_search->second.second = std::move(application_name);
+  }
+}
+
 void TSLineageTracker::add_entry(const int query_id, const long long timestamp,
                                  const std::string &entry_name) {
   LineageEntry new_entry = std::make_pair(entry_name, timestamp);
@@ -176,9 +188,9 @@ void TSLineageTracker::add_entry(const int query_id, const long long timestamp,
     std::vector<LineageEntry> lineages;
     lineages.reserve(lineages_per_query_);
     lineages.push_back(std::move(new_entry));
-    lineages_.emplace(query_id, std::move(lineages));
+    lineages_.emplace(query_id, std::make_pair(std::move(lineages), boost::optional<std::string>()));
   } else {
-    lineages_search->second.push_back(std::move(new_entry));
+    lineages_search->second.first.push_back(std::move(new_entry));
   }
 }
 
@@ -199,9 +211,18 @@ const boost::property_tree::ptree TSLineageTracker::report_tree() {
   boost::property_tree::ptree data_array;
   for (auto &lineage : lineages_) {
     boost::property_tree::ptree child;
-    for (auto &lineage_entry : lineage.second) {
-      child.put(lineage_entry.first, std::to_string(lineage_entry.second));
+    boost::property_tree::ptree child_array;
+
+    auto &application_name = lineage.second.second;
+    if(application_name) {
+      child.put("app_name", application_name.get());
     }
+    auto &lineage_entries = lineage.second.first;
+    for (auto &lineage_entry : lineage_entries) {
+      child_array.put(lineage_entry.first, std::to_string(lineage_entry.second));
+    }
+    child.add_child("entries", child_array);
+
     int query_id = lineage.first;
     data_array.push_back(std::make_pair(std::to_string(query_id), child));
   }
