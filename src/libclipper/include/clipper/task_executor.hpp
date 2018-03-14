@@ -281,7 +281,7 @@ void noop_free(void *data, void *hint);
 
 void real_free(void *data, void *hint);
 
-std::vector<zmq::message_t> construct_batch_message(
+std::vector<rpc::RPCRequestItem> construct_batch_message(
     std::vector<PredictTask> tasks);
 
 class TaskExecutor {
