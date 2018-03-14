@@ -451,8 +451,9 @@ class TSLineageTracker {
    */
   static TSLineageTracker &get_tracker();
 
-  void add_entry(const int query_id, const std::string entry_name,
-                 const long long timestamp);
+  void add_entry(const int query_id, const long long timestamp,
+                 const std::string &entry_name);
+  void add_entry(const int query_id, const std::string &entry_name);
   const boost::property_tree::ptree report_tree();
   void clear();
 

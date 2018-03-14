@@ -235,7 +235,7 @@ void RPCService::send_messages(socket_t &socket, int max_num_messages) {
       // send the sndmore flag unless we are on the last message part
       boost::optional<int> &query_id = cur_item.first;
       if (query_id) {
-        TSLineageTracker.get_tracker().add_entry(
+        metrics::TSLineageTracker.get_tracker().add_entry(
             query_id.get(), curr_system_time, "QUERY SENT VIA RPC");
       }
       zmq::message_t &cur_msg = cur_item.second;

@@ -170,8 +170,8 @@ class ModelQueue {
     queue_arrivals_list_->insert(curr_system_time);
     queue_size_list_->insert(queue_.size());
 
-    TSLineageTracker.get_tracker().add_entry(task.query_id_, curr_system_time,
-                                             "QUERY ENQUEUED TO MODEL QUEUE");
+    metrics::TSLineageTracker.get_tracker().add_entry(
+        task.query_id_, curr_system_time, "QUERY ENQUEUED TO MODEL QUEUE");
 
     queue_not_empty_condition_.notify_one();
   }
@@ -194,7 +194,7 @@ class ModelQueue {
     while (batch.size() < (size_t)max_batch_size && queue_.size() > 0) {
       auto &batch_task = queue_.top().second;
       batch.push_back(batch_task);
-      TSLineageTracker.get_tracker().add_entry(
+      metrics::TSLineageTracker.get_tracker().add_entry(
           batch_task.query_id_, curr_system_time,
           "QUERY DEQUEUED FROM MODEL QUEUE");
       queue_.pop();
@@ -606,7 +606,7 @@ class TaskExecutor {
                     Output{parsed_response.outputs_[batch_num],
                            {completed_msg.model_}});
 
-        TSLineageTracker.get_tracker().add_entry(
+        metrics::TSLineageTracker.get_tracker().add_entry(
             completed_msg.query_id_, curr_system_time,
             "QUERY RESPONSE RECEIVED VIA RPC");
       }

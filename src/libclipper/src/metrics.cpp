@@ -95,9 +95,9 @@ const std::string MetricsRegistry::report_metrics(const bool clear) {
     metrics_tree.put_child(get_metrics_category_name(prev_type),
                            curr_category_tree);
 
-    auto lineage_tree = TSLineageTracker::get_tracker().report_tree();
+    auto lineage_tree = TSLineageTracker.get_tracker().report_tree();
     if (clear) {
-      TSLineageTracker::get_tracker().clear();
+      TSLineageTracker.get_tracker().clear();
     }
 
     main_tree.put_child("metrics", metrics_tree);
@@ -190,7 +190,8 @@ const boost::property_tree::ptree TSLineageTracker::report_tree() {
   for (auto &lineage : lineages_) {
     boost::property_tree::ptree child;
     for (auto &lineage_entry : lineage.second) {
-      child.push_back(lineage_entry);
+      child.push_back(lineage_entry.first,
+                      std::to_string(lineage_entry.second));
     }
     int query_id = lineage.first;
     data_array.push_back(std::make_pair(std::to_string(query_id), child));
