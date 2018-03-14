@@ -221,7 +221,7 @@ void RPCService::send_messages(socket_t &socket, int max_num_messages) {
     message_t id_message(sizeof(int));
     memcpy(id_message.data(), &std::get<1>(request), sizeof(int));
 
-    long long curr_system_time = clock::ClipperClock.get_clock().get_uptime();
+    long long curr_system_time = clock::ClipperClock::get_clock().get_uptime();
 
     socket.send(routing_id.data(), routing_id.size(), ZMQ_SNDMORE);
     socket.send("", 0, ZMQ_SNDMORE);

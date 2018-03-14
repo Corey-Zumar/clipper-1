@@ -95,7 +95,7 @@ const std::string MetricsRegistry::report_metrics(const bool clear) {
     metrics_tree.put_child(get_metrics_category_name(prev_type),
                            curr_category_tree);
 
-    auto lineage_tree = TSLineageTracker.get_tracker().report_tree();
+    auto lineage_tree = TSLineageTracker::get_tracker().report_tree();
     if (clear) {
       TSLineageTracker::get_tracker().clear();
     }
