@@ -157,8 +157,8 @@ std::shared_ptr<Histogram> MetricsRegistry::create_histogram(
 TSLineageTracker::TSLineageTracker(const int lineages_per_query)
     : lineages_per_query_(lineages_per_query) {}
 
-TSLineageTracker::add_entry(const int query_id, const long long timestamp,
-                            const std::string &entry_name) {
+void TSLineageTracker::add_entry(const int query_id, const long long timestamp,
+                                 const std::string &entry_name) {
   LineageEntry new_entry = std::make_pair(entry_name, timestamp);
   std::lock_guard<std::mutex> lineages_lock(lineages_mtx_);
   auto lineages_search = lineages_.find(query_id);
@@ -172,12 +172,13 @@ TSLineageTracker::add_entry(const int query_id, const long long timestamp,
   }
 }
 
-TSLineageTracker::add_entry(const int query_id, const std::string &entry_name) {
+void TSLineageTracker::add_entry(const int query_id,
+                                 const std::string &entry_name) {
   long long timestamp = clock::ClipperClock::get_clock().get_uptime();
   add_entry(query_id, timestamp, entry_name);
 }
 
-TSLineageTracker::clear() {
+void TSLineageTracker::clear() {
   std::lock_guard<std::mutex> lineages_lock(lineages_mtx_);
   lineages_.clear();
 }
@@ -191,8 +192,8 @@ const boost::property_tree::ptree TSLineageTracker::report_tree() {
     for (auto &lineage_entry : lineage.second) {
       child.push_back(lineage_entry);
     }
-    long long query_id = lineage.first;
-    data_array.push_back(std::make_pair(query_id, child));
+    int query_id = lineage.first;
+    data_array.push_back(std::make_pair(std::to_string(query_id), child));
   }
   report_tree.add_child("lineages", data_array);
   return report_tree;

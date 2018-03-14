@@ -221,6 +221,8 @@ void RPCService::send_messages(socket_t &socket, int max_num_messages) {
     message_t id_message(sizeof(int));
     memcpy(id_message.data(), &std::get<1>(request), sizeof(int));
 
+    long long curr_system_time = clock::ClipperClock.get_clock().get_uptime();
+
     socket.send(routing_id.data(), routing_id.size(), ZMQ_SNDMORE);
     socket.send("", 0, ZMQ_SNDMORE);
     socket.send(type_message, ZMQ_SNDMORE);
@@ -231,11 +233,16 @@ void RPCService::send_messages(socket_t &socket, int max_num_messages) {
     for (RPCRequestItem &cur_item : std::get<2>(request)) {
       // message_t cur_buffer(m.first, m.second, noop_free);
       // send the sndmore flag unless we are on the last message part
-
+      boost::optional<int> &query_id = cur_item.first;
+      if (query_id) {
+        TSLineageTracker.get_tracker().add_entry(
+            query_id.get(), curr_system_time, "QUERY SENT VIA RPC");
+      }
+      zmq::message_t &cur_msg = cur_item.second;
       if (cur_msg_num < last_msg_num) {
-        socket.send(cur_message, ZMQ_SNDMORE);
+        socket.send(cur_msg, ZMQ_SNDMORE);
       } else {
-        socket.send(cur_message);
+        socket.send(cur_msg);
       }
       cur_msg_num += 1;
     }
