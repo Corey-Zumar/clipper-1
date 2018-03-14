@@ -288,7 +288,11 @@ void RPCService::receive_message(socket_t &socket) {
   socket.recv(msg_content_buffer.get(), content_size, 0);
   log_info(LOGGING_TAG_RPC, "response received");
   int id = static_cast<int *>(msg_id.data())[0];
-  RPCResponse response(id, content_data_type, msg_content_buffer);
+
+  long long current_system_time = clock::ClipperClock::get_clock().get_uptime();
+
+  RPCResponse response(id, content_data_type, msg_content_buffer,
+                       current_system_time);
 
   std::lock_guard<std::mutex> connections_container_map_lock(
       connections_containers_map_mutex_);

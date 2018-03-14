@@ -401,6 +401,9 @@ class TaskExecutor {
     predictions_counter_ =
         metrics::MetricsRegistry::get_metrics().create_counter(
             "internal:aggregate_num_predictions");
+    rpc_prop_latency_list_ =
+        metrics::MetricsRegistry::get_metrics().create_data_list<long long>(
+            "rpc propagation latencies list", "microseconds");
   }
 
   // Disallow copy
@@ -459,6 +462,9 @@ class TaskExecutor {
       model_queues_;
   boost::shared_mutex model_metrics_mutex_;
   std::unordered_map<VersionedModelId, ModelMetrics> model_metrics_;
+
+  std::shared_ptr<metrics::DataList<long long>> rpc_prop_latency_list_;
+
   static constexpr int INITIAL_MODEL_QUEUES_MAP_SIZE = 100;
 
   bool create_model_queue_if_necessary(const VersionedModelId &model_id) {
@@ -544,7 +550,8 @@ class TaskExecutor {
     int msg_id;
     DataType data_type;
     std::shared_ptr<void> data;
-    std::tie(msg_id, data_type, data) = response;
+    long long response_creation_time;
+    std::tie(msg_id, data_type, data, response_creation_time) = response;
 
     auto keys = inflight_messages_[msg_id];
     boost::shared_lock<boost::shared_mutex> metrics_lock(model_metrics_mutex_);
@@ -609,6 +616,10 @@ class TaskExecutor {
         metrics::TSLineageTracker::get_tracker().add_entry(
             completed_msg.query_id_, curr_system_time,
             "QUERY RESPONSE RECEIVED VIA RPC");
+
+        // ADD SOMETHING HERE
+        rpc_prop_latency_list_->insert(curr_system_time -
+                                       response_creation_time);
       }
     }
   }

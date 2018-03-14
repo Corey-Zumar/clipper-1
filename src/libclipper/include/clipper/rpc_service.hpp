@@ -28,8 +28,8 @@ namespace rpc {
 
 const std::string LOGGING_TAG_RPC = "RPC";
 
-// Tuple of msg_id, data_type, binary data
-using RPCResponse = std::tuple<int, DataType, std::shared_ptr<void>>;
+// Tuple of msg_id, data_type, binary data, creation time
+using RPCResponse = std::tuple<int, DataType, std::shared_ptr<void>, long long>;
 
 // Tuple of query_id, zmq message contents
 using RPCRequestItem = std::pair<boost::optional<int>, zmq::message_t>;
