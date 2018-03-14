@@ -136,7 +136,7 @@ void noop_free(void *data, void *hint) {
 
 void real_free(void *data, void *hint) { free(data); }
 
-std::vector<RPCRequestItem> construct_batch_message(
+std::vector<rpc::RPCRequestItem> construct_batch_message(
     std::vector<PredictTask> tasks) {
   std::vector<zmq::message_t> messages;
   size_t request_metadata_size = 1 * sizeof(uint32_t);
