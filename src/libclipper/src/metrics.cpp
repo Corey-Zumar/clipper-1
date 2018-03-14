@@ -154,6 +154,14 @@ std::shared_ptr<Histogram> MetricsRegistry::create_histogram(
   return histogram;
 }
 
+TSLineageTracker &get_tracker() {
+  // References a global singleton MetricsRegistry object.
+  // This object is created if it does not already exist,
+  // and it is automatically memory managed
+  static TSLineageTracker instance;
+  return instance;
+}
+
 TSLineageTracker::TSLineageTracker(const int lineages_per_query)
     : lineages_per_query_(lineages_per_query) {}
 
