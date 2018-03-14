@@ -259,7 +259,7 @@ class ServerImpl {
       task_executor_.schedule_prediction(
           PredictTask{std::get<0>(request), versioned_models.front(), 1.0,
                       query_id, latency_slo_micros},
-          [this, app_metrics, request_id, client_id,
+          [this, app_metrics, request_id, client_id, query_id,
            create_time](Output output) mutable {
             std::chrono::time_point<std::chrono::system_clock> end =
                 std::chrono::system_clock::now();
