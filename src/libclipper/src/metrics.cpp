@@ -14,6 +14,7 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 
+#include <clipper/clock.hpp>
 #include <clipper/logging.hpp>
 #include <clipper/metrics.hpp>
 
@@ -70,14 +71,15 @@ const std::string MetricsRegistry::report_metrics(const bool clear) {
     // Sorts the metrics by MetricType in order to output them by category
     std::sort(metrics_->begin(), metrics_->end(), compare_metrics);
     boost::property_tree::ptree main_tree;
+    boost::property_tree::ptree metrics_tree;
     boost::property_tree::ptree curr_category_tree;
     MetricType prev_type = metrics_->front()->type();
     for (int i = 0; i < (int)metrics_->size(); i++) {
       std::shared_ptr<Metric> metric = (*metrics_)[i];
       MetricType curr_type = metric->type();
       if (i > 0 && curr_type != prev_type) {
-        main_tree.put_child(get_metrics_category_name(prev_type),
-                            curr_category_tree);
+        metrics_tree.put_child(get_metrics_category_name(prev_type),
+                               curr_category_tree);
         curr_category_tree.clear();
       }
       boost::property_tree::ptree named_tree;
@@ -90,8 +92,17 @@ const std::string MetricsRegistry::report_metrics(const bool clear) {
       prev_type = curr_type;
     }
     // Tail case
-    main_tree.put_child(get_metrics_category_name(prev_type),
-                        curr_category_tree);
+    metrics_tree.put_child(get_metrics_category_name(prev_type),
+                           curr_category_tree);
+
+    auto lineage_tree = TSLineageTracker::get_tracker().report_tree();
+    if (clear) {
+      TSLineageTracker::get_tracker().clear();
+    }
+
+    main_tree.put_child("metrics", metrics_tree);
+    main_tree.put_child("lineages", lineage_tree);
+
     std::ostringstream ss;
     boost::property_tree::write_json(ss, main_tree);
     return ss.str();
@@ -141,6 +152,61 @@ std::shared_ptr<Histogram> MetricsRegistry::create_histogram(
       std::make_shared<Histogram>(name, unit, sample_size);
   metrics_->push_back(histogram);
   return histogram;
+}
+
+TSLineageTracker &TSLineageTracker::get_tracker() {
+  // References a global singleton MetricsRegistry object.
+  // This object is created if it does not already exist,
+  // and it is automatically memory managed
+  //
+  // Reserves space for 20 lineage entries per query id
+  static TSLineageTracker instance(20);
+  return instance;
+}
+
+TSLineageTracker::TSLineageTracker(const int lineages_per_query)
+    : lineages_per_query_(lineages_per_query) {}
+
+void TSLineageTracker::add_entry(const int query_id, const long long timestamp,
+                                 const std::string &entry_name) {
+  LineageEntry new_entry = std::make_pair(entry_name, timestamp);
+  std::lock_guard<std::mutex> lineages_lock(lineages_mtx_);
+  auto lineages_search = lineages_.find(query_id);
+  if (lineages_search == lineages_.end()) {
+    std::vector<LineageEntry> lineages;
+    lineages.reserve(lineages_per_query_);
+    lineages.push_back(std::move(new_entry));
+    lineages_.emplace(query_id, std::move(lineages));
+  } else {
+    lineages_search->second.push_back(std::move(new_entry));
+  }
+}
+
+void TSLineageTracker::add_entry(const int query_id,
+                                 const std::string &entry_name) {
+  long long timestamp = clock::ClipperClock::get_clock().get_uptime();
+  add_entry(query_id, timestamp, entry_name);
+}
+
+void TSLineageTracker::clear() {
+  std::lock_guard<std::mutex> lineages_lock(lineages_mtx_);
+  lineages_.clear();
+}
+
+const boost::property_tree::ptree TSLineageTracker::report_tree() {
+  std::lock_guard<std::mutex> lineages_lock(lineages_mtx_);
+  boost::property_tree::ptree report_tree;
+  boost::property_tree::ptree data_array;
+  for (auto &lineage : lineages_) {
+    boost::property_tree::ptree child;
+    for (auto &lineage_entry : lineage.second) {
+      child.put(lineage_entry.first, std::to_string(lineage_entry.second));
+    }
+    int query_id = lineage.first;
+    data_array.push_back(std::make_pair(std::to_string(query_id), child));
+  }
+  report_tree.add_child("lineages", data_array);
+  return report_tree;
 }
 
 Counter::Counter(const std::string name) : Counter(name, 0) {}
@@ -450,7 +516,7 @@ void Histogram::insert(const int64_t value) {
   sampler_.sample(value);
 }
 
-long double Histogram::percentile(std::vector<int64_t>& snapshot, double rank) {
+long double Histogram::percentile(std::vector<int64_t> &snapshot, double rank) {
   if (rank < 0 || rank > 1) {
     throw std::invalid_argument("Percentile rank must be in [0,1]!");
   }
@@ -492,10 +558,10 @@ long double Histogram::percentile(double rank) {
   return Histogram::percentile(snapshot, rank);
 }
 
-long double Histogram::compute_mean(std::vector<int64_t>& snapshot) {
+long double Histogram::compute_mean(std::vector<int64_t> &snapshot) {
   long double mean = 0;
   long double k = snapshot.size();
-  for(int64_t elem : snapshot) {
+  for (int64_t elem : snapshot) {
     mean += static_cast<long double>(elem) / k;
   }
   return mean;
