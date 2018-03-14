@@ -253,7 +253,7 @@ class ServerImpl {
       std::chrono::time_point<std::chrono::system_clock> create_time =
           std::chrono::system_clock::now();
 
-      metrics::TSLineageTracker::get_tracker().add_entry(
+      clipper::metrics::TSLineageTracker::get_tracker().add_entry(
           query_id, "FRONTEND QUERY RECEIVED");
 
       task_executor_.schedule_prediction(
@@ -272,7 +272,7 @@ class ServerImpl {
             app_metrics.latency_list_->insert(duration_micros);
             app_metrics.num_predictions_->increment(1);
 
-            metrics::TSLineageTracker::get_tracker().add_entry(
+            clipper::metrics::TSLineageTracker::get_tracker().add_entry(
                 query_id, "FRONTEND RESPONSE SENT");
 
             rpc_service_->send_response(
