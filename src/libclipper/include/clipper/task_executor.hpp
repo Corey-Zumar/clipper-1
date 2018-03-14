@@ -5,8 +5,8 @@
 #include <memory>
 #include <mutex>
 #include <string>
-#include <unordered_map>
 #include <tuple>
+#include <unordered_map>
 
 #include <boost/optional.hpp>
 
@@ -35,9 +35,10 @@ class ModelMetrics {
         latency_(metrics::MetricsRegistry::get_metrics().create_histogram(
             "model:" + model.serialize() + ":prediction_latency",
             "microseconds", 4096)),
-        latency_list_(metrics::MetricsRegistry::get_metrics().create_data_list<long long>(
-            "model:" + model.serialize() + ":prediction_latencies_list", "microseconds"
-        )),
+        latency_list_(
+            metrics::MetricsRegistry::get_metrics().create_data_list<long long>(
+                "model:" + model.serialize() + ":prediction_latencies_list",
+                "microseconds")),
         throughput_(metrics::MetricsRegistry::get_metrics().create_meter(
             "model:" + model.serialize() + ":prediction_throughput")),
         num_predictions_(metrics::MetricsRegistry::get_metrics().create_counter(
@@ -129,14 +130,14 @@ class ModelQueue {
             metrics::MetricsRegistry::get_metrics().create_histogram(
                 name + ":queue_size", "microseconds", 1000)),
         queue_size_list_(
-            metrics::MetricsRegistry::get_metrics()
-                .create_data_list<size_t>(name + ":queue_sizes", "queue size")),
+            metrics::MetricsRegistry::get_metrics().create_data_list<size_t>(
+                name + ":queue_sizes", "queue size")),
         queue_arrivals_list_(
-            metrics::MetricsRegistry::get_metrics()
-                .create_data_list<long long>(name + ":queue_arrivals", "timestamp")),
+            metrics::MetricsRegistry::get_metrics().create_data_list<long long>(
+                name + ":queue_arrivals", "timestamp")),
         processing_outs_list_(
-            metrics::MetricsRegistry::get_metrics()
-                .create_data_list<long long>(name + ":processing_outs", "timestamp")) {}
+            metrics::MetricsRegistry::get_metrics().create_data_list<long long>(
+                name + ":processing_outs", "timestamp")) {}
 
   // Disallow copy and assign
   ModelQueue(const ModelQueue &) = delete;
@@ -167,8 +168,11 @@ class ModelQueue {
 
     long long curr_system_time = clock::ClipperClock::get_clock().get_uptime();
     queue_arrivals_list_->insert(curr_system_time);
-
     queue_size_list_->insert(queue_.size());
+
+    metrics::TSLineageTracker::get_tracker().add_entry(
+        task.query_id_, curr_system_time, "QUERY ENQUEUED TO MODEL QUEUE");
+
     queue_not_empty_condition_.notify_one();
   }
 
@@ -184,8 +188,15 @@ class ModelQueue {
     Deadline deadline = queue_.top().first;
     int max_batch_size = get_batch_size(deadline);
     std::vector<PredictTask> batch;
+
+    long long curr_system_time = clock::ClipperClock::get_clock().get_uptime();
+
     while (batch.size() < (size_t)max_batch_size && queue_.size() > 0) {
-      batch.push_back(queue_.top().second);
+      auto &batch_task = queue_.top().second;
+      batch.push_back(batch_task);
+      metrics::TSLineageTracker::get_tracker().add_entry(
+          batch_task.query_id_, curr_system_time,
+          "QUERY DEQUEUED FROM MODEL QUEUE");
       queue_.pop();
     }
     queue_size_hist_->insert(static_cast<int64_t>(queue_.size()));
@@ -198,7 +209,8 @@ class ModelQueue {
     queue_ = ModelPQueue{};
   }
 
-  // Making this public so that on_response_recv of TaskExecutor can add to this queue
+  // Making this public so that on_response_recv of TaskExecutor can add to this
+  // queue
   // Bad design hope it won't bite me in the ass later
   std::shared_ptr<metrics::DataList<long long>> processing_outs_list_;
 
@@ -269,7 +281,7 @@ void noop_free(void *data, void *hint);
 
 void real_free(void *data, void *hint);
 
-std::vector<zmq::message_t> construct_batch_message(
+std::vector<rpc::RPCRequestItem> construct_batch_message(
     std::vector<PredictTask> tasks);
 
 class TaskExecutor {
@@ -284,8 +296,9 @@ class TaskExecutor {
         model_metrics_({}) {
     log_info(LOGGING_TAG_TASK_EXECUTOR, "TaskExecutor started");
     rpc_->start(
-        "*", RPC_SERVICE_SEND_PORT, RPC_SERVICE_RECV_PORT, [ this, task_executor_valid = active_ ](
-                                   VersionedModelId model, int replica_id) {
+        "*", RPC_SERVICE_SEND_PORT, RPC_SERVICE_RECV_PORT,
+        [ this, task_executor_valid = active_ ](VersionedModelId model,
+                                                int replica_id) {
           if (*task_executor_valid) {
             on_container_ready(model, replica_id);
           } else {
@@ -331,8 +344,9 @@ class TaskExecutor {
       }
     });
 
-    std::vector<VersionedModelId> models = redis::get_all_models(redis_connection_);
-    for (auto model_id: models) {
+    std::vector<VersionedModelId> models =
+        redis::get_all_models(redis_connection_);
+    for (auto model_id : models) {
       auto model_info = redis::get_model(redis_connection_, model_id);
       // VersionedModelId model_id = VersionedModelId(
       //     model_info["model_name"], model_info["model_version"]);
@@ -422,10 +436,9 @@ class TaskExecutor {
 
   void drain_queues() {
     boost::unique_lock<boost::shared_mutex> lock(model_queues_mutex_);
-    for (auto entry: model_queues_) {
+    for (auto entry : model_queues_) {
       entry.second->drain_queue();
     }
-
   }
 
  private:
@@ -464,7 +477,7 @@ class TaskExecutor {
         //                        std::forward_as_tuple(model_id));
       }
       return queue_created;
-    } catch(std::exception& e) {
+    } catch (std::exception &e) {
       log_error(LOGGING_TAG_TASK_EXECUTOR, e.what());
     }
   }
@@ -485,7 +498,6 @@ class TaskExecutor {
           "container!");
     }
     std::shared_ptr<ModelQueue> current_model_queue = model_queue_entry->second;
-
 
     // NOTE: It is safe to unlock here because we copy the shared_ptr to
     // the ModelQueue object so even if that entry in the map gets deleted,
@@ -515,9 +527,9 @@ class TaskExecutor {
                                container->replica_id_, b.input_, b.query_id_);
       }
       std::string model_name = model_id.get_name();
-      int message_id = rpc_->send_model_message(model_name,
-                                                construct_batch_message(batch_tasks),
-                                                container->container_id_);
+      int message_id = rpc_->send_model_message(
+          model_name, construct_batch_message(batch_tasks),
+          container->container_id_);
       inflight_messages_.emplace(message_id, std::move(cur_batch));
     } else {
       log_error_formatted(
@@ -577,12 +589,14 @@ class TaskExecutor {
             .latency_list_->insert(static_cast<int64_t>(task_latency_micros));
       }
 
-      long long curr_system_time = clock::ClipperClock::get_clock().get_uptime();
+      long long curr_system_time =
+          clock::ClipperClock::get_clock().get_uptime();
       boost::shared_lock<boost::shared_mutex> lock(model_queues_mutex_);
       auto model_queue_entry = model_queues_.find(cur_model);
       if (model_queue_entry != model_queues_.end()) {
-        for (int batch_num = 0; batch_num < batch_size; ++batch_num){
-          model_queue_entry->second->processing_outs_list_->insert(curr_system_time);
+        for (int batch_num = 0; batch_num < batch_size; ++batch_num) {
+          model_queue_entry->second->processing_outs_list_->insert(
+              curr_system_time);
         }
       }
 
@@ -591,6 +605,10 @@ class TaskExecutor {
         cache_->put(completed_msg.model_, completed_msg.query_id_,
                     Output{parsed_response.outputs_[batch_num],
                            {completed_msg.model_}});
+
+        metrics::TSLineageTracker::get_tracker().add_entry(
+            completed_msg.query_id_, curr_system_time,
+            "QUERY RESPONSE RECEIVED VIA RPC");
       }
     }
   }
