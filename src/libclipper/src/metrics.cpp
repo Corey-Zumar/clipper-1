@@ -158,7 +158,9 @@ TSLineageTracker &get_tracker() {
   // References a global singleton MetricsRegistry object.
   // This object is created if it does not already exist,
   // and it is automatically memory managed
-  static TSLineageTracker instance;
+  //
+  // Reserves space for 20 lineage entries per query id
+  static TSLineageTracker instance(20);
   return instance;
 }
 
