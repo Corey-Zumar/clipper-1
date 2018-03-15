@@ -58,7 +58,6 @@ int main(int argc, char* argv[]) {
         std::string metrics_report =
             // registry.report_metrics(false);
             registry.report_metrics(true);
-        std::cout << metrics_report << std::endl;
         respond_http(metrics_report, "200 OK", response);
       });
 

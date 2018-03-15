@@ -65,9 +65,9 @@ class DataList : public Metric {
   DataList &operator=(DataList &&other) = delete;
 
   void insert(T item) {
-    long long timestamp = clock::ClipperClock::get_clock().get_uptime();
-    std::lock_guard<std::mutex> lock(mtx_);
-    items_.push_back(std::make_pair(timestamp, item));
+    // long long timestamp = clock::ClipperClock::get_clock().get_uptime();
+    // std::lock_guard<std::mutex> lock(mtx_);
+    // items_.push_back(std::make_pair(timestamp, item));
   }
 
   MetricType type() const override { return MetricType::DataList; }
@@ -77,27 +77,28 @@ class DataList : public Metric {
   const boost::property_tree::ptree report_tree() override {
     std::lock_guard<std::mutex> lock(mtx_);
     boost::property_tree::ptree report_tree;
-    boost::property_tree::ptree data_array;
-    for (auto &item : items_) {
-      boost::property_tree::ptree child;
-      child.put(std::to_string(item.first), item.second);
-      data_array.push_back(std::make_pair("", child));
-    }
-    report_tree.add_child("items", data_array);
-    report_tree.put("units", unit_);
+    // boost::property_tree::ptree data_array;
+    // for (auto &item : items_) {
+    //   boost::property_tree::ptree child;
+    //   child.put(std::to_string(item.first), item.second);
+    //   data_array.push_back(std::make_pair("", child));
+    // }
+    // report_tree.add_child("items", data_array);
+    // report_tree.put("units", unit_);
     return report_tree;
   }
 
   const std::string report_str() override {
-    std::ostringstream ss;
-    boost::property_tree::ptree report = report_tree();
-    boost::property_tree::write_json(ss, report);
-    return ss.str();
+    // std::ostringstream ss;
+    // boost::property_tree::ptree report = report_tree();
+    // boost::property_tree::write_json(ss, report);
+    // return ss.str();
+    return "";
   }
 
   void clear() override {
-    std::lock_guard<std::mutex> lock(mtx_);
-    items_.clear();
+    // std::lock_guard<std::mutex> lock(mtx_);
+    // items_.clear();
   }
 
  private:
