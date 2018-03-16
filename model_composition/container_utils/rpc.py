@@ -306,7 +306,7 @@ class Server(threading.Thread):
         return self.event_history.get_events()
 
     def send_response(self):
-        if not self.response_queue.empty() or self.full_buffers == 2:
+        if not self.response_queue.empty() or self.full_buffers == 1:
             response, recv_time = self.response_queue.get()
             self.full_buffers -= 1
             # t3 = datetime.now()
