@@ -30,8 +30,8 @@ ContainerId get_container_id(std::vector<ContainerModelDataItem> &container_data
 class ModelContainer {
  public:
   ~ModelContainer() = default;
-  ModelContainer(VersionedModelId model, int container_id, int replica_id, DataType input_type,
-                 int batch_size);
+  ModelContainer(ContainerId container_id, std::vector<ContainerModelDataItem> model_data,
+                 int connection_id, int batch_size);
   // disallow copy
   ModelContainer(const ModelContainer &) = delete;
   ModelContainer &operator=(const ModelContainer &) = delete;
@@ -44,19 +44,15 @@ class ModelContainer {
   void update_throughput(size_t batch_size, long total_latency);
   void set_batch_size(int batch_size);
 
-  VersionedModelId model_;
   int container_id_;
-  int replica_id_;
-  DataType input_type_;
+  std::vector<ContainerModelDataItem> model_data_;
+  int connection_id_;
   int batch_size_;
   clipper::metrics::Histogram latency_hist_;
 
  private:
   bool connected_{true};
-  boost::shared_mutex throughput_mutex_;
-  double avg_throughput_per_milli_;
-  boost::circular_buffer<double> throughput_buffer_;
-  static const size_t THROUGHPUT_BUFFER_CAPACITY = 100;
+  std::mutex batch_size_mtx_;
   static const size_t HISTOGRAM_SAMPLE_SIZE = 100;
 };
 
@@ -74,17 +70,20 @@ class ActiveContainers {
   ActiveContainers(ActiveContainers &&) = default;
   ActiveContainers &operator=(ActiveContainers &&) = default;
 
-  void add_container(VersionedModelId model, int connection_id, int replica_id,
-                     DataType input_type);
+  void add_container(std::vector<ContainerModelDataItem> model_data, int connection_id);
+  void add_container(ContainerId container_id, std::vector<ContainerModelDataItem> model_data,
+                     int connection_id);
 
   void register_batch_size(VersionedModelId model, int batch_size);
 
   /// This method returns the active container specified by the
-  /// provided model id and replica id. This is threadsafe because each
+  /// provided container id. This is threadsafe because each
   /// individual ModelContainer object is threadsafe, and this method returns
   /// a shared_ptr to a ModelContainer object.
   std::shared_ptr<ModelContainer> get_model_replica(const VersionedModelId &model,
                                                     const int replica_id);
+
+  std::shared_ptr<ModelContainer> get_container_by_id(const ContainerId container_id);
 
   /// Get list of all models that have at least one active replica.
   std::vector<VersionedModelId> get_known_models();
@@ -97,7 +96,10 @@ class ActiveContainers {
 
   // A mapping of models to their replicas. The replicas
   // for each model are represented as a map keyed on replica id.
-  std::unordered_map<VersionedModelId, std::map<int, std::shared_ptr<ModelContainer>>> containers_;
+  std::unordered_map<VersionedModelId, std::map<int, std::shared_ptr<ModelContainer>>>
+      by_model_containers_;
+  // A mapping from container id to a corresponding model container
+  std::unordered_map<ContainerId, std::shared_ptr<ModelContainer>> by_id_containers_;
   std::unordered_map<VersionedModelId, int> batch_sizes_;
 };
 }

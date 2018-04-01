@@ -55,7 +55,7 @@ std::string gen_model_replica_key(const VersionedModelId& key, int model_replica
 }
 
 // Expects keys of format "model_name:model_version:replica_id"
-std::vector<ContainerModelDataItem> parse_models_key(std::string key) {
+std::vector<ContainerModelDataItem> parse_models_key(const std::string& key) {
   std::vector<std::string> model_keys = str_to_labels(key);
   std::vector<ContainerModelDataItem> model_data_items;
   model_data_items.reserve(model_keys.size());
@@ -354,8 +354,8 @@ bool add_container(redox::Redox& redis,
                                  std::to_string(zmq_connection_id),
                                  "batch_size",
                                  std::to_string(1),
-                                 "input_type",
-                                 get_readable_input_type(input_type)};
+                                 "container_id",
+                                 std::to_string(container_id)};
     return send_cmd_no_reply<string>(redis, cmd_vec);
   } else {
     return false;
@@ -371,21 +371,30 @@ bool delete_container(Redox& redis, const ContainerId container_id) {
   }
 }
 
-unordered_map<string, string> get_container(Redox& redis, const ContainerId container_id) {
+std::pair<std::vector<ContainerModelDataItem>, std::unordered_map<std::string, std::string>>
+get_container(Redox& redis, const ContainerId container_id) {
   std::string container_key = std::to_string(container_id);
   return get_container_by_key(redis, container_key);
 }
 
-unordered_map<string, string> get_container_by_key(Redox& redis, const std::string& key) {
+std::pair<std::vector<ContainerModelDataItem>, std::unordered_map<std::string, std::string>>
+    unordered_map<string, string> get_container_by_key(Redox& redis, const std::string& key) {
   if (send_cmd_no_reply<string>(redis, {"SELECT", std::to_string(REDIS_CONTAINER_DB_NUM)})) {
     std::vector<std::string> container_data;
     auto result = send_cmd_with_reply<vector<string>>(redis, {"HGETALL", key});
     if (result) {
       container_data = *result;
     }
-    return parse_redis_map(container_data);
+    std::unordered_map<std::string, std::string> parsed_container_data =
+        parse_redis_map(container_data);
+
+    std::string models = parsed_container_data.find("models")->second;
+    std::vector<ContainerModelDataItem> container_models_data = parse_models_key(models);
+
+    return std::make_pair(std::move(container_models_data), parsed_container_data);
   } else {
-    return unordered_map<string, string>{};
+    return std::make_pair(std::vector<std::string>{},
+                          std::unordered_map<std::string, std::string>{});
   }
 }
 
@@ -398,7 +407,11 @@ std::vector<ContainerModelDataItem> get_all_containers(redox::Redox& redis) {
     if (result) {
       auto container_keys = *result;
       for (auto c : container_keys) {
-        containers.push_back(parse_models_key(c));
+        // NOTE: This is not efficient, but we don't expect this method to be
+        // invoked frequently
+        std::pair<std::vector<ContainerModelDataItem>, std::unordered_map<std::string, std::string>>
+            container_info = get_container_by_key(c);
+        containers.push_back(std::move(container_info.first));
       }
     }
   }

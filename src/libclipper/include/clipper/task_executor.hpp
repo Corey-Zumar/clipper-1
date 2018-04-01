@@ -367,26 +367,29 @@ class TaskExecutor {
                                                 const std::string &event_type) {
           if (event_type == "hset" && *task_executor_valid) {
             auto container_info = redis::get_container_by_key(redis_connection_, key);
-            VersionedModelId vm =
-                VersionedModelId(container_info["model_name"], container_info["model_version"]);
-            int replica_id = std::stoi(container_info["model_replica_id"]);
 
-            active_containers_->add_container(vm, std::stoi(container_info["zmq_connection_id"]),
-                                              replica_id,
-                                              parse_input_type(container_info["input_type"]));
+            std::vector<ContainerModelDataItem> &container_models = container_info.first;
+            std::unordered_map<std::string, std::string> &container_metadata =
+                container_info.second;
 
-            TaskExecutionThreadPool::create_queue(vm, replica_id);
-            // TaskExecutionThreadPool::submit_job(
-            //     vm, replica_id, [this, vm, replica_id]() {
-            //       on_container_ready(vm, replica_id);
-            //     });
-            TaskExecutionThreadPool::submit_job(
-                vm, replica_id, [this, vm, replica_id]() { on_container_ready(vm, replica_id); });
-            bool created_queue = create_model_queue_if_necessary(vm);
-            if (created_queue) {
-              log_info_formatted(LOGGING_TAG_TASK_EXECUTOR, "Created queue for new model: {} : {}",
-                                 vm.get_name(), vm.get_id());
+            ContainerId container_id = std::stoul(container_metadata["container_id"]);
+            int connection_id = std::stoi(container_metadata["zmq_connection_id"]);
+            active_containers_->add_container(container_id, container_models, connection_id);
+
+            for (ContainerModelDataItem &model : container_models) {
+              VersionedModelId &vm = model.first;
+              bool created_queue = create_model_queue_if_necessary(vm);
+              if (created_queue) {
+                log_info_formatted(LOGGING_TAG_TASK_EXECUTOR,
+                                   "Created queue for new model: {} : {}", vm.get_name(),
+                                   vm.get_id());
+              }
             }
+
+            TaskExecutionThreadPool::create_queue(container_id);
+            TaskExecutionThreadPool::submit_job(container_id,
+                                                [this]() { on_container_ready(container_id); });
+
           } else if (!*task_executor_valid) {
             log_info(LOGGING_TAG_TASK_EXECUTOR,
                      "Not running TaskExecutor's "
@@ -500,14 +503,24 @@ class TaskExecutor {
 
   void on_container_ready(ContainerId container_id) {
     std::shared_ptr<ModelContainer> container =
-        active_containers_->get_model_replica(model_id, replica_id);
+        active_containers_->get_container_by_id(container_id);
+
     if (!container) {
       throw std::runtime_error(
           "TaskExecutor failed to find previously registered active "
           "container!");
     }
     boost::shared_lock<boost::shared_mutex> l(model_queues_mutex_);
-    auto model_queue_entry = model_queues_.find(container->model_);
+
+    for (ContainerModelDataItem &model_data_item : container.model_data_) {
+      VersionedModelId &vm = model_data_item.first;
+    }
+
+    VersionedModelId &first_model = container.model_data_[0].first;
+
+    // TODO: Figure out how to fairly wait on multiple queues
+
+    auto model_queue_entry = model_queues_.find(first_model);
     if (model_queue_entry == model_queues_.end()) {
       throw std::runtime_error(
           "Failed to find model queue associated with a previously registered "
@@ -586,7 +599,6 @@ class TaskExecutor {
       std::shared_ptr<ModelContainer> processing_container =
           active_containers_->get_model_replica(cur_model, cur_replica_id);
 
-      processing_container->update_throughput(batch_size, task_latency_micros);
       processing_container->latency_hist_.insert(task_latency_micros);
 
       boost::optional<ModelMetrics> cur_model_metric;
