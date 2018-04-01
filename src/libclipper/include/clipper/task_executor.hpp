@@ -305,9 +305,9 @@ class TaskExecutor {
     log_info(LOGGING_TAG_TASK_EXECUTOR, "TaskExecutor started");
     rpc_->start(
         "*", RPC_SERVICE_SEND_PORT, RPC_SERVICE_RECV_PORT,
-        [ this, task_executor_valid = active_ ](VersionedModelId model, int replica_id) {
+        [ this, task_executor_valid = active_ ](ContainerId container_id) {
           if (*task_executor_valid) {
-            on_container_ready(model, replica_id);
+            on_container_ready(container_id);
           } else {
             log_info(LOGGING_TAG_TASK_EXECUTOR,
                      "Not running on_container_ready callback because "
@@ -498,7 +498,7 @@ class TaskExecutor {
     }
   }
 
-  void on_container_ready(VersionedModelId model_id, int replica_id) {
+  void on_container_ready(ContainerId container_id) {
     std::shared_ptr<ModelContainer> container =
         active_containers_->get_model_replica(model_id, replica_id);
     if (!container) {
@@ -544,8 +544,8 @@ class TaskExecutor {
                                container->replica_id_, b.input_, b.query_id_, b.lineage_);
       }
       std::string model_name = model_id.get_name();
-      int message_id = rpc_->send_model_message(model_name, construct_batch_message(batch_tasks),
-                                                container->container_id_);
+      int message_id = rpc_->send_message(model_name, construct_batch_message(batch_tasks),
+                                          container->container_id_);
       inflight_messages_.emplace(message_id, std::move(cur_batch));
     } else {
       log_error_formatted(LOGGING_TAG_TASK_EXECUTOR,

@@ -3,10 +3,10 @@
 
 #include <chrono>
 #include <memory>
-#include <string>
-#include <vector>
-#include <unordered_map>
 #include <mutex>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 #include <boost/functional/hash.hpp>
 #include <boost/optional.hpp>
@@ -142,9 +142,8 @@ class PredictTask {
 
   PredictTask() = default;
 
-  PredictTask(InputVector input, VersionedModelId model, float utility,
-              QueryId query_id, long latency_slo_micros,
-              std::shared_ptr<QueryLineage> lineage);
+  PredictTask(InputVector input, VersionedModelId model, float utility, QueryId query_id,
+              long latency_slo_micros, std::shared_ptr<QueryLineage> lineage);
 
   PredictTask(const PredictTask &other) = default;
   PredictTask &operator=(const PredictTask &other) = default;
@@ -185,15 +184,13 @@ class OutputData {
 
   virtual void *get_data() const = 0;
 
-  static std::shared_ptr<OutputData> create_output(DataType type,
-                                                   std::shared_ptr<void> data,
+  static std::shared_ptr<OutputData> create_output(DataType type, std::shared_ptr<void> data,
                                                    size_t start, size_t end);
 };
 
 class FloatVectorOutput : public OutputData {
  public:
-  explicit FloatVectorOutput(std::shared_ptr<float> data, size_t start,
-                             size_t end);
+  explicit FloatVectorOutput(std::shared_ptr<float> data, size_t start, size_t end);
 
   // Disallow copy
   FloatVectorOutput(FloatVectorOutput &other) = delete;
@@ -243,8 +240,7 @@ class IntVectorOutput : public OutputData {
 
 class ByteVectorOutput : public OutputData {
  public:
-  explicit ByteVectorOutput(std::shared_ptr<uint8_t> data, size_t start,
-                            size_t end);
+  explicit ByteVectorOutput(std::shared_ptr<uint8_t> data, size_t start, size_t end);
 
   // Disallow copy
   ByteVectorOutput(ByteVectorOutput &other) = delete;
@@ -294,8 +290,7 @@ class StringOutput : public OutputData {
 
 class Output {
  public:
-  Output(const std::shared_ptr<OutputData> y_hat,
-         const std::vector<VersionedModelId> models_used);
+  Output(const std::shared_ptr<OutputData> y_hat, const std::vector<VersionedModelId> models_used);
 
   ~Output() = default;
 
@@ -353,8 +348,8 @@ class PredictionResponse {
   PredictionResponse(PredictionResponse &&other) = default;
   PredictionResponse &operator=(PredictionResponse &&other) = default;
 
-  static PredictionResponse deserialize_prediction_response(
-      DataType data_type, std::shared_ptr<void> &data);
+  static PredictionResponse deserialize_prediction_response(DataType data_type,
+                                                            std::shared_ptr<void> &data);
 
   const std::vector<std::shared_ptr<OutputData>> outputs_;
 };

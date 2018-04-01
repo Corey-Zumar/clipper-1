@@ -32,11 +32,10 @@ namespace rpc {
 constexpr int INITIAL_REPLICA_ID_SIZE = 100;
 
 RPCService::RPCService()
-    : request_queue_(std::make_shared<moodycamel::ConcurrentQueue<RPCRequest>>(
-          sizeof(RPCRequest) * 10000)),
+    : request_queue_(
+          std::make_shared<moodycamel::ConcurrentQueue<RPCRequest>>(sizeof(RPCRequest) * 10000)),
       response_queue_(
-          std::make_shared<moodycamel::ConcurrentQueue<RPCResponse>>(
-              sizeof(RPCResponse) * 10000)),
+          std::make_shared<moodycamel::ConcurrentQueue<RPCResponse>>(sizeof(RPCResponse) * 10000)),
       active_(false),
       // The version of the unordered_map constructor that allows
       // you to specify your own hash function also requires you
@@ -54,24 +53,20 @@ RPCService::~RPCService() { stop(); }
 
 void RPCService::start(
     const string ip, int send_port, int recv_port,
-    std::function<void(VersionedModelId, int)> &&container_ready_callback,
-    std::function<void(RPCResponse, long long, long long, long long)>
-        &&new_response_callback) {
+    std::function<void(ContainerId)> &&container_ready_callback,
+    std::function<void(RPCResponse, long long, long long, long long)> &&new_response_callback) {
   container_ready_callback_ = container_ready_callback;
   new_response_callback_ = new_response_callback;
   if (active_) {
-    throw std::runtime_error(
-        "Attempted to start RPC Service when it is already running!");
+    throw std::runtime_error("Attempted to start RPC Service when it is already running!");
   }
   // 7000
   const string send_address = "tcp://" + ip + ":" + std::to_string(send_port);
   // 7001
   const string recv_address = "tcp://" + ip + ":" + std::to_string(recv_port);
   active_ = true;
-  rpc_send_thread_ = std::thread(
-      [this, send_address]() { manage_send_service(send_address); });
-  rpc_recv_thread_ = std::thread(
-      [this, recv_address]() { manage_recv_service(recv_address); });
+  rpc_send_thread_ = std::thread([this, send_address]() { manage_send_service(send_address); });
+  rpc_recv_thread_ = std::thread([this, recv_address]() { manage_recv_service(recv_address); });
 }
 
 void RPCService::manage_send_service(const string address) {
@@ -84,10 +79,8 @@ void RPCService::manage_send_service(const string address) {
 
   auto redis_connection = std::make_shared<redox::Redox>();
   Config &conf = get_config();
-  while (!redis_connection->connect(conf.get_redis_address(),
-                                    conf.get_redis_port())) {
-    log_error(LOGGING_TAG_RPC, "RPCService failed to connect to Redis",
-              "Retrying in 1 second...");
+  while (!redis_connection->connect(conf.get_redis_address(), conf.get_redis_port())) {
+    log_error(LOGGING_TAG_RPC, "RPCService failed to connect to Redis", "Retrying in 1 second...");
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }
 
@@ -126,61 +119,25 @@ void RPCService::stop() {
   }
 }
 
-int RPCService::send_message(std::vector<RPCRequestItem> items,
-                             const int zmq_connection_id) {
+int RPCService::send_message(std::vector<RPCRequestItem> items, const int zmq_connection_id) {
   if (!active_) {
-    log_error(LOGGING_TAG_RPC,
-              "Cannot send message to inactive RPCService instance",
+    log_error(LOGGING_TAG_RPC, "Cannot send message to inactive RPCService instance",
               "Dropping Message");
     return -1;
   }
   int id = message_id_;
   message_id_ += 1;
-  long current_time_micros =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          std::chrono::system_clock::now().time_since_epoch())
-          .count();
-  RPCRequest request(zmq_connection_id, id, std::move(items),
-                     current_time_micros);
-  request_queue_->enqueue(std::move(request));
-  return id;
-}
-
-int RPCService::send_model_message(std::string model_name,
-                                   std::vector<RPCRequestItem> items,
-                                   const int zmq_connection_id) {
-  // Duplicated code in order to avoid potential race conditions
-  if (!active_) {
-    log_error(LOGGING_TAG_RPC,
-              "Cannot send message to inactive RPCService instance",
-              "Dropping Message");
-    return -1;
-  }
-  int id = message_id_;
-  message_id_ += 1;
-  long current_time_micros =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          std::chrono::system_clock::now().time_since_epoch())
-          .count();
-  RPCRequest request(zmq_connection_id, id, std::move(items),
-                     current_time_micros);
-  // auto model_metrics_search = model_processing_latencies_.find(model_name);
-  // if (model_metrics_search == model_processing_latencies_.end()) {
-  //   auto model_metric = metrics::MetricsRegistry::get_metrics()
-  //       .create_data_list<long>(model_name + ":processing_latency",
-  //       "milliseconds");
-  //   model_processing_latencies_.emplace(model_name, model_metric);
-  // }
-
-  msg_id_models_map_.emplace(id, model_name);
+  long current_time_micros = std::chrono::duration_cast<std::chrono::microseconds>(
+                                 std::chrono::system_clock::now().time_since_epoch())
+                                 .count();
+  RPCRequest request(zmq_connection_id, id, std::move(items), current_time_micros);
   request_queue_->enqueue(std::move(request));
   return id;
 }
 
 vector<RPCResponse> RPCService::try_get_responses(const int max_num_responses) {
   std::vector<RPCResponse> vec(response_queue_->size_approx());
-  size_t num_dequeued =
-      response_queue_->try_dequeue_bulk(vec.begin(), vec.size());
+  size_t num_dequeued = response_queue_->try_dequeue_bulk(vec.begin(), vec.size());
   vec.resize(num_dequeued);
   return vec;
 }
@@ -204,8 +161,7 @@ void RPCService::send_messages(socket_t &socket, int max_num_messages) {
   }
 
   std::vector<RPCRequest> requests(max_num_messages);
-  size_t num_requests =
-      request_queue_->try_dequeue_bulk(requests.begin(), max_num_messages);
+  size_t num_requests = request_queue_->try_dequeue_bulk(requests.begin(), max_num_messages);
 
   for (size_t i = 0; i < num_requests; i++) {
     RPCRequest &request = requests[i];
@@ -215,14 +171,13 @@ void RPCService::send_messages(socket_t &socket, int max_num_messages) {
     auto routing_id_search = connection_routing_map_.find(zmq_connection_id);
     if (routing_id_search == connection_routing_map_.end()) {
       std::stringstream ss;
-      ss << "Received a send request associated with a client id "
-         << zmq_connection_id << " that has no associated routing identity";
+      ss << "Received a send request associated with a client id " << zmq_connection_id
+         << " that has no associated routing identity";
       throw std::runtime_error(ss.str());
     }
     const std::vector<uint8_t> &routing_id = routing_id_search->second;
     message_t type_message(sizeof(int));
-    static_cast<int *>(type_message.data())[0] =
-        static_cast<int>(MessageType::ContainerContent);
+    static_cast<int *>(type_message.data())[0] = static_cast<int>(MessageType::ContainerContent);
     message_t id_message(sizeof(int));
     memcpy(id_message.data(), &std::get<1>(request), sizeof(int));
 
@@ -239,8 +194,7 @@ void RPCService::send_messages(socket_t &socket, int max_num_messages) {
         auto cur_time = std::chrono::system_clock::now();
         lineage.get()->add_timestamp(
             "clipper::sent_rpc",
-            std::chrono::duration_cast<std::chrono::microseconds>(
-                cur_time.time_since_epoch())
+            std::chrono::duration_cast<std::chrono::microseconds>(cur_time.time_since_epoch())
                 .count());
       }
 
@@ -253,13 +207,6 @@ void RPCService::send_messages(socket_t &socket, int max_num_messages) {
       }
       cur_msg_num += 1;
     }
-
-    int msg_id = std::get<1>(request);
-    auto outbound_timestamp = std::chrono::system_clock::now();
-    msg_id_timestamp_map_.emplace(msg_id, std::move(outbound_timestamp));
-
-    // long long curr_system_time = clock::ClipperClock::get_clock().get_uptime();
-    // model_send_times_->insert(curr_system_time);
   }
 }
 
@@ -273,8 +220,7 @@ void RPCService::receive_message(socket_t &socket) {
   socket.recv(&msg_zmq_connection_id, 0);
   socket.recv(&msg_type, 0);
 
-  MessageType type =
-      static_cast<MessageType>(static_cast<int *>(msg_type.data())[0]);
+  MessageType type = static_cast<MessageType>(static_cast<int *>(msg_type.data())[0]);
 
   int zmq_connection_id = static_cast<int *>(msg_zmq_connection_id.data())[0];
   if (type != MessageType::ContainerContent) {
@@ -303,23 +249,17 @@ void RPCService::receive_message(socket_t &socket) {
   socket.recv(&msg_container_recv, 0);
   socket.recv(&msg_container_send, 0);
 
-  long long container_recv =
-      std::llround(static_cast<double *>(msg_container_recv.data())[0]);
-  long long container_send =
-      std::llround(static_cast<double *>(msg_container_send.data())[0]);
+  long long container_recv = std::llround(static_cast<double *>(msg_container_recv.data())[0]);
+  long long container_send = std::llround(static_cast<double *>(msg_container_send.data())[0]);
 
   auto clipper_recv_time = std::chrono::system_clock::now();
-
-
 
   log_info(LOGGING_TAG_RPC, "response received");
   int id = static_cast<int *>(msg_id.data())[0];
   RPCResponse response(id, content_data_type, msg_content_buffer);
 
-  std::lock_guard<std::mutex> connections_container_map_lock(
-      connections_containers_map_mutex_);
-  auto container_info_entry =
-      connections_containers_map_.find(zmq_connection_id);
+  std::lock_guard<std::mutex> connections_container_map_lock(connections_containers_map_mutex_);
+  auto container_info_entry = connections_containers_map_.find(zmq_connection_id);
   if (container_info_entry == connections_containers_map_.end()) {
     std::stringstream ss;
     ss << "Failed to find container with ID " << zmq_connection_id;
@@ -327,40 +267,20 @@ void RPCService::receive_message(socket_t &socket) {
     throw std::runtime_error(ss.str());
   }
 
-  // auto outbound_timestamp = msg_id_timestamp_map_.find(id)->second;
-  std::string model_name = msg_id_models_map_.find(id)->second;
-  // auto model_latencies_list =
-  // model_processing_latencies_.find(model_name)->second;
+  std::vector<ContainerModelDataItem> container_info = container_info_entry->second;
+  ContainerId container_id = get_container_id(container_info);
 
-  // auto inbound_timestamp = std::chrono::system_clock::now();
-  // long model_processing_latency =
-  //     std::chrono::duration_cast<std::chrono::milliseconds>(inbound_timestamp -
-  //                                                           outbound_timestamp)
-  //         .count();
-
-  // model_latencies_list->insert(model_processing_latency);
-  msg_id_timestamp_map_.erase(id);
-  msg_id_models_map_.erase(id);
-
-  std::pair<VersionedModelId, int> container_info =
-      container_info_entry->second;
-
-  VersionedModelId vm = container_info.first;
-  int replica_id = container_info.second;
-  TaskExecutionThreadPool::submit_job(vm, replica_id, new_response_callback_,
-      response, container_recv, container_send,
-      std::chrono::duration_cast<std::chrono::microseconds>(
-        clipper_recv_time.time_since_epoch())
-      .count());
-  TaskExecutionThreadPool::submit_job(vm, replica_id, container_ready_callback_,
-                                      vm, replica_id);
+  TaskExecutionThreadPool::submit_job(
+      container_id, new_response_callback_, response, container_recv, container_send,
+      std::chrono::duration_cast<std::chrono::microseconds>(clipper_recv_time.time_since_epoch())
+          .count());
+  TaskExecutionThreadPool::submit_job(container_id, container_ready_callback_, vm, replica_id);
 
   response_queue_->enqueue(response);
 }
 
-void RPCService::handle_new_connection(
-    socket_t &socket, int &zmq_connection_id,
-    std::shared_ptr<redox::Redox> redis_connection) {
+void RPCService::handle_new_connection(socket_t &socket, int &zmq_connection_id,
+                                       std::shared_ptr<redox::Redox> redis_connection) {
   std::cout << "New connection detected" << std::endl;
 
   message_t msg_routing_identity;
@@ -371,16 +291,13 @@ void RPCService::handle_new_connection(
   socket.recv(&msg_delimiter, 0);
   socket.recv(&msg_type, 0);
 
-  MessageType type =
-      static_cast<MessageType>(static_cast<int *>(msg_type.data())[0]);
+  MessageType type = static_cast<MessageType>(static_cast<int *>(msg_type.data())[0]);
 
   if (type != MessageType::NewContainer) {
     std::stringstream ss;
     ss << "Wrong message type in RPCService::HandleNewConnection. Expected ";
-    ss << static_cast<std::underlying_type<MessageType>::type>(
-        MessageType::NewContainer);
-    ss << ". Found "
-       << static_cast<std::underlying_type<MessageType>::type>(type);
+    ss << static_cast<std::underlying_type<MessageType>::type>(MessageType::NewContainer);
+    ss << ". Found " << static_cast<std::underlying_type<MessageType>::type>(type);
     throw std::runtime_error(ss.str());
   }
 
@@ -390,41 +307,41 @@ void RPCService::handle_new_connection(
 
   int curr_zmq_connection_id = zmq_connection_id;
   std::lock_guard<std::mutex> lock(connection_routing_mutex_);
-  connection_routing_map_.emplace(curr_zmq_connection_id,
-                                  std::move(routing_id));
+  connection_routing_map_.emplace(curr_zmq_connection_id, std::move(routing_id));
 
-  message_t model_name;
-  message_t model_version;
-  message_t model_input_type;
-  socket.recv(&model_name, 0);
-  socket.recv(&model_version, 0);
-  socket.recv(&model_input_type, 0);
+  message_t msg_num_models;
+  socket.recv(&msg_num_models, 0);
+  uint32_t num_models = static_cast<uint32_t *>(msg_num_models.data())[0];
 
-  std::string name(static_cast<char *>(model_name.data()), model_name.size());
-  std::string version(static_cast<char *>(model_version.data()),
-                      model_version.size());
-  std::string input_type_str(static_cast<char *>(model_input_type.data()),
-                             model_input_type.size());
+  std::vector<ContainerModelDataItem> container_models;
+  container_models.reserve(num_models);
 
-  DataType input_type = static_cast<DataType>(std::stoi(input_type_str));
+  for (size_t i = 0; i < num_models; ++i) {
+    message_t msg_model_name;
+    message_t msg_model_versionl socket.recv(&msg_model_name, 0);
+    socket.recv(&model_version, 0);
+    std::string model_name(static_cast<char *>(msg_model_name.data()), msg_model_name.size());
+    std::string version(static_cast<char *>(msg_model_version.data()), msg_model_version.size());
 
-  VersionedModelId model = VersionedModelId(name, version);
+    VersionedModelId model_id = std::make_pair(model_name, model_version);
+    container_models.push_back(model_id);
 
-  // Note that if the map does not have an entry for this model,
-  // a new entry will be created with the default value (0).
-  // This use of operator[] avoids the boilerplate of having to
-  // check if the key is present in the map.
-  int cur_replica_id = replica_ids_[model];
-  replica_ids_[model] = cur_replica_id + 1;
-  redis::add_container(*redis_connection, model, cur_replica_id,
-                       curr_zmq_connection_id, input_type);
-  std::lock_guard<std::mutex> connections_container_map_lock(
-      connections_containers_map_mutex_);
-  connections_containers_map_.emplace(
-      curr_zmq_connection_id,
-      std::pair<VersionedModelId, int>(model, cur_replica_id));
+    // Note that if the map does not have an entry for this model,
+    // a new entry will be created with the default value (0).
+    // This use of operator[] avoids the boilerplate of having to
+    // check if the key is present in the map.
+    int model_replica_id = replica_ids_[model];
+    replica_ids_[model] = model_replica_id + 1;
+    container_models.push_back(std::make_pair(model_id, model_replica_id));
+  }
 
-  TaskExecutionThreadPool::create_queue(model, cur_replica_id);
+  redis::add_container(*redis_connection, container_models, curr_zmq_connection_id, input_type);
+  std::lock_guard<std::mutex> connections_container_map_lock(connections_containers_map_mutex_);
+  connections_containers_map_.emplace(curr_zmq_connection_id, container_models);
+
+  size_t container_id = get_container_id(container_models);
+
+  TaskExecutionThreadPool::create_queue(container_id);
 
   zmq::message_t msg_zmq_connection_id(sizeof(int));
   memcpy(msg_zmq_connection_id.data(), &curr_zmq_connection_id, sizeof(int));

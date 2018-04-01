@@ -1,4 +1,3 @@
-
 #include <chrono>
 #include <iostream>
 #include <memory>
@@ -20,54 +19,58 @@ namespace clipper {
 
 const std::string LOGGING_TAG_CONTAINERS = "CONTAINERS";
 
-ModelContainer::ModelContainer(VersionedModelId model, int container_id,
-                               int replica_id, DataType input_type, int batch_size)
+ContainerId get_container_id(std::vector<ContainerModelDataItem> &container_data) {
+  ContainerId container_id = 0;
+  for (auto &model_item : container_info) {
+    boost::hash_combine(container_id, model_item.first.get_name());
+    boost::hash_combine(container_id, model_item.first.get_id());
+    boost::hash_combine(container_id, model_item.second);
+  }
+  return container_id;
+}
+
+ModelContainer::ModelContainer(VersionedModelId model, int container_id, int replica_id,
+                               DataType input_type, int batch_size)
     : model_(model),
       container_id_(container_id),
       replica_id_(replica_id),
       input_type_(input_type),
       batch_size_(batch_size),
-      latency_hist_("container:" + model.serialize() + ":" +
-                        std::to_string(replica_id) + ":prediction_latency",
+      latency_hist_("container:" + model.serialize() + ":" + std::to_string(replica_id) +
+                        ":prediction_latency",
                     "microseconds", HISTOGRAM_SAMPLE_SIZE),
       avg_throughput_per_milli_(0),
       throughput_buffer_(THROUGHPUT_BUFFER_CAPACITY) {
   std::string model_str = model.serialize();
-  log_info_formatted(LOGGING_TAG_CONTAINERS,
-                     "Creating new ModelContainer for model {}, id: {}",
+  log_info_formatted(LOGGING_TAG_CONTAINERS, "Creating new ModelContainer for model {}, id: {}",
                      model_str, std::to_string(container_id));
 }
 
-void ModelContainer::update_throughput(size_t batch_size,
-                                       long total_latency_micros) {
+void ModelContainer::update_throughput(size_t batch_size, long total_latency_micros) {
   if (batch_size <= 0 || total_latency_micros <= 0) {
-    throw std::invalid_argument(
-        "Batch size and latency must be positive for throughput updates!");
+    throw std::invalid_argument("Batch size and latency must be positive for throughput updates!");
   }
 
   latency_hist_.insert(total_latency_micros);
 
   boost::unique_lock<boost::shared_mutex> lock(throughput_mutex_);
-  double new_throughput = 1000 * (static_cast<double>(batch_size) /
-                                  static_cast<double>(total_latency_micros));
-  double old_total_throughput =
-      avg_throughput_per_milli_ * throughput_buffer_.size();
+  double new_throughput =
+      1000 * (static_cast<double>(batch_size) / static_cast<double>(total_latency_micros));
+  double old_total_throughput = avg_throughput_per_milli_ * throughput_buffer_.size();
   if (throughput_buffer_.size() == throughput_buffer_.capacity()) {
     // If the throughput buffer is already at maximum capacity,
     // we replace the oldest throughput sample with
     // the latest throughput and recalculate the average
     double oldest_throughput = throughput_buffer_.front();
-    double new_total_throughput =
-        (old_total_throughput - oldest_throughput + new_throughput);
+    double new_total_throughput = (old_total_throughput - oldest_throughput + new_throughput);
     avg_throughput_per_milli_ =
         new_total_throughput / static_cast<double>(throughput_buffer_.size());
   } else {
     // If the throughput buffer is not yet at capacity,
     // we add the latest throughput sample to the buffer
     // and incorporate it into the average
-    avg_throughput_per_milli_ =
-        (old_total_throughput + new_throughput) /
-        static_cast<double>(throughput_buffer_.size() + 1);
+    avg_throughput_per_milli_ = (old_total_throughput + new_throughput) /
+                                static_cast<double>(throughput_buffer_.size() + 1);
   }
   throughput_buffer_.push_back(new_throughput);
 }
@@ -77,39 +80,33 @@ double ModelContainer::get_average_throughput_per_millisecond() {
   return avg_throughput_per_milli_;
 }
 
-size_t ModelContainer::get_batch_size(Deadline deadline) {
-  return batch_size_;
-}
+size_t ModelContainer::get_batch_size(Deadline deadline) { return batch_size_; }
 
-void ModelContainer::set_batch_size(int batch_size) {
-  batch_size_ = batch_size;
-}
+void ModelContainer::set_batch_size(int batch_size) { batch_size_ = batch_size; }
 
 ActiveContainers::ActiveContainers()
     : containers_(
-          std::unordered_map<VersionedModelId,
-                             std::map<int, std::shared_ptr<ModelContainer>>>(
-              {})),
-      batch_sizes_(std::unordered_map<VersionedModelId, int>()){}
+          std::unordered_map<VersionedModelId, std::map<int, std::shared_ptr<ModelContainer>>>({})),
+      batch_sizes_(std::unordered_map<VersionedModelId, int>()) {}
 
-void ActiveContainers::add_container(VersionedModelId model, int connection_id,
-                                     int replica_id, DataType input_type) {
+void ActiveContainers::add_container(VersionedModelId model, int connection_id, int replica_id,
+                                     DataType input_type) {
   log_info_formatted(LOGGING_TAG_CONTAINERS,
                      "Adding new container - model: {}, version: {}, "
                      "connection ID: {}, replica ID: {}, input_type: {}",
-                     model.get_name(), model.get_id(), connection_id,
-                     replica_id, get_readable_input_type(input_type));
+                     model.get_name(), model.get_id(), connection_id, replica_id,
+                     get_readable_input_type(input_type));
   boost::unique_lock<boost::shared_mutex> l{m_};
 
   // Set a default batch size of 1
   int batch_size = 1;
   auto batch_size_search = batch_sizes_.find(model);
-  if(batch_size_search != batch_sizes_.end()) {
+  if (batch_size_search != batch_sizes_.end()) {
     batch_size = batch_size_search->second;
   }
 
-  auto new_container = std::make_shared<ModelContainer>(model, connection_id,
-                                                        replica_id, input_type, batch_size);
+  auto new_container =
+      std::make_shared<ModelContainer>(model, connection_id, replica_id, input_type, batch_size);
   auto entry = containers_[new_container->model_];
   entry.emplace(replica_id, new_container);
   containers_[new_container->model_] = entry;
@@ -119,33 +116,29 @@ void ActiveContainers::add_container(VersionedModelId model, int connection_id,
   for (auto model : containers_) {
     log_msg << "\tModel: " << model.first.serialize() << "\n";
     for (auto r : model.second) {
-      log_msg << "\t\trep_id: " << r.first
-              << ", container_id: " << r.second->container_id_ << "\n";
+      log_msg << "\t\trep_id: " << r.first << ", container_id: " << r.second->container_id_ << "\n";
     }
   }
   log_info(LOGGING_TAG_CONTAINERS, log_msg.str());
 }
 
-std::shared_ptr<ModelContainer> ActiveContainers::get_model_replica(
-    const VersionedModelId &model, const int replica_id) {
+std::shared_ptr<ModelContainer> ActiveContainers::get_model_replica(const VersionedModelId &model,
+                                                                    const int replica_id) {
   boost::shared_lock<boost::shared_mutex> l{m_};
 
   auto replicas_map_entry = containers_.find(model);
   if (replicas_map_entry == containers_.end()) {
-    log_error_formatted(LOGGING_TAG_CONTAINERS,
-                        "Requested replica {} for model {} NOT FOUND",
+    log_error_formatted(LOGGING_TAG_CONTAINERS, "Requested replica {} for model {} NOT FOUND",
                         replica_id, model.serialize());
     return nullptr;
   }
 
-  std::map<int, std::shared_ptr<ModelContainer>> replicas_map =
-      replicas_map_entry->second;
+  std::map<int, std::shared_ptr<ModelContainer>> replicas_map = replicas_map_entry->second;
   auto replica_entry = replicas_map.find(replica_id);
   if (replica_entry != replicas_map.end()) {
     return replica_entry->second;
   } else {
-    log_error_formatted(LOGGING_TAG_CONTAINERS,
-                        "Requested replica {} for model {} NOT FOUND",
+    log_error_formatted(LOGGING_TAG_CONTAINERS, "Requested replica {} for model {} NOT FOUND",
                         replica_id, model.serialize());
     return nullptr;
   }
@@ -162,16 +155,15 @@ std::vector<VersionedModelId> ActiveContainers::get_known_models() {
 
 void ActiveContainers::register_batch_size(VersionedModelId model, int batch_size) {
   auto batch_size_entry = batch_sizes_.find(model);
-  if(batch_size_entry != batch_sizes_.end()) {
+  if (batch_size_entry != batch_sizes_.end()) {
     batch_sizes_.erase(model);
   }
   batch_sizes_.emplace(model, batch_size);
   auto matching_containers_entry = containers_.find(model);
-  if(matching_containers_entry != containers_.end()) {
-    for(auto &container : matching_containers_entry->second) {
+  if (matching_containers_entry != containers_.end()) {
+    for (auto &container : matching_containers_entry->second) {
       container.second->set_batch_size(batch_size);
     }
   }
 }
-
 }

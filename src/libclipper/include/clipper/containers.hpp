@@ -1,4 +1,3 @@
-
 #ifndef CLIPPER_LIB_CONTAINERS_HPP
 #define CLIPPER_LIB_CONTAINERS_HPP
 
@@ -18,11 +17,21 @@ namespace clipper {
 // due to its cross-platform consistency (consistent epoch, resolution)
 using Deadline = std::chrono::time_point<std::chrono::system_clock>;
 
+// Pair of model id, replica id
+using ContainerModelDataItem = std::pair<VersionedModelId, int>;
+
+using ContainerId = size_t;
+
+// Computes a stable, unique identifier for a container
+// based on its constituent model. Stability is guaranteed
+// as long as the container info vector order is maintained
+ContainerId get_container_id(std::vector<ContainerModelDataItem> &container_data);
+
 class ModelContainer {
  public:
   ~ModelContainer() = default;
-  ModelContainer(VersionedModelId model, int container_id, int replica_id,
-                 DataType input_type, int batch_size);
+  ModelContainer(VersionedModelId model, int container_id, int replica_id, DataType input_type,
+                 int batch_size);
   // disallow copy
   ModelContainer(const ModelContainer &) = delete;
   ModelContainer &operator=(const ModelContainer &) = delete;
@@ -74,8 +83,8 @@ class ActiveContainers {
   /// provided model id and replica id. This is threadsafe because each
   /// individual ModelContainer object is threadsafe, and this method returns
   /// a shared_ptr to a ModelContainer object.
-  std::shared_ptr<ModelContainer> get_model_replica(
-      const VersionedModelId &model, const int replica_id);
+  std::shared_ptr<ModelContainer> get_model_replica(const VersionedModelId &model,
+                                                    const int replica_id);
 
   /// Get list of all models that have at least one active replica.
   std::vector<VersionedModelId> get_known_models();
@@ -88,9 +97,7 @@ class ActiveContainers {
 
   // A mapping of models to their replicas. The replicas
   // for each model are represented as a map keyed on replica id.
-  std::unordered_map<VersionedModelId,
-                     std::map<int, std::shared_ptr<ModelContainer>>>
-      containers_;
+  std::unordered_map<VersionedModelId, std::map<int, std::shared_ptr<ModelContainer>>> containers_;
   std::unordered_map<VersionedModelId, int> batch_sizes_;
 };
 }
