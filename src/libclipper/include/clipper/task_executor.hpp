@@ -557,8 +557,8 @@ class TaskExecutor {
                                container->replica_id_, b.input_, b.query_id_, b.lineage_);
       }
       std::string model_name = model_id.get_name();
-      int message_id = rpc_->send_message(model_name, construct_batch_message(batch_tasks),
-                                          container->container_id_);
+      int message_id =
+          rpc_->send_message(construct_batch_message(batch_tasks), container->connection_id);
       inflight_messages_.emplace(message_id, std::move(cur_batch));
     } else {
       log_error_formatted(LOGGING_TAG_TASK_EXECUTOR,

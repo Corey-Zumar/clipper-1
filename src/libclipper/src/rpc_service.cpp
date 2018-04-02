@@ -119,7 +119,7 @@ void RPCService::stop() {
   }
 }
 
-int RPCService::send_message(std::vector<RPCRequestItem> items, const int zmq_connection_id) {
+int RPCService::send_message(std::vector<zmq::message_t> items, const int zmq_connection_id) {
   if (!active_) {
     log_error(LOGGING_TAG_RPC, "Cannot send message to inactive RPCService instance",
               "Dropping Message");
@@ -188,22 +188,12 @@ void RPCService::send_messages(socket_t &socket, int max_num_messages) {
     int cur_msg_num = 0;
     // subtract 1 because we start counting at 0
     int last_msg_num = std::get<2>(request).size() - 1;
-    for (RPCRequestItem &cur_item : std::get<2>(request)) {
-      boost::optional<std::shared_ptr<QueryLineage>> lineage = cur_item.first;
-      if (lineage) {
-        auto cur_time = std::chrono::system_clock::now();
-        lineage.get()->add_timestamp(
-            "clipper::sent_rpc",
-            std::chrono::duration_cast<std::chrono::microseconds>(cur_time.time_since_epoch())
-                .count());
-      }
-
-      zmq::message_t &cur_message = cur_item.second;
+    for (auto &cur_msg : std::get<2>(request)) {
       // send the sndmore flag unless we are on the last message part
       if (cur_msg_num < last_msg_num) {
-        socket.send(cur_message, ZMQ_SNDMORE);
+        socket.send(cur_msg, ZMQ_SNDMORE);
       } else {
-        socket.send(cur_message);
+        socket.send(cur_msg);
       }
       cur_msg_num += 1;
     }
@@ -335,7 +325,7 @@ void RPCService::handle_new_connection(socket_t &socket, int &zmq_connection_id,
     container_models.push_back(std::make_pair(model_id, model_replica_id));
   }
 
-  redis::add_container(*redis_connection, container_models, curr_zmq_connection_id, input_type);
+  redis::add_container(*redis_connection, container_models, curr_zmq_connection_id);
   std::lock_guard<std::mutex> connections_container_map_lock(connections_containers_map_mutex_);
   connections_containers_map_.emplace(curr_zmq_connection_id, container_models);
 

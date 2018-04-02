@@ -31,11 +31,8 @@ const std::string LOGGING_TAG_RPC = "RPC";
 // Tuple of msg_id, data_type, binary data
 using RPCResponse = std::tuple<int, DataType, std::shared_ptr<void>>;
 
-// Tuple of query_id, zmq message contents
-using RPCRequestItem = std::pair<boost::optional<std::shared_ptr<QueryLineage>>, zmq::message_t>;
-
 /// Tuple of zmq_connection_id, message_id, vector of messages, creation time
-using RPCRequest = std::tuple<int, int, std::vector<RPCRequestItem>, long>;
+using RPCRequest = std::tuple<int, int, std::vector<zmq::message_t>, long>;
 
 enum class RPCEvent {
   SentHeartbeat = 1,
@@ -72,7 +69,7 @@ class RPCService {
    */
   void stop();
 
-  int send_message(std::vector<RPCRequestItem> msg, const int zmq_connection_id);
+  int send_message(std::vector<zmq::message_t> msg, const int zmq_connection_id);
 
  private:
   void manage_send_service(const string address);

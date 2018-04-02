@@ -13,8 +13,7 @@
 namespace clipper {
 
 template <typename T>
-size_t serialize_to_buffer(const std::shared_ptr<T> &data, const size_t size,
-                           uint8_t *buf) {
+size_t serialize_to_buffer(const std::shared_ptr<T> &data, const size_t size, uint8_t *buf) {
   size_t amt_to_write = size * (sizeof(T) / sizeof(uint8_t));
   memcpy(buf, data.get(), amt_to_write);
   return amt_to_write;
@@ -41,11 +40,9 @@ DataType parse_input_type(std::string type_string) {
     //            type_string == "integer" || type_string == "int" ||
     //            type_string == "i") {
     //   return DataType::Ints;
-  } else if (type_string == "floats" || type_string == "float" ||
-             type_string == "f") {
+  } else if (type_string == "floats" || type_string == "float" || type_string == "f") {
     return DataType::Floats;
-  } else if (type_string == "doubles" || type_string == "double" ||
-             type_string == "d") {
+  } else if (type_string == "doubles" || type_string == "double" || type_string == "d") {
     return DataType::Doubles;
     // } else if (type_string == "strings" || type_string == "string" ||
     //            type_string == "str" || type_string == "strs" ||
@@ -105,40 +102,31 @@ Output::Output(const std::shared_ptr<OutputData> y_hat,
     : y_hat_(std::move(y_hat)), models_used_(models_used) {}
 
 bool Output::operator==(const Output &rhs) const {
-  return (y_hat_->hash() == rhs.y_hat_->hash() &&
-          models_used_ == rhs.models_used_);
+  return (y_hat_->hash() == rhs.y_hat_->hash() && models_used_ == rhs.models_used_);
 }
 
 bool Output::operator!=(const Output &rhs) const {
-  return !(y_hat_->hash() == rhs.y_hat_->hash() &&
-           models_used_ == rhs.models_used_);
+  return !(y_hat_->hash() == rhs.y_hat_->hash() && models_used_ == rhs.models_used_);
 }
 
-InputVector::InputVector(void *data, size_t size_typed, size_t size_bytes,
-                         DataType type)
-    : data_(data),
-      size_typed_(size_typed),
-      size_bytes_(size_bytes),
-      type_(type) {}
+InputVector::InputVector(void *data, size_t size_typed, size_t size_bytes, DataType type)
+    : data_(data), size_typed_(size_typed), size_bytes_(size_bytes), type_(type) {}
 
-std::shared_ptr<OutputData> OutputData::create_output(
-    DataType type, std::shared_ptr<void> data, size_t start, size_t end) {
+std::shared_ptr<OutputData> OutputData::create_output(DataType type, std::shared_ptr<void> data,
+                                                      size_t start, size_t end) {
   switch (type) {
     case DataType::Bytes:
-      return std::make_shared<ByteVectorOutput>(
-          std::static_pointer_cast<uint8_t>(data), start, end);
+      return std::make_shared<ByteVectorOutput>(std::static_pointer_cast<uint8_t>(data), start,
+                                                end);
     case DataType::Ints:
-      return std::make_shared<IntVectorOutput>(
-          std::static_pointer_cast<int>(data), start / sizeof(int),
-          end / sizeof(int));
+      return std::make_shared<IntVectorOutput>(std::static_pointer_cast<int>(data),
+                                               start / sizeof(int), end / sizeof(int));
     case DataType::Floats:
-      return std::make_shared<FloatVectorOutput>(
-          std::static_pointer_cast<float>(data), start / sizeof(float),
-          end / sizeof(float));
+      return std::make_shared<FloatVectorOutput>(std::static_pointer_cast<float>(data),
+                                                 start / sizeof(float), end / sizeof(float));
     case DataType::Strings:
-      return std::make_shared<StringOutput>(
-          std::static_pointer_cast<char>(data), start / sizeof(char),
-          end / sizeof(char));
+      return std::make_shared<StringOutput>(std::static_pointer_cast<char>(data),
+                                            start / sizeof(char), end / sizeof(char));
     case DataType::Doubles:
     case DataType::Invalid:
     default:
@@ -149,8 +137,7 @@ std::shared_ptr<OutputData> OutputData::create_output(
   }
 }
 
-ByteVectorOutput::ByteVectorOutput(std::shared_ptr<uint8_t> data, size_t start,
-                                   size_t end)
+ByteVectorOutput::ByteVectorOutput(std::shared_ptr<uint8_t> data, size_t start, size_t end)
     : data_(data), start_(start), end_(end) {}
 
 size_t ByteVectorOutput::size() const { return end_ - start_; }
@@ -170,15 +157,12 @@ size_t ByteVectorOutput::serialize(void *buf) const {
 
 void *ByteVectorOutput::get_data() const { return data_.get() + start_; }
 
-IntVectorOutput::IntVectorOutput(std::shared_ptr<int> data, size_t start,
-                                 size_t end)
+IntVectorOutput::IntVectorOutput(std::shared_ptr<int> data, size_t start, size_t end)
     : data_(data), start_(start), end_(end) {}
 
 size_t IntVectorOutput::size() const { return end_ - start_; }
 
-size_t IntVectorOutput::byte_size() const {
-  return (end_ - start_) * sizeof(int);
-}
+size_t IntVectorOutput::byte_size() const { return (end_ - start_) * sizeof(int); }
 
 size_t IntVectorOutput::hash() const {
   return boost::hash_range(data_.get() + start_, data_.get() + end_);
@@ -193,15 +177,12 @@ size_t IntVectorOutput::serialize(void *buf) const {
 
 void *IntVectorOutput::get_data() const { return data_.get() + start_; }
 
-FloatVectorOutput::FloatVectorOutput(std::shared_ptr<float> data, size_t start,
-                                     size_t end)
+FloatVectorOutput::FloatVectorOutput(std::shared_ptr<float> data, size_t start, size_t end)
     : data_(data), start_(start), end_(end) {}
 
 size_t FloatVectorOutput::size() const { return end_ - start_; }
 
-size_t FloatVectorOutput::byte_size() const {
-  return (end_ - start_) * sizeof(float);
-}
+size_t FloatVectorOutput::byte_size() const { return (end_ - start_) * sizeof(float); }
 
 size_t FloatVectorOutput::hash() const {
   return boost::hash_range(data_.get() + start_, data_.get() + end_);
@@ -221,9 +202,7 @@ StringOutput::StringOutput(std::shared_ptr<char> data, size_t start, size_t end)
 
 size_t StringOutput::size() const { return end_ - start_; }
 
-size_t StringOutput::byte_size() const {
-  return (end_ - start_) * sizeof(char);
-}
+size_t StringOutput::byte_size() const { return (end_ - start_) * sizeof(char); }
 
 size_t StringOutput::hash() const {
   return boost::hash_range(data_.get() + start_, data_.get() + end_);
@@ -345,19 +324,16 @@ void *StringOutput::get_data() const { return data_.get() + start_; }
 //   return serialized_request;
 // }
 
-rpc::PredictionResponse::PredictionResponse(
-    const std::vector<std::shared_ptr<OutputData>> outputs)
+rpc::PredictionResponse::PredictionResponse(const std::vector<std::shared_ptr<OutputData>> outputs)
     : outputs_(outputs) {}
 
-rpc::PredictionResponse
-rpc::PredictionResponse::deserialize_prediction_response(
+rpc::PredictionResponse rpc::PredictionResponse::deserialize_prediction_response(
     DataType data_type, std::shared_ptr<void> &data) {
   std::vector<std::shared_ptr<OutputData>> outputs;
   uint32_t *output_lengths_data = reinterpret_cast<uint32_t *>(data.get());
   uint32_t num_outputs = output_lengths_data[0];
   output_lengths_data++;
-  size_t curr_output_index =
-      sizeof(uint32_t) + (num_outputs * sizeof(uint32_t));
+  size_t curr_output_index = sizeof(uint32_t) + (num_outputs * sizeof(uint32_t));
   for (uint32_t i = 0; i < num_outputs; i++) {
     uint32_t output_length = output_lengths_data[i];
     std::shared_ptr<OutputData> output = OutputData::create_output(
@@ -389,10 +365,8 @@ rpc::PredictionResponse::deserialize_prediction_response(
 //       output_is_default_(output_is_default),
 //       default_explanation_(std::move(default_explanation)) {}
 
-PredictTask::PredictTask(InputVector input, VersionedModelId model,
-                         float utility, QueryId query_id,
-                         long latency_slo_micros,
-                         std::shared_ptr<QueryLineage> lineage)
+PredictTask::PredictTask(InputVector input, VersionedModelId model, float utility, QueryId query_id,
+                         long latency_slo_micros, std::shared_ptr<QueryLineage> lineage)
     : input_(input),
       model_(model),
       utility_(utility),

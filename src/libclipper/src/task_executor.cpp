@@ -150,13 +150,13 @@ std::vector<rpc::RPCRequestItem> construct_batch_message(std::vector<PredictTask
   uint32_t *request_metadata = static_cast<uint32_t *>(malloc(request_metadata_size));
   request_metadata[0] = static_cast<uint32_t>(RequestType::PredictRequest);
 
-  size_t input_metadata_size = (2 + tasks.size()) * sizeof(uint32_t);
+  size_t input_metadata_size = (1 + (tasks.size() * 2)) * sizeof(uint32_t);
   uint32_t *input_metadata = static_cast<uint32_t *>(malloc(input_metadata_size));
-  input_metadata[0] = static_cast<uint32_t>(tasks[0].input_.type_);
-  input_metadata[1] = static_cast<uint32_t>(tasks.size());
+  input_metadata[0] = static_cast<uint32_t>(tasks.size());
 
   for (size_t i = 0; i < tasks.size(); ++i) {
-    input_metadata[i + 2] = static_cast<uint32_t>(tasks[i].input_.size_bytes_);
+    input_metadata[(2 * i) + 1] = static_cast<uint32_t>(tasks[i].input_.type_);
+    input_metadata[(2 * i) + 2] = static_cast<uint32_t>(tasks[i].input_.size_bytes_);
   }
 
   size_t input_metadata_size_buf_size = 1 * sizeof(long);
@@ -166,31 +166,24 @@ std::vector<rpc::RPCRequestItem> construct_batch_message(std::vector<PredictTask
   // buffer allocation in the receiving container
   input_metadata_size_buf[0] = input_metadata_size;
 
-  // serialized_request.push_back(std::make_pair(
-  //     reinterpret_cast<void *>(request_metadata), request_metadata_size));
-  messages.emplace_back(std::make_pair(boost::optional<std::shared_ptr<QueryLineage>>(),
-                                       zmq::message_t(reinterpret_cast<void *>(request_metadata),
-                                                      request_metadata_size, real_free)));
-  // serialized_request.push_back(
-  //     std::make_pair(reinterpret_cast<void *>(input_metadata_size_buf),
-  //                    input_metadata_size_buf_size));
   messages.emplace_back(
-      std::make_pair(boost::optional<std::shared_ptr<QueryLineage>>(),
-                     zmq::message_t(reinterpret_cast<void *>(input_metadata_size_buf),
-                                    input_metadata_size_buf_size, real_free)));
-  // serialized_request.push_back(std::make_pair(
-  //     reinterpret_cast<void *>(input_metadata), input_metadata_size));
-  messages.emplace_back(std::make_pair(
-      boost::optional<std::shared_ptr<QueryLineage>>(),
-      zmq::message_t(reinterpret_cast<void *>(input_metadata), input_metadata_size, real_free)));
+      zmq::message_t(reinterpret_cast<void *>(request_metadata), request_metadata_size, real_free));
+
+  messages.emplace_back(zmq::message_t(reinterpret_cast<void *>(input_metadata_size_buf),
+                                       input_metadata_size_buf_size, real_free));
+
+  messages.emplace_back(
+      zmq::message_t(reinterpret_cast<void *>(input_metadata), input_metadata_size, real_free));
 
   for (size_t i = 0; i < tasks.size(); ++i) {
-    // serialized_request.push_back(
-    //     std::make_pair(inputs_[i]->get_data(), inputs_[i]->byte_size()));
-    messages.emplace_back(
-        std::make_pair(boost::optional<std::shared_ptr<QueryLineage>>(tasks[i].lineage_),
-                       zmq::message_t(reinterpret_cast<void *>(tasks[i].input_.data_),
-                                      tasks[i].input_.size_bytes_, noop_free)));
+    VersionedModelId &task_vm = tasks[i].model_;
+    std::string serialized_vm = task_vm.serialize();
+    size_t model_name_size = serialized_vm.size() * sizeof(char);
+    zmq::message_t msg_model_name(model_name_size);
+    memcpy(msg_model_name.data(), serialized_vm.data(), model_name_size);
+    messages.emplace_back(std::move(msg_model_name));
+    messages.emplace_back(zmq::message_t(reinterpret_cast<void *>(tasks[i].input_.data_),
+                                         tasks[i].input_.size_bytes_, noop_free));
   }
   return messages;
 }
