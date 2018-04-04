@@ -15,6 +15,8 @@ from multiprocessing import Process, Queue
 from tf_serving_utils import GRPCClient, ReplicaAddress
 from tf_serving_utils import tfs_utils
 
+from e2e_configs import get_e2e_model_configs
+
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
     datefmt='%y-%m-%d:%H:%M:%S',
@@ -30,40 +32,15 @@ LOG_REG_MODEL_NAME = "log_reg"
 KERNEL_SVM_MODEL_NAME = "kernel_svm"
 
 CURR_DIR = os.path.dirname(os.path.realpath(__file__))
-MODEL_BASE_DIR_PATH = os.path.join(CURR_DIR, "exported_tf_models")
-
-INCEPTION_FEATS_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "inception_tfserve")
-RESNET_152_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "resnet_tfserve")
-LOG_REG_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "log_reg_tfserve")
-KERNEL_SVM_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "kernel_svm_tfserve")
 
 INCEPTION_FEATS_OUTPUT_KEY = "feats"
 RESNET_FEATS_OUTPUT_KEY = "feats"
 KERNEL_SVM_OUTPUT_KEY = "outputs"
 LOG_REG_OUTPUT_KEY = "outputs"
 
-INCEPTION_PORTS = range(9500,9508)
-RESNET_152_PORTS = range(9508, 9516)
-LOG_REG_PORTS = range(9516, 9524)
-KERNEL_SVM_PORTS = range(9524, 9532)
-
 TFS_ADDRESS = "localhost"
 
-########## Setup ##########
-
-def setup_heavy_nodes(configs):
-    """
-    Parameters
-    ------------
-    configs : dict
-        Dictionary of TFSHeavyNodeConfig objects,
-        keyed on model names
-    """
-
-    for config in configs.values():
-        tfs_utils.setup_heavy_node(config)
-
-    time.sleep(5)
+########## Client Setup ##########
 
 def create_clients(configs):
     """
@@ -81,52 +58,6 @@ def create_clients(configs):
         clients[key] = client
 
     return clients
-
-def get_heavy_node_config(model_name, batch_size, num_replicas, allocated_cpus, cpus_per_replica=2, allocated_gpus=[]):
-    if model_name == INCEPTION_FEATS_MODEL_NAME:
-        return tfs_utils.TFSHeavyNodeConfig(name=INCEPTION_FEATS_MODEL_NAME,
-                                            model_base_path=INCEPTION_FEATS_MODEL_BASE_PATH,
-                                            ports=INCEPTION_PORTS[:num_replicas],
-                                            input_type="floats",
-                                            allocated_cpus=allocated_cpus,
-                                            cpus_per_replica=cpus_per_replica,
-                                            num_replicas=num_replicas,
-                                            gpus=allocated_gpus,
-                                            batch_size=batch_size)
-
-    elif model_name == LOG_REG_MODEL_NAME:
-        return tfs_utils.TFSHeavyNodeConfig(name=LOG_REG_MODEL_NAME,
-                                            model_base_path=LOG_REG_MODEL_BASE_PATH,
-                                            ports=LOG_REG_PORTS[:num_replicas],
-                                            input_type="floats",
-                                            allocated_cpus=allocated_cpus,
-                                            cpus_per_replica=cpus_per_replica,
-                                            num_replicas=num_replicas,
-                                            gpus=allocated_gpus,
-                                            batch_size=batch_size)
-
-
-    elif model_name == RESNET_152_MODEL_NAME:
-        return tfs_utils.TFSHeavyNodeConfig(name=RESNET_152_MODEL_NAME,
-                                            model_base_path=RESNET_152_MODEL_BASE_PATH,
-                                            ports=RESNET_152_PORTS[:num_replicas],
-                                            input_type="floats",
-                                            allocated_cpus=allocated_cpus,
-                                            cpus_per_replica=cpus_per_replica,
-                                            num_replicas=num_replicas,
-                                            gpus=allocated_gpus,
-                                            batch_size=batch_size)
-
-    elif model_name == KERNEL_SVM_MODEL_NAME:
-        return tfs_utils.TFSHeavyNodeConfig(name=KERNEL_SVM_MODEL_NAME,
-                                            model_base_path=KERNEL_SVM_MODEL_BASE_PATH,
-                                            ports=KERNEL_SVM_PORTS[:num_replicas],
-                                            input_type="floats",
-                                            allocated_cpus=allocated_cpus,
-                                            cpus_per_replica=cpus_per_replica,
-                                            num_replicas=num_replicas,
-                                            gpus=allocated_gpus,
-                                            batch_size=batch_size)
 
 ########## Benchmarking ##########
 
@@ -221,7 +152,7 @@ class Predictor(object):
 
         inception_request = tfs_utils.create_predict_request(INCEPTION_FEATS_MODEL_NAME, inception_input)
         self.inception_client.predict(inception_request, inception_feats_continuation)
-
+       
     def _get_resnet_request(self, resnet_input):
         """
         Parameters
@@ -293,7 +224,7 @@ class DriverBenchmarker(object):
         self.queue = queue
         self.configs = configs
 
-    def run(self, num_trials, request_delay=.01):
+    def run(self, num_trials, request_delay=.01, arrival_process=None):
         logger.info("Creating clients!")
         clients = create_clients(self.configs)
 
@@ -303,8 +234,14 @@ class DriverBenchmarker(object):
         logger.info("Starting predictions")
         start_time = datetime.now()
         predictor = Predictor(trial_length=self.trial_length, clients=clients)
-        for resnet_input, inception_input in inputs:
+
+        for i in range(len(inputs)):
+            resnet_input, inception_input = inputs[i]
             predictor.predict(resnet_input, inception_input)
+
+            if arrival_process:
+                request_delay = arrival_process[i]
+
             time.sleep(request_delay)
 
             if len(predictor.stats["thrus"]) > num_trials:
@@ -330,59 +267,30 @@ class RequestDelayConfig:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Clipper image driver 1')
     parser.add_argument('-t', '--num_trials', type=int, default=30, help='The number of trials to complete for the benchmarking process')
-    parser.add_argument('-b', '--batch_sizes', type=int, nargs='+', help="The batch size configurations to benchmark for the model. Each configuration will be benchmarked separately.")
-    parser.add_argument('-c', '--model_cpus', type=int, nargs='+', help="The set of cpu cores on which to run replicas of the provided model")
     parser.add_argument('-rd', '--request_delay', type=float, default=.015, help="The delay, in seconds, between requests")
-    parser.add_argument('-l', '--trial_length', type=int, default=10, help="The length of each trial, in number of requests")
-    parser.add_argument('-n', '--num_clients', type=int, default=1, help='number of clients')
+    parser.add_argument('-l', '--trial_length', type=int, default=100, help="The length of each trial, in number of requests")
+    parser.add_argument('-n', '--num_clients', type=int, default=16, help='number of clients')
+    parser.add_argument('-p', '--process_file', type=str, help='The arrival process file path')
 
 
     args = parser.parse_args()
 
-    resnet_feats_config = get_heavy_node_config(model_name=RESNET_152_MODEL_NAME,
-                                                batch_size=1,
-                                                num_replicas=1,
-                                                cpus_per_replica=2,
-                                                allocated_cpus=[14,15,16,17],
-                                                allocated_gpus=[0,1,2,3])
+    model_configs = get_e2e_model_configs()
 
-    kernel_svm_config = get_heavy_node_config(model_name=KERNEL_SVM_MODEL_NAME,
-                                              batch_size=1,
-                                              num_replicas=1,
-                                              cpus_per_replica=2,
-                                              allocated_cpus=[18,19])
-
-    inception_feats_config = get_heavy_node_config(model_name=INCEPTION_FEATS_MODEL_NAME,
-                                                   batch_size=8,
-                                                   num_replicas=1,
-                                                   cpus_per_replica=2,
-                                                   allocated_cpus=[20,21,22,23],
-                                                   allocated_gpus=[4,5,6,7])
-
-    log_reg_config = get_heavy_node_config(model_name=LOG_REG_MODEL_NAME,
-                                           batch_size=16,
-                                           num_replicas=1,
-                                           cpus_per_replica=2,
-                                           allocated_cpus=[24,25])
-
-    model_configs = {
-        RESNET_152_MODEL_NAME : resnet_feats_config,
-        KERNEL_SVM_MODEL_NAME : kernel_svm_config,
-        INCEPTION_FEATS_MODEL_NAME : inception_feats_config,
-        LOG_REG_MODEL_NAME : log_reg_config
-    }
-
-    # Set up TFS nodes
-    setup_heavy_nodes(model_configs)
-
-    time.sleep(10)
     queue = Queue()
+
+    arrival_process = None
+    if args.process_file:
+        f = open(args.process_file)
+        arrival_lines = f.readlines()
+        f.close()
+        arrival_lines = np.array([float(line.rstrip()) for line in arrival_lines])
+        arrival_process = np.cumsum(arrival_lines)
 
     procs = []
     for i in range(args.num_clients):
-        clipper_metrics = (i == 0)
         benchmarker = DriverBenchmarker(args.trial_length, queue, model_configs)
-        p = Process(target=benchmarker.run, args=(args.num_trials, args.request_delay))
+        p = Process(target=benchmarker.run, args=(args.num_trials, args.request_delay, arrival_process))
         p.start()
         procs.append(p)
 
