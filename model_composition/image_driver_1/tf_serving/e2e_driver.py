@@ -306,7 +306,7 @@ if __name__ == "__main__":
 
     # Save Results
 
-    all_configs = model_configs.values() + [output_config]
+    all_configs = model_configs.values()
 
     fname = "{clients}_clients".format(clients=args.num_clients)
     tfs_utils.save_results(all_configs, all_stats, "tf_image_driver_1_exps", prefix=fname, arrival_process=args.process_file)
