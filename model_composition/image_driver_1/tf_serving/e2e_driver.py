@@ -239,7 +239,7 @@ class DriverBenchmarker(object):
             resnet_input, inception_input = inputs[i]
             predictor.predict(resnet_input, inception_input)
 
-            if arrival_process:
+            if arrival_process is not None:
                 request_delay = arrival_process[i]
 
             time.sleep(request_delay)
@@ -286,11 +286,17 @@ if __name__ == "__main__":
         f.close()
         arrival_lines = np.array([float(line.rstrip()) for line in arrival_lines])
         arrival_process = np.cumsum(arrival_lines)
+       
+        mean_throughput = (float(arrival_process[-1] - arrival_process[0]) / len(arrival_process))
+
+        args.request_delay = 1.0 / mean_throughput 
+        print("Based on mean arrival process throughput of {} qps, initialized request delay to {} seconds".format(mean_throughput, args.request_delay))
+
 
     procs = []
     for i in range(args.num_clients):
         benchmarker = DriverBenchmarker(args.trial_length, queue, model_configs)
-        p = Process(target=benchmarker.run, args=(args.num_trials, args.request_delay, arrival_process))
+        p = Process(target=benchmarker.run, args=(args.num_trials, args.request_delay, None))
         p.start()
         procs.append(p)
 
@@ -300,9 +306,8 @@ if __name__ == "__main__":
 
     # Save Results
 
-    output_config = RequestDelayConfig(args.request_delay)
     all_configs = model_configs.values() + [output_config]
 
     fname = "{clients}_clients".format(clients=args.num_clients)
-    tfs_utils.save_results(all_configs, all_stats, "tf_image_driver_1_exps", prefix=fname)
+    tfs_utils.save_results(all_configs, all_stats, "tf_image_driver_1_exps", prefix=fname, arrival_process=args.process_file)
     sys.exit(0)

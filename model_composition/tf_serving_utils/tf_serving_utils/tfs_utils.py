@@ -59,12 +59,15 @@ class TFSHeavyNodeConfig(object):
     def to_json(self):
         return json.dumps(self.__dict__)
 
-def save_results(configs, client_metrics, results_dir, prefix="results"):
+def save_results(configs, client_metrics, results_dir, prefix="results", arrival_process=None):
     """
     Parameters
     ----------
     configs : list(HeavyNodeConfig)
-        The configs for any models deployed
+       The configs for any models deployed
+    arrival_process : str (optional)
+        Path to an arrival process file used to generate experimental request
+        delays
     """
 
     results_dir = os.path.abspath(os.path.expanduser(results_dir))
@@ -76,6 +79,10 @@ def save_results(configs, client_metrics, results_dir, prefix="results"):
         "node_configs": [c.__dict__ for c in configs],
         "client_metrics": client_metrics,
     }
+
+    if arrival_process is not None:
+        results_obj["arrival_process"] = arrival_process
+
     results_file = os.path.join(results_dir, "{prefix}-{ts:%y%m%d_%H%M%S}.json".format(
         prefix=prefix, ts=datetime.now()))
     with open(results_file, "w") as f:
