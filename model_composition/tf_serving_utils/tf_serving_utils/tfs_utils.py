@@ -133,7 +133,7 @@ def _start_serving(config, port_number, cpus, gpu_number=None):
     cpus_str = ",".join(["%d"] * len(cpus)) % tuple(cpus)
     cmd_filter_cpus = "numactl -C {cpus}".format(cpus=cpus_str)
 
-    if gpu_number:
+    if gpu_number is not None:
         cmd_filter_gpus = "export CUDA_VISIBLE_DEVICES={gpu}".format(gpu=gpu_number)
     else:
         cmd_filter_gpus = "export CUDA_VISIBLE_DEVICES=''"
