@@ -16,6 +16,7 @@ from tf_serving_utils import GRPCClient, ReplicaAddress
 from tf_serving_utils import tfs_utils
 
 from e2e_configs import get_e2e_model_configs
+from e2e_utils import load_arrival_deltas, calculate_mean_throughput, calculate_peak_throughput
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -240,7 +241,7 @@ class DriverBenchmarker(object):
             predictor.predict(resnet_input, inception_input)
 
             if arrival_process is not None:
-                request_delay = arrival_process[i]
+                request_delay = arrival_process[i] * .001
 
             time.sleep(request_delay)
 
@@ -272,7 +273,6 @@ if __name__ == "__main__":
     parser.add_argument('-n', '--num_clients', type=int, default=16, help='number of clients')
     parser.add_argument('-p', '--process_file', type=str, help='The arrival process file path')
 
-
     args = parser.parse_args()
 
     model_configs = get_e2e_model_configs()
@@ -281,22 +281,16 @@ if __name__ == "__main__":
 
     arrival_process = None
     if args.process_file:
-        f = open(args.process_file)
-        arrival_lines = f.readlines()
-        f.close()
-        arrival_lines = np.array([float(line.rstrip()) for line in arrival_lines])
-        arrival_process = np.cumsum(arrival_lines)
-       
-        mean_throughput = (float(arrival_process[-1] - arrival_process[0]) / len(arrival_process))
+        arrival_process = load_arrival_deltas(args.process_file)
+        mean_throughput = calculate_mean_throughput(arrival_process)
+        peak_throughput = calculate_peak_throughput(arrival_process)
 
-        args.request_delay = 1.0 / mean_throughput 
-        print("Based on mean arrival process throughput of {} qps, initialized request delay to {} seconds".format(mean_throughput, args.request_delay))
-
-
+        print("Mean throughput: {}\nPeak throughput: {}".format(mean_throughput, peak_throughput))
+        
     procs = []
     for i in range(args.num_clients):
         benchmarker = DriverBenchmarker(args.trial_length, queue, model_configs)
-        p = Process(target=benchmarker.run, args=(args.num_trials, args.request_delay, None))
+        p = Process(target=benchmarker.run, args=(args.num_trials, args.request_delay, arrival_process))
         p.start()
         procs.append(p)
 
