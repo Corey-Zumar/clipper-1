@@ -11,6 +11,8 @@ from tensorflow_serving.apis import prediction_service_pb2
 from Queue import Queue
 from threading import Thread, Lock
 
+from datetime import datetime
+
 REQUEST_QUEUE_POLLING_DELAY_SECONDS = .005
 REQUEST_TIME_OUT_SECONDS = 30
 
@@ -35,7 +37,7 @@ class GRPCClient:
         """
 
         self.clients = [self._create_client(address) for address in replica_addrs]
-        self.request_queue = Queue(maxsize=len(self.clients))
+        self.request_queue = Queue()
 
         # TODO(czumar): Make sure this synchronization var works
         self.active = False
@@ -67,6 +69,9 @@ class GRPCClient:
         for thread in self.threads:
             thread.join()
 
+    def get_queue_size(self):
+        return self.request_queue.qsize()
+
     def _create_client(self, address):
         """
         Parameters
@@ -77,7 +82,6 @@ class GRPCClient:
         return prediction_service_pb2.beta_create_PredictionService_stub(address.get_channel())
 
     def _run(self, replica_num):
-        i = 0
         while self.active:
             input_item, callback = self.request_queue.get(block=True)
             response = self.clients[replica_num].Predict(input_item, REQUEST_TIME_OUT_SECONDS)
