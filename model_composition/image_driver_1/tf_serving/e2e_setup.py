@@ -11,7 +11,7 @@ import tensorflow as tf
 from tf_serving_utils import GRPCClient, ReplicaAddress
 from tf_serving_utils import tfs_utils
 
-from e2e_configs import get_e2e_model_configs
+from e2e_configs import get_setup_model_configs 
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -37,7 +37,7 @@ def setup_heavy_nodes(configs):
     time.sleep(5)
 
 if __name__ == "__main__":
-    model_configs = get_e2e_model_configs()
+    model_configs = get_setup_model_configs()
 
     logger.info("Setting up pipeline nodes...")
 

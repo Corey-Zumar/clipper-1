@@ -15,7 +15,7 @@ from multiprocessing import Process, Queue
 from tf_serving_utils import GRPCClient, ReplicaAddress
 from tf_serving_utils import tfs_utils
 
-from e2e_configs import get_e2e_model_configs
+from e2e_configs import get_setup_model_configs, get_benchmark_model_configs 
 from e2e_utils import load_arrival_deltas, calculate_mean_throughput, calculate_peak_throughput
 
 logging.basicConfig(
@@ -272,10 +272,14 @@ if __name__ == "__main__":
     parser.add_argument('-l', '--trial_length', type=int, default=100, help="The length of each trial, in number of requests")
     parser.add_argument('-n', '--num_clients', type=int, default=16, help='number of clients')
     parser.add_argument('-p', '--process_file', type=str, help='The arrival process file path')
+    parser.add_argument('-w', '--warmup', action='store_true')
 
     args = parser.parse_args()
-
-    model_configs = get_e2e_model_configs()
+    
+    if args.warmup:
+        model_configs = get_setup_model_configs()
+    else:
+        model_configs = get_benchmark_model_configs()
 
     queue = Queue()
 
