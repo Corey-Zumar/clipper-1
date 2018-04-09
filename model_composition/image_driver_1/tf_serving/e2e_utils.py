@@ -58,6 +58,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     deltas = load_arrival_deltas(args.process_file)
+
+    print(min(np.cumsum(deltas)))
+    print(len(deltas))
     
     mean_thru = calculate_mean_throughput(deltas)
     print(mean_thru)

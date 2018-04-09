@@ -26,6 +26,54 @@ TFS_BASE_PATH = "~/tfserving"
 
 MODEL_SERVER_RELATIVE_PATH = "bazel-bin/tensorflow_serving/model_servers/tensorflow_model_server"
 
+MILLISECONDS_PER_SECOND = 1000
+
+def load_arrival_deltas(path):
+    with open(path, "r") as f:
+        arrival_lines = f.readlines()
+        arrival_deltas = [float(line.rstrip()) for line in arrival_lines]
+
+    return arrival_deltas
+
+def calculate_mean_throughput(arrival_deltas_millis):
+    cumulative = np.cumsum(arrival_deltas_millis)
+    return MILLISECONDS_PER_SECOND * (len(cumulative) / (cumulative[-1] - cumulative[0]))
+
+def calculate_peak_throughput(arrival_deltas_millis, slo_window_millis=250):
+    cumulative = np.cumsum(arrival_deltas_millis)
+    front = 0
+    back = 1
+
+    max_window_length_queries = 0
+
+    while back < len(cumulative):
+        if front == back:
+            back += 1
+            continue
+
+        window_length_millis = cumulative[back] - cumulative[front]
+        window_length_queries = back - front
+
+        if window_length_millis <= slo_window_millis:
+            max_window_length_queries = max(max_window_length_queries, window_length_queries)
+            back += 1
+        else:
+            front += 1
+    
+    last_idx = len(cumulative) - 1
+    while front < last_idx:
+        window_length_millis = cumulative[last_idx] - cumulative[front]
+        window_length_queries = last_idx - front
+
+        if window_length_millis <= slo_window_millis:
+            max_window_length_queries = max(max_window_length_queries, window_length_queries)
+            break
+        else:
+            front += 1
+
+    peak_throughput = (MILLISECONDS_PER_SECOND * float(max_window_length_queries)) / (slo_window_millis)
+    return peak_throughput
+
 class TFSHeavyNodeConfig(object):
     def __init__(self,
                  name,
@@ -59,7 +107,7 @@ class TFSHeavyNodeConfig(object):
     def to_json(self):
         return json.dumps(self.__dict__)
 
-def save_results(configs, client_metrics, results_dir, prefix="results", arrival_process=None):
+def save_results(configs, client_metrics, results_dir, prefix="results", slo_millis=250, arrival_process=None):
     """
     Parameters
     ----------
@@ -81,7 +129,15 @@ def save_results(configs, client_metrics, results_dir, prefix="results", arrival
     }
 
     if arrival_process is not None:
-        results_obj["arrival_process"] = arrival_process
+        arrival_deltas = load_arrival_deltas(arrival_process)
+        mean_throughput = calculate_mean_throughput(arrival_deltas)
+        peak_throughput = calculate_peak_throughput(arrival_deltas, slo_millis)
+
+        results_obj["arrival_process"] = {
+            "filename" : arrival_process,
+            "mean_thru" : mean_throughput,
+            "peak_thru" : peak_throughput
+        }
 
     results_file = os.path.join(results_dir, "{prefix}-{ts:%y%m%d_%H%M%S}.json".format(
         prefix=prefix, ts=datetime.now()))

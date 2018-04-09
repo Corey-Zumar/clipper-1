@@ -16,7 +16,6 @@ from tf_serving_utils import GRPCClient, ReplicaAddress
 from tf_serving_utils import tfs_utils
 
 from e2e_configs import get_setup_model_configs, get_benchmark_model_configs 
-from e2e_utils import load_arrival_deltas, calculate_mean_throughput, calculate_peak_throughput
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -240,13 +239,13 @@ class DriverBenchmarker(object):
             resnet_input, inception_input = inputs[i]
             predictor.predict(resnet_input, inception_input)
 
+            if len(predictor.stats["thrus"]) >= num_trials:
+                break
+
             if arrival_process is not None:
                 request_delay = arrival_process[i] * .001
 
             time.sleep(request_delay)
-
-            if len(predictor.stats["thrus"]) > num_trials:
-                break
 
         self.queue.put(predictor.stats)
 
@@ -267,12 +266,13 @@ class RequestDelayConfig:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Clipper image driver 1')
-    parser.add_argument('-t', '--num_trials', type=int, default=30, help='The number of trials to complete for the benchmarking process')
     parser.add_argument('-rd', '--request_delay', type=float, default=.015, help="The delay, in seconds, between requests")
+    parser.add_argument('-t', '--num_trials', type=int, default=20, help="The number of trials to conduct")
     parser.add_argument('-l', '--trial_length', type=int, default=100, help="The length of each trial, in number of requests")
     parser.add_argument('-n', '--num_clients', type=int, default=16, help='number of clients')
     parser.add_argument('-p', '--process_file', type=str, help='The arrival process file path')
     parser.add_argument('-w', '--warmup', action='store_true')
+    parser.add_argument('-s',  '--slo_millis', type=int, help="The latency SLO, in milliseconds")
 
     args = parser.parse_args()
     
@@ -285,9 +285,9 @@ if __name__ == "__main__":
 
     arrival_process = None
     if args.process_file:
-        arrival_process = load_arrival_deltas(args.process_file)
-        mean_throughput = calculate_mean_throughput(arrival_process)
-        peak_throughput = calculate_peak_throughput(arrival_process)
+        arrival_process = tfs_utils.load_arrival_deltas(args.process_file)
+        mean_throughput = tfs_utils.calculate_mean_throughput(arrival_process)
+        peak_throughput = tfs_utils.calculate_peak_throughput(arrival_process)
 
         print("Mean throughput: {}\nPeak throughput: {}".format(mean_throughput, peak_throughput))
         
@@ -307,5 +307,5 @@ if __name__ == "__main__":
     all_configs = model_configs.values()
 
     fname = "{clients}_clients".format(clients=args.num_clients)
-    tfs_utils.save_results(all_configs, all_stats, "tf_image_driver_1_exps", prefix=fname, arrival_process=args.process_file)
+    tfs_utils.save_results(all_configs, all_stats, "tf_image_driver_1_exps", prefix=fname, slo_millis=args.slo_millis, arrival_process=args.process_file)
     sys.exit(0)
