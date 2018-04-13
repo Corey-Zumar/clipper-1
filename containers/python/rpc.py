@@ -54,29 +54,6 @@ SUPPORTED_OUTPUT_TYPES_MAPPING = {
     str: DATA_TYPE_STRINGS,
 }
 
-
-def string_to_input_type(input_str):
-    input_str = input_str.strip().lower()
-    byte_strs = ["b", "bytes", "byte"]
-    int_strs = ["i", "ints", "int", "integer", "integers"]
-    float_strs = ["f", "floats", "float"]
-    double_strs = ["d", "doubles", "double"]
-    string_strs = ["s", "strings", "string", "strs", "str"]
-
-    if any(input_str == s for s in byte_strs):
-        return DATA_TYPE_BYTES
-    elif any(input_str == s for s in int_strs):
-        return DATA_TYPE_INTS
-    elif any(input_str == s for s in float_strs):
-        return DATA_TYPE_FLOATS
-    elif any(input_str == s for s in double_strs):
-        return DATA_TYPE_DOUBLES
-    elif any(input_str == s for s in string_strs):
-        return DATA_TYPE_STRINGS
-    else:
-        return -1
-
-
 def input_type_to_dtype(input_type):
     if input_type == DATA_TYPE_BYTES:
         return np.int8
@@ -219,12 +196,14 @@ class Server(threading.Thread):
 
 
         # Now send container metadata to establish a connection
+        num_models = len(self.model_info)
 
         self.recv_socket.send("", zmq.SNDMORE)
         self.recv_socket.send(struct.pack("<I", MESSAGE_TYPE_NEW_CONTAINER), zmq.SNDMORE)
-        self.recv_socket.send_string(self.model_name, zmq.SNDMORE)
-        self.recv_socket.send_string(str(self.model_version), zmq.SNDMORE)
-        self.recv_socket.send_string(str(self.model_input_type))
+        self.recv_socket.send(struct.pack("<I", num_models), zmq.SNDMORE)
+        for model_name, model_version in self.model_info:
+            self.recv_socket.send_string(self.model_name, zmq.SNDMORE)
+            self.recv_socket.send_string(str(self.model_version), zmq.SNDMORE)
         print("Sent container metadata!")
         sys.stdout.flush()
         sys.stderr.flush()
@@ -244,24 +223,8 @@ class Server(threading.Thread):
         self.send_socket = self.context.socket(zmq.DEALER)
         self.send_socket.connect(send_address)
 
-
-
     def get_prediction_function(self):
-        if self.model_input_type == DATA_TYPE_INTS:
-            return self.model.predict_ints
-        elif self.model_input_type == DATA_TYPE_FLOATS:
-            return self.model.predict_floats
-        elif self.model_input_type == DATA_TYPE_DOUBLES:
-            return self.model.predict_doubles
-        elif self.model_input_type == DATA_TYPE_BYTES:
-            return self.model.predict_bytes
-        elif self.model_input_type == DATA_TYPE_STRINGS:
-            return self.model.predict_strings
-        else:
-            print(
-                "Attempted to get predict function for invalid model input type!"
-            )
-            raise
+        return self.model.predict
 
     def get_event_history(self):
         return self.event_history.get_events()
@@ -459,21 +422,19 @@ class FeedbackResponse():
 
 
 class ModelContainerBase(object):
-    def predict_ints(self, inputs):
-        pass
+    def predict(self, inputs):
+        """
+        Parameters
+        ------------
+        inputs : dict
+            A mapping between model names and batched prediction data
 
-    def predict_floats(self, inputs):
+        Returns
+        ------------
+        dict 
+            A mapping between model names and model prediction outputs
+        """
         pass
-
-    def predict_doubles(self, inputs):
-        pass
-
-    def predict_bytes(self, inputs):
-        pass
-
-    def predict_strings(self, inputs):
-        pass
-
 
 class RPCService:
     def __init__(self):
@@ -486,15 +447,14 @@ class RPCService:
             print("Cannot retrieve message history for inactive RPC service!")
             raise
 
-    def start(self, model, host, model_name, model_version, input_type):
+    def start(self, predictor, host, model_info):
         """
         Args:
-            model (object): The loaded model object ready to make predictions.
+            model (object): A predictor conforming to the Clipper prediction interface.
             host (str): The Clipper RPC hostname or IP address.
             port (int): The Clipper RPC port.
-            model_name (str): The name of the model.
-            model_version (int): The version of the model
-            input_type (str): One of ints, doubles, floats, bytes, strings.
+            model_info ([str, int]): A list of models served by this container
+                of the form (<model_name>, <model_version>)
         """
 
         recv_port = 7010
@@ -507,10 +467,7 @@ class RPCService:
             sys.exit(1)
         context = zmq.Context()
         self.server = Server(context, ip, send_port, recv_port)
-        model_input_type = string_to_input_type(input_type)
-        self.server.model_name = model_name
-        self.server.model_version = model_version
-        self.server.model_input_type = model_input_type
+        self.server.model_info = model_info
         self.server.model = model
         self.server.run()
 
