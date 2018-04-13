@@ -202,8 +202,8 @@ class Server(threading.Thread):
         self.recv_socket.send(struct.pack("<I", MESSAGE_TYPE_NEW_CONTAINER), zmq.SNDMORE)
         self.recv_socket.send(struct.pack("<I", num_models), zmq.SNDMORE)
         for model_name, model_version in self.model_info:
-            self.recv_socket.send_string(self.model_name, zmq.SNDMORE)
-            self.recv_socket.send_string(str(self.model_version), zmq.SNDMORE)
+            self.recv_socket.send_string(model_name, zmq.SNDMORE)
+            self.recv_socket.send_string(str(model_version), zmq.SNDMORE)
         print("Sent container metadata!")
         sys.stdout.flush()
         sys.stderr.flush()
@@ -224,7 +224,7 @@ class Server(threading.Thread):
         self.send_socket.connect(send_address)
 
     def get_prediction_function(self):
-        return self.model.predict
+        return self.predictor.predict
 
     def get_event_history(self):
         return self.event_history.get_events()
@@ -298,8 +298,7 @@ class Server(threading.Thread):
                                            self.request_queue,
                                            self.response_queue))
         self.handler_thread.start()
-        print("Serving predictions for {0} input type.".format(
-            input_type_to_string(self.model_input_type)))
+        print("Serving predictions...")
         self.connect()
         print("Connected")
         sys.stdout.flush()
@@ -450,7 +449,7 @@ class RPCService:
     def start(self, predictor, host, model_info):
         """
         Args:
-            model (object): A predictor conforming to the Clipper prediction interface.
+            predictor (object): A predictor conforming to the Clipper prediction interface.
             host (str): The Clipper RPC hostname or IP address.
             port (int): The Clipper RPC port.
             model_info ([str, int]): A list of models served by this container
@@ -467,8 +466,8 @@ class RPCService:
             sys.exit(1)
         context = zmq.Context()
         self.server = Server(context, ip, send_port, recv_port)
+        self.server.predictor = predictor
         self.server.model_info = model_info
-        self.server.model = model
         self.server.run()
 
 

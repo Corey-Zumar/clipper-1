@@ -22,8 +22,8 @@ constexpr size_t NUM_RESPONSES_SEND = 1000;
 
 constexpr size_t TOTAL_DATA_BYTES = 299 * 299 * 3 * sizeof(float) * RESPONSE_QUEUE_SIZE;
 
-// Tuple of input, request id, client id, query lineage
-typedef std::tuple<InputVector, int, int, std::shared_ptr<QueryLineage>> FrontendRPCRequest;
+// Tuple of input, request id, client id
+typedef std::tuple<InputVector, int, int> FrontendRPCRequest;
 // Tuple of output, request id, client id. Request id and client ids
 // should match corresponding ids of a FrontendRPCRequest object
 typedef std::tuple<Output, int, int> FrontendRPCResponse;

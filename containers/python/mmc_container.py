@@ -15,11 +15,11 @@ class MMCContainer(rpc.ModelContainerBase):
 
         return outputs 
 
-def parse_model_info(raw_model_info)
+def parse_model_info(raw_model_info):
     model_info = []
     names_versions = raw_model_info.split(",")
     for item in names_versions:
-        name, version = names_versions.split(":")
+        name, version = item.split(":")
         model_info.append((name, version))
 
     return model_info
@@ -40,12 +40,6 @@ if __name__ == "__main__":
     else:
         print("Connecting to Clipper on localhost")
 
-    port = 7000
-    if "CLIPPER_PORT" in os.environ:
-        port = int(os.environ["CLIPPER_PORT"])
-    else:
-        print("Connecting to Clipper with default port: 7000")
-
-    model = MMCContainer()
+    predictor = MMCContainer()
     rpc_service = rpc.RPCService()
-    rpc_service.start(model, ip, port, model_info) 
+    rpc_service.start(predictor, ip, model_info) 

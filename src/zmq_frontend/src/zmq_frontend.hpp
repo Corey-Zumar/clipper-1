@@ -229,7 +229,6 @@ class ServerImpl {
           [this, app_metrics, request_id, client_id, create_time](Output output) mutable {
             std::chrono::time_point<std::chrono::system_clock> end =
                 std::chrono::system_clock::now();
-                   .count());
                    long duration_micros =
                        std::chrono::duration_cast<std::chrono::microseconds>(end - create_time)
                            .count();

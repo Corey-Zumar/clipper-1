@@ -22,6 +22,7 @@
 #include <clipper/redis.hpp>
 // #include <clipper/selection_policies.hpp>
 #include <clipper/util.hpp>
+#include <clipper/container.hpp>
 
 using HttpServer = SimpleWeb::Server<SimpleWeb::HTTP>;
 using clipper::VersionedModelId;
@@ -942,7 +943,7 @@ class RequestHandler {
 
     bool verbose = get_bool(d, "verbose");
 
-    std::vector<std::pair<VersionedModelId, int>> containers =
+    std::vector<std::vector<ContainerModelDataItem>> containers =
         clipper::redis::get_all_containers(redis_connection_);
 
     rapidjson::Document response_doc;
@@ -950,7 +951,9 @@ class RequestHandler {
 
     if (verbose) {
       for (auto container : containers) {
-        std::unordered_map<std::string, std::string> container_metadata =
+        
+
+        auto container_metadata =
             clipper::redis::get_container(redis_connection_, container.first,
                                           container.second);
         rapidjson::Document container_doc(&response_doc.GetAllocator());

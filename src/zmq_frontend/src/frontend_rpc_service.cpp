@@ -244,17 +244,9 @@ void FrontendRPCService::receive_request(zmq::socket_t &socket) {
 
     int client_id = static_cast<int *>(msg_client_id.data())[0];
 
-    std::shared_ptr<QueryLineage> lineage =
-        std::make_shared<QueryLineage>(request_id);
-    lineage->add_timestamp(
-        "clipper::frontend_rpc_recv",
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            recv_end_time.time_since_epoch())
-            .count());
-
     // The app_function should be very cheap, it's just constructing
     // an object and putting it on the task queue. Try executing it directly.
-    app_function(std::make_tuple(input, request_id, client_id, lineage));
+    app_function(std::make_tuple(input, request_id, client_id));
 
     request_enqueue_meter_->mark(1);
     // prediction_executor_->submit(
@@ -274,12 +266,6 @@ void FrontendRPCService::send_responses(zmq::socket_t &socket,
     Output &output = std::get<0>(response);
     int request_id = std::get<1>(response);
     int client_id = std::get<2>(response);
-    auto cur_time = std::chrono::system_clock::now();
-    std::get<3>(response)->add_timestamp("clipper::frontend_rpc_response_send",
-                std::chrono::duration_cast<std::chrono::microseconds>(
-                    cur_time.time_since_epoch())
-                    .count());
-
 
     std::lock_guard<std::mutex> routing_lock(client_routing_mutex_);
     auto routing_id_search = client_routing_map_.find(client_id);
@@ -304,21 +290,6 @@ void FrontendRPCService::send_responses(zmq::socket_t &socket,
     socket.send(&output_length_bytes, sizeof(int), ZMQ_SNDMORE);
     socket.send(output.y_hat_->get_data(), output.y_hat_->byte_size(),
                 ZMQ_SNDMORE);
-    auto lineage_map = std::get<3>(response)->get_timestamps();
-    int lineage_length = (int)lineage_map.size();
-    socket.send(&lineage_length, sizeof(int), ZMQ_SNDMORE);
-    int idx = 0;
-    for (auto &entry : lineage_map) {
-      socket.send(entry.first.data(), entry.first.size(), ZMQ_SNDMORE);
-
-      if (idx < lineage_length - 1) {
-        socket.send(&(entry.second), sizeof(long long), ZMQ_SNDMORE);
-      } else {
-        // Don't use sndmore flag for last message
-        socket.send(&(entry.second), sizeof(long long));
-      }
-      idx += 1;
-    }
 
     sent_responses += 1;
   }
