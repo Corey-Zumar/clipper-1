@@ -293,10 +293,15 @@ class Server(threading.Thread):
             self.full_buffers += 1
 
     def run(self):
-        self.handler_thread = Thread(target=handle_predictions,
-                                     args=(self.get_prediction_function(),
-                                           self.request_queue,
-                                           self.response_queue))
+        def target_fn():
+            try:
+                handle_predictions(self.get_prediction_function(),
+                                   self.request_queue,
+                                   self.response_queue)
+            except Exception as e:
+                print(e)
+
+        self.handler_thread = Thread(target=target_fn)
         self.handler_thread.start()
         print("Serving predictions...")
         self.connect()
