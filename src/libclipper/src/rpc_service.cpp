@@ -54,7 +54,7 @@ RPCService::~RPCService() { stop(); }
 void RPCService::start(
     const string ip, int send_port, int recv_port,
     std::function<void(ContainerId)> &&container_ready_callback,
-    std::function<void(RPCResponse, long long, long long, long long)> &&new_response_callback) {
+    std::function<void(RPCResponse)> &&new_response_callback) {
   container_ready_callback_ = container_ready_callback;
   new_response_callback_ = new_response_callback;
   if (active_) {
@@ -225,7 +225,7 @@ void RPCService::receive_message(socket_t &socket) {
   socket.recv(&msg_output_header, 0);
   socket.recv(&msg_output_types, 0);
 
-  uint64_t output_header = static_cast<uint64_t *>(msg_output_header.data());
+  uint64_t *output_header = static_cast<uint64_t *>(msg_output_header.data());
   uint64_t num_outputs = output_header[0];
   output_header += 1;
 
@@ -244,16 +244,11 @@ void RPCService::receive_message(socket_t &socket) {
   for (uint64_t i = 0; i < (num_outputs * 2); i += 2) {
     uint64_t output_size = output_header[i];
     uint32_t output_batch_id = output_header[i + 1];
-
     DataType output_type = static_cast<DataType>(output_types[i]);
 
     socket.recv(output_data_raw + curr_start, output_size, 0);
-    std::shared_ptr<OutputData> output = std::make_shared<OutputData>(
-        output_type, output_data, curr_start, curr_start + output_size);
-
     outputs.emplace(output_batch_id,
-                    std::make_shared<OutputData>(output_type, output_data, curr_start,
-                                                 curr_start + output_size));
+                    OutputData::create_output(output_type, output_data, curr_start, curr_start + output_size));
 
     curr_start += output_size;
     output_data_raw += output_size;
@@ -276,7 +271,7 @@ void RPCService::receive_message(socket_t &socket) {
   ContainerId container_id = get_container_id(container_info);
 
   TaskExecutionThreadPool::submit_job(container_id, new_response_callback_, response);
-  TaskExecutionThreadPool::submit_job(container_id, container_ready_callback_, vm, replica_id);
+  TaskExecutionThreadPool::submit_job(container_id, container_ready_callback_, container_id);
 
   response_queue_->enqueue(response);
 }
@@ -320,20 +315,22 @@ void RPCService::handle_new_connection(socket_t &socket, int &zmq_connection_id,
 
   for (size_t i = 0; i < num_models; ++i) {
     message_t msg_model_name;
-    message_t msg_model_versionl socket.recv(&msg_model_name, 0);
-    socket.recv(&model_version, 0);
-    std::string model_name(static_cast<char *>(msg_model_name.data()), msg_model_name.size());
-    std::string version(static_cast<char *>(msg_model_version.data()), msg_model_version.size());
+    message_t msg_model_version;
+    
+    socket.recv(&msg_model_name, 0);
+    socket.recv(&msg_model_version, 0);
 
-    VersionedModelId model_id = std::make_pair(model_name, model_version);
-    container_models.push_back(model_id);
+    std::string model_name(static_cast<char *>(msg_model_name.data()), msg_model_name.size());
+    std::string model_version(static_cast<char *>(msg_model_version.data()), msg_model_version.size());
+
+    VersionedModelId model_id(model_name, model_version);
 
     // Note that if the map does not have an entry for this model,
     // a new entry will be created with the default value (0).
     // This use of operator[] avoids the boilerplate of having to
     // check if the key is present in the map.
-    int model_replica_id = replica_ids_[model];
-    replica_ids_[model] = model_replica_id + 1;
+    int model_replica_id = replica_ids_[model_id];
+    replica_ids_[model_id] = model_replica_id + 1;
     container_models.push_back(std::make_pair(model_id, model_replica_id));
   }
 

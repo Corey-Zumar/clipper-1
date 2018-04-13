@@ -81,16 +81,16 @@ class ThreadPool {
     auto queue = queues_.find(static_cast<size_t>(container_id));
     if (queue != queues_.end()) {
       log_error_formatted(LOGGING_TAG_THREADPOOL,
-                          "Work queue already exists for model {}, replica {}", vm.serialize(),
-                          std::to_string(replica_id));
+                          "Work queue already exists for container with id {}",
+                          std::to_string(container_id));
       return false;
     } else {
       queues_.emplace(std::piecewise_construct, std::forward_as_tuple(container_id),
                       std::forward_as_tuple());
       threads_.emplace(std::piecewise_construct, std::forward_as_tuple(container_id),
                        std::forward_as_tuple(&ThreadPool::worker, this, container_id));
-      log_info_formatted(LOGGING_TAG_THREADPOOL, "Work queue created for model {}, replica {}",
-                         vm.serialize(), std::to_string(replica_id));
+      log_info_formatted(LOGGING_TAG_THREADPOOL, "Work queue created for container with id {}",
+                         std::to_string(container_id));
       return true;
     }
   }
@@ -113,8 +113,7 @@ class ThreadPool {
       queue->second.enqueue(std::make_unique<TaskType>(std::move(task)));
     } else {
       std::stringstream error_msg;
-      error_msg << "No work queue for model " << vm.serialize() << ", replica "
-                << std::to_string(replica_id);
+      error_msg << "No work queue for container with id: " << std::to_string(container_id);
       log_error(LOGGING_TAG_THREADPOOL, error_msg.str());
       throw std::runtime_error(error_msg.str());
     }
@@ -185,13 +184,13 @@ inline ThreadPool& get_thread_pool(void) {
  * Submit a job to the task execution thread pool.
  */
 template <typename Func, typename... Args>
-inline auto submit_job(VersionedModelId vm, int replica_id, Func&& func, Args&&... args) {
-  return get_thread_pool().submit(vm, replica_id, std::forward<Func>(func),
+inline auto submit_job(ContainerId container_id, Func&& func, Args&&... args) {
+  return get_thread_pool().submit(container_id, std::forward<Func>(func),
                                   std::forward<Args>(args)...);
 }
 
-inline void create_queue(VersionedModelId vm, int replica_id) {
-  get_thread_pool().create_queue(vm, replica_id);
+inline void create_queue(ContainerId container_id) {
+  get_thread_pool().create_queue(container_id);
 }
 
 }  // namespace DefaultThreadPool

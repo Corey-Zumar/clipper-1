@@ -25,7 +25,7 @@ using ContainerId = size_t;
 // Computes a stable, unique identifier for a container
 // based on its constituent model. Stability is guaranteed
 // as long as the container info vector order is maintained
-ContainerId get_container_id(std::vector<ContainerModelDataItem> &container_data);
+ContainerId get_container_id(const std::vector<ContainerModelDataItem> &container_data);
 
 class ModelContainer {
  public:
@@ -40,12 +40,13 @@ class ModelContainer {
   ModelContainer &operator=(ModelContainer &&) = default;
 
   size_t get_batch_size(Deadline deadline);
-  double get_average_throughput_per_millisecond();
+  double get_average_throughput_per_millisecond() const;
   void update_throughput(size_t batch_size, long total_latency);
   void set_batch_size(int batch_size);
+  int get_replica_id(VersionedModelId model_id) const;
 
   ContainerId container_id_;
-  std::vector<ContainerModelDataItem> model_data_;
+  std::unordered_map<VersionedModelId, int> model_data_;
   int connection_id_;
   int batch_size_;
   clipper::metrics::Histogram latency_hist_;
@@ -61,7 +62,7 @@ class ModelContainer {
 /// with a shared_ptr.
 class ActiveContainers {
  public:
-  explicit ActiveContainers();
+  ActiveContainers() = default;
 
   // Disallow copy
   ActiveContainers(const ActiveContainers &) = delete;

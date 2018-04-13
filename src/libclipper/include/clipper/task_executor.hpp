@@ -246,8 +246,8 @@ class ModelQueue {
 class InflightMessage {
  public:
   InflightMessage(const std::chrono::time_point<std::chrono::system_clock> send_time,
-                  const ContainerId container_id, const VersionedModelId model,
-                  const int replica_id, const InputVector input, const QueryId query_id)
+                  const ContainerId container_id, const VersionedModelId model, int replica_id,
+                  const InputVector input, const QueryId query_id)
       : send_time_(send_time),
         container_id_(container_id),
         model_(model),
@@ -378,7 +378,7 @@ class TaskExecutor {
 
             TaskExecutionThreadPool::create_queue(container_id);
             TaskExecutionThreadPool::submit_job(container_id,
-                                                [this]() { on_container_ready(container_id); });
+                                                [this, container_id]() { on_container_ready(container_id); });
 
           } else if (!*task_executor_valid) {
             log_info(LOGGING_TAG_TASK_EXECUTOR,
@@ -496,11 +496,11 @@ class TaskExecutor {
     }
     boost::shared_lock<boost::shared_mutex> l(model_queues_mutex_);
 
-    for (ContainerModelDataItem &model_data_item : container.model_data_) {
-      VersionedModelId &vm = model_data_item.first;
+    VersionedModelId first_model;
+    for (auto &model_data_item : container->model_data_) {
+      first_model = model_data_item.first;
+      break;
     }
-
-    VersionedModelId &first_model = container.model_data_[0].first;
 
     // TODO: Figure out how to fairly wait on multiple queues
 
@@ -529,7 +529,7 @@ class TaskExecutor {
       // into the map
       std::unique_lock<std::mutex> l(inflight_messages_mutex_);
       auto batch_message = construct_batch_message(batch);
-      std::vector<zmq::message_t> &rpc_messages = batch_message.first;
+      std::vector<zmq::message_t> rpc_message = std::move(batch_message.first);
       std::vector<uint32_t> &batch_ids = batch_message.second;
 
       std::unordered_map<uint32_t, InflightMessage> outbound_messages;
@@ -541,37 +541,35 @@ class TaskExecutor {
         uint32_t batch_id = batch_ids[i];
         outbound_messages.emplace(
             std::piecewise_construct, std::forward_as_tuple(batch_id),
-            std::forward_as_tuple(current_time, container->container_id_, b.model_,
-                                  container->replica_id_, b.input_, b.query_id_));
+            std::forward_as_tuple(current_time, container->container_id_, b.model_, container->get_replica_id(b.model_), b.input_, b.query_id_));
       }
 
-      int message_id = rpc_->send_message(batch_message, container->connection_id);
+
+      int message_id = rpc_->send_message(std::move(rpc_message), container->connection_id_);
       inflight_messages_.emplace(message_id, std::move(outbound_messages));
     } else {
-      log_error_formatted(LOGGING_TAG_TASK_EXECUTOR,
-                          "ModelQueue returned empty batch for model {}, replica {}",
-                          model_id.serialize(), std::to_string(replica_id));
+      // log_error_formatted(LOGGING_TAG_TASK_EXECUTOR,
+      //                     "ModelQueue returned empty batch for model {}, replica {}",
+      //                     model_id.serialize(), std::to_string(replica_id));
     }
   }
 
   void on_response_recv(rpc::RPCResponse response) {
-    auto on_response_recv_timestamp = std::chrono::system_clock::now();
-    std::unique_lock<std::mutex> l(inflight_messages_mutex_);
     int msg_id = std::get<0>(response);
     std::unordered_map<uint32_t, std::shared_ptr<OutputData>> &outputs = std::get<1>(response);
-
+    
+    std::unique_lock<std::mutex> inflight_messages_lock(inflight_messages_mutex_);
     std::unordered_map<uint32_t, InflightMessage> inbound_messages = inflight_messages_[msg_id];
-    assert(outputs.size() == keys.size());
-
+    size_t batch_size = inbound_messages.size();
+    assert(outputs.size() == batch_size);
     inflight_messages_.erase(msg_id);
-    l.unlock();
+    inflight_messages_lock.unlock();
 
-    size_t batch_size = keys.size();
     throughput_meter_->mark(batch_size);
     std::chrono::time_point<std::chrono::system_clock> current_time =
         std::chrono::system_clock::now();
 
-    std::unique_lock<std::mutex> l(prediction_callback_map_mutex_);
+    std::unique_lock<std::mutex> callbacks_lock(prediction_callback_map_mutex_);
     boost::shared_lock<boost::shared_mutex> metrics_lock(model_metrics_mutex_);
     long task_latency_micros = -1;
     for (auto &entry : outputs) {
@@ -583,8 +581,10 @@ class TaskExecutor {
             "Received prediction response with no corresponding inflight message!");
       }
       InflightMessage &completed_msg = completed_msg_search->second;
+      VersionedModelId &cur_model = completed_msg.model_;
 
       if (task_latency_micros == -1) {
+        int cur_replica_id = completed_msg.replica_id_;
         auto task_latency = current_time - completed_msg.send_time_;
         task_latency_micros =
             std::chrono::duration_cast<std::chrono::microseconds>(task_latency).count();

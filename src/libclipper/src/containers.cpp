@@ -21,7 +21,7 @@ const std::string LOGGING_TAG_CONTAINERS = "CONTAINERS";
 
 ContainerId get_container_id(const std::vector<ContainerModelDataItem> &container_data) {
   ContainerId container_id = 0;
-  for (auto &model_item : container_info) {
+  for (auto &model_item : container_data) {
     boost::hash_combine(container_id, model_item.first.get_name());
     boost::hash_combine(container_id, model_item.first.get_id());
     boost::hash_combine(container_id, model_item.second);
@@ -33,31 +33,37 @@ ModelContainer::ModelContainer(ContainerId container_id,
                                std::vector<ContainerModelDataItem> model_data, int connection_id,
                                int batch_size)
     : container_id_(container_id),
-      model_data_(model_data),
-      connection_id_(container_id),
+      connection_id_(connection_id),
       batch_size_(batch_size),
-      latency_hist_("container:" + model.serialize() + ":" + std::to_string(replica_id) +
-                        ":prediction_latency",
+      latency_hist_("container:" + std::to_string(container_id) + ":prediction_latency",
                     "microseconds", HISTOGRAM_SAMPLE_SIZE) {
-  std::string model_str = model.serialize();
-  log_info_formatted(LOGGING_TAG_CONTAINERS, "Creating new ModelContainer for model {}, id: {}",
-                     model_str, std::to_string(container_id));
+  log_info_formatted(LOGGING_TAG_CONTAINERS, "Creating new ModelContainer with id {}", std::to_string(container_id));
+
+  for (auto &data_item : model_data) {
+    model_data_.emplace(data_item.first, data_item.second);
+  }
 }
 
 size_t ModelContainer::get_batch_size(Deadline deadline) {
-  std::lock_guard<std::mutex> lock(batch_size_mtx);
+  std::lock_guard<std::mutex> lock(batch_size_mtx_);
   return batch_size_;
 }
 
 void ModelContainer::set_batch_size(int batch_size) {
-  std::lock_guard<std::mutex> lock(batch_size_mtx);
+  std::lock_guard<std::mutex> lock(batch_size_mtx_);
   batch_size_ = batch_size;
 }
 
-ActiveContainers::ActiveContainers()
-    : containers_(
-          std::unordered_map<VersionedModelId, std::map<int, std::shared_ptr<ModelContainer>>>({})),
-      batch_sizes_(std::unordered_map<VersionedModelId, int>()) {}
+
+int ModelContainer::get_replica_id(VersionedModelId model_id) const {
+  auto id_search = model_data_.find(model_id);
+  if (id_search == model_data_.end()) {
+    std::stringstream ss;
+    ss << "Attempted to find replica id for unregistered model " << model_id.get_name() << ":" << model_id.get_id();
+    throw std::runtime_error(ss.str());
+  }
+  return id_search->second;
+}
 
 void ActiveContainers::add_container(std::vector<ContainerModelDataItem> model_data,
                                      int connection_id) {
@@ -86,8 +92,8 @@ void ActiveContainers::add_container(ContainerId container_id,
 
   by_id_containers_.emplace(container_id, new_container);
 
-  for (ContainerModelDataItem &model_data_item : new_container->model_data_) {
-    VersionedModelId &vm = model.first;
+  for (const auto &model_data_item : new_container->model_data_) {
+    const VersionedModelId &vm = model_data_item.first;
     int replica_id = model_data_item.second;
     auto entry = by_model_containers_[vm];
     entry.emplace(replica_id, new_container);
@@ -127,7 +133,7 @@ std::shared_ptr<ModelContainer> ActiveContainers::get_model_replica(const Versio
   }
 }
 
-std::shared_ptr<ModelContainer> get_container_by_id(const ContainerId container_id) {
+std::shared_ptr<ModelContainer> ActiveContainers::get_container_by_id(const ContainerId container_id) {
   boost::shared_lock<boost::shared_mutex> l{m_};
 
   auto container_entry = by_id_containers_.find(container_id);

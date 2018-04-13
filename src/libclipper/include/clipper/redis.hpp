@@ -241,7 +241,7 @@ get_container_by_key(redox::Redox& redis, const std::string& key);
  * the container table. If no containers are found in the table,
  * an empty vector will be returned.
  */
-std::vector<std::pair<VersionedModelId, int>> get_all_containers(redox::Redox& redis);
+std::vector<std::vector<ContainerModelDataItem>> get_all_containers(redox::Redox& redis);
 
 /**
  * Adds an application into the application table. This will

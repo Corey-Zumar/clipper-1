@@ -29,7 +29,7 @@ namespace rpc {
 const std::string LOGGING_TAG_RPC = "RPC";
 
 // Tuple of msg_id, data_type, binary data
-using RPCResponse = std::tuple<uint32_t, std::vector<OutputData>>;
+using RPCResponse = std::tuple<uint32_t, std::unordered_map<uint32_t, std::shared_ptr<OutputData>>>;
 
 /// Tuple of zmq_connection_id, message_id, vector of messages, creation time
 using RPCRequest = std::tuple<int, int, std::vector<zmq::message_t>, long>;
@@ -62,7 +62,7 @@ class RPCService {
   void start(
       const string ip, int send_port, int recv_port,
       std::function<void(ContainerId)> &&container_ready_callback,
-      std::function<void(RPCResponse, long long, long long, long long)> &&new_response_callback);
+      std::function<void(RPCResponse)> &&new_response_callback);
   /**
    * Stops the RPC Service. This is called implicitly within the RPCService
    * destructor.
@@ -106,7 +106,7 @@ class RPCService {
   // Map from zmq_connection_id to container metadata.
   // Values are pairs of model id and integer replica id.
 
-  std::unordered_map<int, std::vector<ContainerInfo>> connections_containers_map_;
+  std::unordered_map<int, std::vector<ContainerModelDataItem>> connections_containers_map_;
   std::mutex connections_containers_map_mutex_;
 };
 
