@@ -188,7 +188,6 @@ class Server(threading.Thread):
         sys.stdout.flush()
         sys.stderr.flush()
 
-
         self.recv_socket.connect(recv_address)
         # Send a blank message to establish a connection
         # self.recv_socket.send("", zmq.SNDMORE)
@@ -201,9 +200,15 @@ class Server(threading.Thread):
         self.recv_socket.send("", zmq.SNDMORE)
         self.recv_socket.send(struct.pack("<I", MESSAGE_TYPE_NEW_CONTAINER), zmq.SNDMORE)
         self.recv_socket.send(struct.pack("<I", num_models), zmq.SNDMORE)
-        for model_name, model_version in self.model_info:
+        idx = 0
+        for idx in range(num_models):
+            model_name, model_version = self.model_info[idx]
             self.recv_socket.send_string(model_name, zmq.SNDMORE)
-            self.recv_socket.send_string(str(model_version), zmq.SNDMORE)
+            if idx < num_models - 1:
+                self.recv_socket.send_string(str(model_version), zmq.SNDMORE)
+            else:
+                self.recv_socket.send_string(str(model_version), 0)
+
         print("Sent container metadata!")
         sys.stdout.flush()
         sys.stderr.flush()
