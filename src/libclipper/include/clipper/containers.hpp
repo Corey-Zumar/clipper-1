@@ -44,7 +44,7 @@ class ModelContainer {
   void update_throughput(size_t batch_size, long total_latency);
   void set_batch_size(int batch_size);
 
-  int container_id_;
+  ContainerId container_id_;
   std::vector<ContainerModelDataItem> model_data_;
   int connection_id_;
   int batch_size_;

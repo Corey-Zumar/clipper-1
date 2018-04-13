@@ -20,16 +20,13 @@ constexpr size_t RESPONSE_QUEUE_SIZE = 50000;
 constexpr size_t NUM_REQUESTS_RECV = 100;
 constexpr size_t NUM_RESPONSES_SEND = 1000;
 
-constexpr size_t TOTAL_DATA_BYTES =
-    299 * 299 * 3 * sizeof(float) * RESPONSE_QUEUE_SIZE;
+constexpr size_t TOTAL_DATA_BYTES = 299 * 299 * 3 * sizeof(float) * RESPONSE_QUEUE_SIZE;
 
 // Tuple of input, request id, client id, query lineage
-typedef std::tuple<InputVector, int, int, std::shared_ptr<QueryLineage>>
-    FrontendRPCRequest;
+typedef std::tuple<InputVector, int, int, std::shared_ptr<QueryLineage>> FrontendRPCRequest;
 // Tuple of output, request id, client id. Request id and client ids
 // should match corresponding ids of a FrontendRPCRequest object
-typedef std::tuple<Output, int, int, std::shared_ptr<QueryLineage>>
-    FrontendRPCResponse;
+typedef std::tuple<Output, int, int> FrontendRPCResponse;
 
 class FrontendRPCService {
  public:
@@ -42,8 +39,7 @@ class FrontendRPCService {
   void start(const std::string address, int send_port, int recv_port);
   void stop();
   void send_response(FrontendRPCResponse response);
-  void add_application(std::string name,
-                       std::function<void(FrontendRPCRequest)> app_function);
+  void add_application(std::string name, std::function<void(FrontendRPCRequest)> app_function);
 
  private:
   void manage_send_service(const std::string ip, int port);
@@ -53,15 +49,13 @@ class FrontendRPCService {
   void receive_request(zmq::socket_t &socket);
   void send_responses(zmq::socket_t &socket, size_t num_responses);
 
-  std::shared_ptr<moodycamel::ConcurrentQueue<FrontendRPCResponse>>
-      response_queue_;
+  std::shared_ptr<moodycamel::ConcurrentQueue<FrontendRPCResponse>> response_queue_;
   // std::shared_ptr<clipper::CallbackThreadPool> prediction_executor_;
   std::atomic_bool active_;
   std::mutex app_functions_mutex_;
   std::mutex client_routing_mutex_;
   // Mapping from app name to prediction function
-  std::unordered_map<std::string, std::function<void(FrontendRPCRequest)>>
-      app_functions_;
+  std::unordered_map<std::string, std::function<void(FrontendRPCRequest)>> app_functions_;
   // Mapping from client id to routing id
   std::unordered_map<size_t, const std::vector<uint8_t>> client_routing_map_;
   std::thread rpc_send_thread_;

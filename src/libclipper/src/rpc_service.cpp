@@ -119,7 +119,7 @@ void RPCService::stop() {
   }
 }
 
-int RPCService::send_message(std::vector<zmq::message_t> items, const int zmq_connection_id) {
+uint32_t RPCService::send_message(std::vector<zmq::message_t> items, const int zmq_connection_id) {
   if (!active_) {
     log_error(LOGGING_TAG_RPC, "Cannot send message to inactive RPCService instance",
               "Dropping Message");
@@ -218,35 +218,50 @@ void RPCService::receive_message(socket_t &socket) {
   }
   // This message is a response to a container query
   message_t msg_id;
-  message_t msg_content_type;
-  message_t msg_content_size;
-  message_t msg_content;
+  message_t msg_output_header;
+  message_t msg_output_types;
+
   socket.recv(&msg_id, 0);
-  socket.recv(&msg_content_type, 0);
-  socket.recv(&msg_content_size, 0);
+  socket.recv(&msg_output_header, 0);
+  socket.recv(&msg_output_types, 0);
 
-  DataType content_data_type =
-      static_cast<DataType>(static_cast<int *>(msg_content_type.data())[0]);
-  uint32_t content_size = static_cast<uint32_t *>(msg_content_size.data())[0];
+  uint64_t output_header = static_cast<uint64_t *>(msg_output_header.data());
+  uint64_t num_outputs = output_header[0];
+  output_header += 1;
 
-  std::shared_ptr<void> msg_content_buffer(malloc(content_size), free);
+  uint64_t output_data_size =
+      static_cast<uint64_t>(std::accumulate(output_header, output_header + num_outputs, 0));
 
-  socket.recv(msg_content_buffer.get(), content_size, 0);
+  int *output_types = static_cast<int *>(msg_output_types.data());
 
-  message_t msg_container_recv;
-  message_t msg_container_send;
+  std::shared_ptr<void> output_data(malloc(output_data_size), free);
+  uint8_t *output_data_raw = static_cast<uint8_t *>(output_data.get());
 
-  socket.recv(&msg_container_recv, 0);
-  socket.recv(&msg_container_send, 0);
+  std::unordered_map<uint32_t, std::shared_ptr<OutputData>> outputs;
+  outputs.reserve(num_outputs);
 
-  long long container_recv = std::llround(static_cast<double *>(msg_container_recv.data())[0]);
-  long long container_send = std::llround(static_cast<double *>(msg_container_send.data())[0]);
+  uint64_t curr_start = 0;
+  for (uint64_t i = 0; i < (num_outputs * 2); i += 2) {
+    uint64_t output_size = output_header[i];
+    uint32_t output_batch_id = output_header[i + 1];
 
-  auto clipper_recv_time = std::chrono::system_clock::now();
+    DataType output_type = static_cast<DataType>(output_types[i]);
+
+    socket.recv(output_data_raw + curr_start, output_size, 0);
+    std::shared_ptr<OutputData> output = std::make_shared<OutputData>(
+        output_type, output_data, curr_start, curr_start + output_size);
+
+    outputs.emplace(output_batch_id,
+                    std::make_shared<OutputData>(output_type, output_data, curr_start,
+                                                 curr_start + output_size));
+
+    curr_start += output_size;
+    output_data_raw += output_size;
+  }
 
   log_info(LOGGING_TAG_RPC, "response received");
-  int id = static_cast<int *>(msg_id.data())[0];
-  RPCResponse response(id, content_data_type, msg_content_buffer);
+  uint32_t id = static_cast<uint32_t *>(msg_id.data())[0];
+  RPCResponse response(id, std::move(outputs));
 
   std::lock_guard<std::mutex> connections_container_map_lock(connections_containers_map_mutex_);
   auto container_info_entry = connections_containers_map_.find(zmq_connection_id);
@@ -260,10 +275,7 @@ void RPCService::receive_message(socket_t &socket) {
   std::vector<ContainerModelDataItem> container_info = container_info_entry->second;
   ContainerId container_id = get_container_id(container_info);
 
-  TaskExecutionThreadPool::submit_job(
-      container_id, new_response_callback_, response, container_recv, container_send,
-      std::chrono::duration_cast<std::chrono::microseconds>(clipper_recv_time.time_since_epoch())
-          .count());
+  TaskExecutionThreadPool::submit_job(container_id, new_response_callback_, response);
   TaskExecutionThreadPool::submit_job(container_id, container_ready_callback_, vm, replica_id);
 
   response_queue_->enqueue(response);

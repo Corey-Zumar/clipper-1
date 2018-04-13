@@ -29,7 +29,7 @@ namespace rpc {
 const std::string LOGGING_TAG_RPC = "RPC";
 
 // Tuple of msg_id, data_type, binary data
-using RPCResponse = std::tuple<int, DataType, std::shared_ptr<void>>;
+using RPCResponse = std::tuple<uint32_t, std::vector<OutputData>>;
 
 /// Tuple of zmq_connection_id, message_id, vector of messages, creation time
 using RPCRequest = std::tuple<int, int, std::vector<zmq::message_t>, long>;
@@ -69,7 +69,7 @@ class RPCService {
    */
   void stop();
 
-  int send_message(std::vector<zmq::message_t> msg, const int zmq_connection_id);
+  uint32_t send_message(std::vector<zmq::message_t> msg, const int zmq_connection_id);
 
  private:
   void manage_send_service(const string address);
@@ -89,7 +89,7 @@ class RPCService {
   // Flag indicating whether rpc service is active
   std::atomic_bool active_;
   // The next available message id
-  int message_id_ = 0;
+  uint32_t message_id_ = 0;
   std::unordered_map<VersionedModelId, int> replica_ids_;
   std::shared_ptr<metrics::Histogram> msg_queueing_hist_;
   std::unordered_map<std::string, std::shared_ptr<metrics::DataList<long>>>
@@ -97,7 +97,7 @@ class RPCService {
   std::shared_ptr<metrics::DataList<long long>> model_send_times_;
 
   std::function<void(ContainerId)> container_ready_callback_;
-  std::function<void(RPCResponse, long long, long long, long long)> new_response_callback_;
+  std::function<void(RPCResponse)> new_response_callback_;
 
   // Mapping from zmq_connection_id to routing id (for sending)
   std::unordered_map<int, const std::vector<uint8_t>> connection_routing_map_;

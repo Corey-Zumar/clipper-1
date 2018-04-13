@@ -144,19 +144,27 @@ void noop_free(void *data, void *hint) {
 
 void real_free(void *data, void *hint) { free(data); }
 
-std::vector<rpc::RPCRequestItem> construct_batch_message(std::vector<PredictTask> tasks) {
-  std::vector<rpc::RPCRequestItem> messages;
+std::pair<std::vector<zmq::message_t>, std::vector<uint32_t>> construct_batch_message(
+    std::vector<PredictTask> tasks) {
+  std::vector<uint32_t> batch_ids;
+  batch_ids.reserve(tasks.size());
+
+  std::vector<zmq::message_t> messages;
   size_t request_metadata_size = 1 * sizeof(uint32_t);
   uint32_t *request_metadata = static_cast<uint32_t *>(malloc(request_metadata_size));
   request_metadata[0] = static_cast<uint32_t>(RequestType::PredictRequest);
 
-  size_t input_metadata_size = (1 + (tasks.size() * 2)) * sizeof(uint32_t);
+  size_t input_metadata_size = (1 + (tasks.size() * 3)) * sizeof(uint32_t);
   uint32_t *input_metadata = static_cast<uint32_t *>(malloc(input_metadata_size));
   input_metadata[0] = static_cast<uint32_t>(tasks.size());
 
+  uint32_t curr_batch_id = 0;
   for (size_t i = 0; i < tasks.size(); ++i) {
-    input_metadata[(2 * i) + 1] = static_cast<uint32_t>(tasks[i].input_.type_);
-    input_metadata[(2 * i) + 2] = static_cast<uint32_t>(tasks[i].input_.size_bytes_);
+    batch_ids.push_back(curr_batch_id);
+    input_metadata[(3 * i) + 1] = curr_batch_id;
+    input_metadata[(3 * i) + 2] = static_cast<uint32_t>(tasks[i].input_.type_);
+    input_metadata[(3 * i) + 3] = static_cast<uint32_t>(tasks[i].input_.size_bytes_);
+    curr_batch_id += 1;
   }
 
   size_t input_metadata_size_buf_size = 1 * sizeof(long);
@@ -185,7 +193,7 @@ std::vector<rpc::RPCRequestItem> construct_batch_message(std::vector<PredictTask
     messages.emplace_back(zmq::message_t(reinterpret_cast<void *>(tasks[i].input_.data_),
                                          tasks[i].input_.size_bytes_, noop_free));
   }
-  return messages;
+  return std::make_pair(std::move(messages), std::move(batch_ids));
 }
 
 }  // namespace clipper

@@ -78,8 +78,7 @@ class CacheEntry {
   bool completed_ = false;
   bool used_ = true;
   Output value_;
-  std::vector<std::function<void(Output, std::shared_ptr<QueryLineage>)>> value_callbacks_;
-  std::shared_ptr<QueryLineage> lineage_;
+  std::vector<std::function<void(Output)>> value_callbacks_;
 };
 
 // A cache page is a pair of <hash, entry_size>
@@ -90,10 +89,9 @@ class QueryCache {
  public:
   QueryCache(size_t size_bytes);
   bool fetch(const VersionedModelId &model, const QueryId query_id,
-             std::function<void(Output, std::shared_ptr<QueryLineage>)> callback);
+             std::function<void(Output)> callback);
 
-  void put(const VersionedModelId &model, const QueryId query_id, Output output,
-           std::shared_ptr<QueryLineage> lineage);
+  void put(const VersionedModelId &model, const QueryId query_id, Output output);
 
  private:
   size_t hash(const VersionedModelId &model, const QueryId query_id) const;
@@ -189,11 +187,6 @@ class ModelQueue {
       while (batch.size() < (size_t)max_batch_size && queue_.size() > 0) {
         auto &task = queue_.top().second;
         batch.push_back(task);
-        auto cur_time = std::chrono::system_clock::now();
-        task.lineage_->add_timestamp(
-            "clipper::task_dequeued",
-            std::chrono::duration_cast<std::chrono::microseconds>(cur_time.time_since_epoch())
-                .count());
         queue_.pop();
       }
       queue_size_hist_->insert(static_cast<int64_t>(queue_.size()));
@@ -204,11 +197,6 @@ class ModelQueue {
       while (batch.size() < (size_t)max_batch_size && queue_.size() > 0) {
         auto &task = queue_.top().second;
         batch.push_back(task);
-        auto cur_time = std::chrono::system_clock::now();
-        task.lineage_->add_timestamp(
-            "clipper::task_dequeued",
-            std::chrono::duration_cast<std::chrono::microseconds>(cur_time.time_since_epoch())
-                .count());
         queue_.pop();
       }
       queue_size_hist_->insert(static_cast<int64_t>(queue_.size()));
@@ -258,16 +246,14 @@ class ModelQueue {
 class InflightMessage {
  public:
   InflightMessage(const std::chrono::time_point<std::chrono::system_clock> send_time,
-                  const int container_id, const VersionedModelId model, const int replica_id,
-                  const InputVector input, const QueryId query_id,
-                  std::shared_ptr<QueryLineage> lineage)
+                  const ContainerId container_id, const VersionedModelId model,
+                  const int replica_id, const InputVector input, const QueryId query_id)
       : send_time_(send_time),
         container_id_(container_id),
         model_(model),
         replica_id_(replica_id),
         input_(input),
-        query_id_(query_id),
-        lineage_(lineage) {}
+        query_id_(query_id) {}
 
   // Default copy and move constructors
   InflightMessage(const InflightMessage &) = default;
@@ -278,19 +264,25 @@ class InflightMessage {
   InflightMessage &operator=(InflightMessage &&) = default;
 
   std::chrono::time_point<std::chrono::system_clock> send_time_;
-  int container_id_;
+  ContainerId container_id_;
   VersionedModelId model_;
   int replica_id_;
   InputVector input_;
   QueryId query_id_;
-  std::shared_ptr<QueryLineage> lineage_;
 };
 
 void noop_free(void *data, void *hint);
 
 void real_free(void *data, void *hint);
 
-std::vector<rpc::RPCRequestItem> construct_batch_message(std::vector<PredictTask> tasks);
+/**
+ * Returns a pair consisting of ZMQ messages to be sent via the RPC layer,
+ * as well as a collection of batch ids. The id at index n corresponds to
+ * the specified predict task at index n. These ids will be useful when
+ * deconstructing the batched response into individual query results.
+ */
+std::pair<std::vector<zmq::message_t>, std::vector<uint32_t>> construct_batch_message(
+    std::vector<PredictTask> tasks);
 
 class TaskExecutor {
  public:
@@ -303,28 +295,26 @@ class TaskExecutor {
         model_queues_({}),
         model_metrics_({}) {
     log_info(LOGGING_TAG_TASK_EXECUTOR, "TaskExecutor started");
-    rpc_->start(
-        "*", RPC_SERVICE_SEND_PORT, RPC_SERVICE_RECV_PORT,
-        [ this, task_executor_valid = active_ ](ContainerId container_id) {
-          if (*task_executor_valid) {
-            on_container_ready(container_id);
-          } else {
-            log_info(LOGGING_TAG_TASK_EXECUTOR,
-                     "Not running on_container_ready callback because "
-                     "TaskExecutor has been destroyed.");
-          }
-        },
-        [ this, task_executor_valid = active_ ](rpc::RPCResponse response, long long container_recv,
-                                                long long container_send, long long clipper_recv) {
-          if (*task_executor_valid) {
-            on_response_recv(std::move(response), container_recv, container_send, clipper_recv);
-          } else {
-            log_info(LOGGING_TAG_TASK_EXECUTOR,
-                     "Not running on_response_recv callback because "
-                     "TaskExecutor has been destroyed.");
-          }
+    rpc_->start("*", RPC_SERVICE_SEND_PORT, RPC_SERVICE_RECV_PORT,
+                [ this, task_executor_valid = active_ ](ContainerId container_id) {
+                  if (*task_executor_valid) {
+                    on_container_ready(container_id);
+                  } else {
+                    log_info(LOGGING_TAG_TASK_EXECUTOR,
+                             "Not running on_container_ready callback because "
+                             "TaskExecutor has been destroyed.");
+                  }
+                },
+                [ this, task_executor_valid = active_ ](rpc::RPCResponse response) {
+                  if (*task_executor_valid) {
+                    on_response_recv(std::move(response));
+                  } else {
+                    log_info(LOGGING_TAG_TASK_EXECUTOR,
+                             "Not running on_response_recv callback because "
+                             "TaskExecutor has been destroyed.");
+                  }
 
-        });
+                });
     Config &conf = get_config();
     while (!redis_connection_.connect(conf.get_redis_address(), conf.get_redis_port())) {
       log_error(LOGGING_TAG_TASK_EXECUTOR, "TaskExecutor failed to connect to redis",
@@ -411,9 +401,8 @@ class TaskExecutor {
   TaskExecutor(TaskExecutor &&other) = default;
   TaskExecutor &operator=(TaskExecutor &&other) = default;
 
-  void schedule_prediction(
-      PredictTask task,
-      std::function<void(Output, std::shared_ptr<QueryLineage>)> &&task_completion_callback) {
+  void schedule_prediction(PredictTask task,
+                           std::function<void(Output)> &&task_completion_callback) {
     predictions_counter_->increment(1);
     // add each task to the queue corresponding to its associated model
     boost::shared_lock<boost::shared_mutex> lock(model_queues_mutex_);
@@ -432,10 +421,6 @@ class TaskExecutor {
       log_info_formatted(LOGGING_TAG_TASK_EXECUTOR, "Adding task to queue. QueryID: {}, model: {}",
                          task.query_id_, task.model_.serialize());
 
-      task.lineage_->add_timestamp(
-          "clipper::task_enqueued",
-          std::chrono::duration_cast<std::chrono::microseconds>(task.recv_time_.time_since_epoch())
-              .count());
       // }
     } else {
       log_error_formatted(LOGGING_TAG_TASK_EXECUTOR, "Received task for unknown model: {} : {}",
@@ -462,7 +447,7 @@ class TaskExecutor {
   redox::Redox redis_connection_;
   redox::Subscriber redis_subscriber_;
   std::mutex inflight_messages_mutex_;
-  std::unordered_map<int, std::vector<InflightMessage>> inflight_messages_;
+  std::unordered_map<uint32_t, std::unordered_map<uint32_t, InflightMessage>> inflight_messages_;
   std::shared_ptr<metrics::Counter> predictions_counter_;
   std::shared_ptr<metrics::Meter> throughput_meter_;
   boost::shared_mutex model_queues_mutex_;
@@ -471,8 +456,7 @@ class TaskExecutor {
   std::unordered_map<VersionedModelId, ModelMetrics> model_metrics_;
   static constexpr int INITIAL_MODEL_QUEUES_MAP_SIZE = 100;
 
-  std::unordered_map<QueryId, std::function<void(Output, std::shared_ptr<QueryLineage>)>>
-      prediction_callback_map_;
+  std::unordered_map<QueryId, std::function<void(Output)>> prediction_callback_map_;
   std::mutex prediction_callback_map_mutex_;
   std::atomic_bool use_full_batches_{false};
 
@@ -538,28 +522,31 @@ class TaskExecutor {
         [container](Deadline deadline) { return container->get_batch_size(deadline); },
         use_full_batches_);
 
-    // Create a histogram "queue size hist"
-
     if (batch.size() > 0) {
       // move the lock up here, so that nothing can pull from the
       // inflight_messages_
       // map between the time a message is sent and when it gets inserted
       // into the map
       std::unique_lock<std::mutex> l(inflight_messages_mutex_);
-      std::vector<InflightMessage> cur_batch;
+      auto batch_message = construct_batch_message(batch);
+      std::vector<zmq::message_t> &rpc_messages = batch_message.first;
+      std::vector<uint32_t> &batch_ids = batch_message.second;
 
-      std::vector<PredictTask> batch_tasks;
+      std::unordered_map<uint32_t, InflightMessage> outbound_messages;
+
       std::chrono::time_point<std::chrono::system_clock> current_time =
           std::chrono::system_clock::now();
-      for (auto b : batch) {
-        batch_tasks.push_back(b);
-        cur_batch.emplace_back(current_time, container->container_id_, b.model_,
-                               container->replica_id_, b.input_, b.query_id_, b.lineage_);
+      for (size_t i = 0; i < batch.size(); ++i) {
+        PredictTask &b = batch[i];
+        uint32_t batch_id = batch_ids[i];
+        outbound_messages.emplace(
+            std::piecewise_construct, std::forward_as_tuple(batch_id),
+            std::forward_as_tuple(current_time, container->container_id_, b.model_,
+                                  container->replica_id_, b.input_, b.query_id_));
       }
-      std::string model_name = model_id.get_name();
-      int message_id =
-          rpc_->send_message(construct_batch_message(batch_tasks), container->connection_id);
-      inflight_messages_.emplace(message_id, std::move(cur_batch));
+
+      int message_id = rpc_->send_message(batch_message, container->connection_id);
+      inflight_messages_.emplace(message_id, std::move(outbound_messages));
     } else {
       log_error_formatted(LOGGING_TAG_TASK_EXECUTOR,
                           "ModelQueue returned empty batch for model {}, replica {}",
@@ -567,39 +554,51 @@ class TaskExecutor {
     }
   }
 
-  void on_response_recv(rpc::RPCResponse response, long long container_recv,
-                        long long container_send, long long clipper_recv) {
+  void on_response_recv(rpc::RPCResponse response) {
     auto on_response_recv_timestamp = std::chrono::system_clock::now();
     std::unique_lock<std::mutex> l(inflight_messages_mutex_);
-    int msg_id;
-    DataType data_type;
-    std::shared_ptr<void> data;
-    std::tie(msg_id, data_type, data) = response;
+    int msg_id = std::get<0>(response);
+    std::unordered_map<uint32_t, std::shared_ptr<OutputData>> &outputs = std::get<1>(response);
 
-    auto keys = inflight_messages_[msg_id];
-    boost::shared_lock<boost::shared_mutex> metrics_lock(model_metrics_mutex_);
+    std::unordered_map<uint32_t, InflightMessage> inbound_messages = inflight_messages_[msg_id];
+    assert(outputs.size() == keys.size());
 
     inflight_messages_.erase(msg_id);
     l.unlock();
-    rpc::PredictionResponse parsed_response =
-        rpc::PredictionResponse::deserialize_prediction_response(data_type, data);
-    assert(parsed_response.outputs_.size() == keys.size());
-    int batch_size = keys.size();
+
+    size_t batch_size = keys.size();
     throughput_meter_->mark(batch_size);
     std::chrono::time_point<std::chrono::system_clock> current_time =
         std::chrono::system_clock::now();
-    if (batch_size > 0) {
-      InflightMessage &first_message = keys[0];
-      const VersionedModelId &cur_model = first_message.model_;
-      const int cur_replica_id = first_message.replica_id_;
-      auto task_latency = current_time - first_message.send_time_;
-      long task_latency_micros =
-          std::chrono::duration_cast<std::chrono::microseconds>(task_latency).count();
 
-      std::shared_ptr<ModelContainer> processing_container =
-          active_containers_->get_model_replica(cur_model, cur_replica_id);
+    std::unique_lock<std::mutex> l(prediction_callback_map_mutex_);
+    boost::shared_lock<boost::shared_mutex> metrics_lock(model_metrics_mutex_);
+    long task_latency_micros = -1;
+    for (auto &entry : outputs) {
+      uint32_t batch_id = entry.first;
+      std::shared_ptr<OutputData> &output_data = entry.second;
+      auto completed_msg_search = inbound_messages.find(batch_id);
+      if (completed_msg_search == inbound_messages.end()) {
+        throw std::runtime_error(
+            "Received prediction response with no corresponding inflight message!");
+      }
+      InflightMessage &completed_msg = completed_msg_search->second;
 
-      processing_container->latency_hist_.insert(task_latency_micros);
+      if (task_latency_micros == -1) {
+        auto task_latency = current_time - completed_msg.send_time_;
+        task_latency_micros =
+            std::chrono::duration_cast<std::chrono::microseconds>(task_latency).count();
+
+        std::shared_ptr<ModelContainer> processing_container =
+            active_containers_->get_model_replica(cur_model, cur_replica_id);
+        processing_container->latency_hist_.insert(task_latency_micros);
+      }
+
+      auto search = prediction_callback_map_.find(completed_msg.query_id_);
+      if (search != prediction_callback_map_.end()) {
+        search->second(Output{output_data, {completed_msg.model_}});
+        prediction_callback_map_.erase(completed_msg.query_id_);
+      }
 
       boost::optional<ModelMetrics> cur_model_metric;
       auto cur_model_metric_entry = model_metrics_.find(cur_model);
@@ -611,40 +610,6 @@ class TaskExecutor {
         (*cur_model_metric).num_predictions_->increment(batch_size);
         (*cur_model_metric).batch_size_->insert(batch_size);
         (*cur_model_metric).latency_->insert(static_cast<int64_t>(task_latency_micros));
-        // (*cur_model_metric)
-        //     .latency_list_->insert(static_cast<int64_t>(task_latency_micros));
-      }
-      for (int batch_num = 0; batch_num < batch_size; ++batch_num) {
-        InflightMessage completed_msg = keys[batch_num];
-        completed_msg.lineage_->add_timestamp("container::recv", container_recv);
-        completed_msg.lineage_->add_timestamp("container::send", container_send);
-        completed_msg.lineage_->add_timestamp("clipper::rpc_recv", clipper_recv);
-        completed_msg.lineage_->add_timestamp("clipper::task_executor_recv",
-                                              std::chrono::duration_cast<std::chrono::microseconds>(
-                                                  on_response_recv_timestamp.time_since_epoch())
-                                                  .count());
-        auto task_executor_end_time = std::chrono::system_clock::now();
-        completed_msg.lineage_->add_timestamp("clipper::task_executor_recv_end",
-                                              std::chrono::duration_cast<std::chrono::microseconds>(
-                                                  task_executor_end_time.time_since_epoch())
-                                                  .count());
-        std::unique_lock<std::mutex> l(prediction_callback_map_mutex_);
-        auto search = prediction_callback_map_.find(completed_msg.query_id_);
-        if (search != prediction_callback_map_.end()) {
-          auto callback_found_time = std::chrono::system_clock::now();
-          completed_msg.lineage_->add_timestamp(
-              "clipper::task_executor_msg_callback_found",
-              std::chrono::duration_cast<std::chrono::microseconds>(
-                  callback_found_time.time_since_epoch())
-                  .count());
-          search->second(Output{parsed_response.outputs_[batch_num], {completed_msg.model_}},
-                         completed_msg.lineage_);
-          prediction_callback_map_.erase(completed_msg.query_id_);
-        }
-        // cache_->put(
-        //     completed_msg.model_, completed_msg.query_id_,
-        //     Output{parsed_response.outputs_[batch_num], {completed_msg.model_}},
-        //     completed_msg.lineage_);
       }
     }
   }
