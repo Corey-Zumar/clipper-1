@@ -110,6 +110,23 @@ def get_inception_input():
     inception_input = np.array(np.random.rand(299, 299, 3) * 255, dtype=np.float32)
     return inception_input.flatten()
 
+########## Arrival Processes ##########
+def condense_delays(arrival_process, replica_num):
+    condensed_process = []
+    idx = 0
+    curr_delay = 0
+    while idx < len(arrival_process):
+        request_delay_millis, request_replica_num = arrival_process[idx]
+        if request_replica_num == replica_num:
+            condensed_process.append((curr_delay + request_delay_millis, replica_num))
+            curr_delay = 0
+        else:
+            curr_delay += request_delay_millis
+
+        idx += 1
+
+    return condensed_process
+
 ########## Benchmarking ##########
 
 class Predictor(object):
@@ -297,6 +314,11 @@ class DriverBenchmarker(object):
     def _benchmark_arrival_process(self, replica_num, num_trials, batch_size, slo_millis, process_file):
         logger.info("Parsing arrival process")
         arrival_process = load_tagged_arrival_deltas(process_file)
+        arrival_process = condense_delays(arrival_process, replica_num)
+        with open("CONDENSED.deltas", "w+") as f:
+            for delay, tag in arrival_process:
+                line = "{},{}\n".format(delay, tag)
+                f.write(line)
 
         logger.info("Initializing processor thread")
         processor_thread = Thread(target=self._run_async_query_processor, args=(replica_num, num_trials, batch_size, slo_millis, process_file))
