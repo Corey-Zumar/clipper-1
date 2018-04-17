@@ -309,16 +309,12 @@ class DriverBenchmarker(object):
 
         logger.info("Starting predictions")
 
-        predictor = Predictor(self.models_dict, trial_length=self.trial_length, warmup_batch_sizes=[batch_size, batch_size * 2.2])
+        predictor = Predictor(self.models_dict, trial_length=self.trial_length, warmup_batch_sizes=[])
         while True:
             send_time = datetime.now()
-            send_times = [send_time for _ in range(batch_size)]
+            batch = [(i, send_time) for i in range(batch_size)]
             
-            batch_idx = np.random.randint(len(resnet_inputs) - batch_size)
-            resnet_batch = resnet_inputs[batch_idx : batch_idx + batch_size]
-            inception_batch = inception_inputs[batch_idx : batch_idx + batch_size]
-
-            predictor.predict(send_times, resnet_batch, inception_batch)
+            predictor.predict(batch) 
 
             if len(predictor.stats["thrus"]) > num_trials:
                 break
@@ -343,7 +339,7 @@ class DriverBenchmarker(object):
 
     def _benchmark_arrival_process(self, replica_num, num_trials, batch_size, slo_millis, process_file):
         arrival_process = load_tagged_arrival_deltas(process_file)
-        predictor = Predictor(self.models_dict, trial_length=self.trial_length, warmup_batch_sizes=[32, 70])
+        predictor = Predictor(self.models_dict, trial_length=self.trial_length, warmup_batch_sizes=[48, 112])
 
         logger.info("Starting predictions...")
 
