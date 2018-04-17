@@ -2,9 +2,9 @@
     "batch_size" : 80,
     "cpu_affinities": ["0 16 1 17 2 18 3 19"],
     "gpu_affinities": ["0 1"],
-    "tagged_process_path": "DEBUGGING/363_tagged_2.deltas",
+    "tagged_process_path": "DEBUGGING/254/254_tagged_2.deltas",
     "num_replicas": 1,
-    "trial_length": 600,
+    "trial_length": 1000,
     "num_trials": 30,
     "slo_millis": 350
 }
