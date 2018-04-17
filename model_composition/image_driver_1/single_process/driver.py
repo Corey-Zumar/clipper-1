@@ -180,7 +180,7 @@ class Predictor(object):
             
         for batch_size in self.warmup_batch_sizes:
             for _ in range(1000):
-                bs = int(batch_size * (1 + np.random.normal(0, .2)))
+                bs = max(1, int(batch_size * (1 + np.random.normal(0, .2))))
                 time = datetime.now()
                 self.predict([(msg_id, time) for msg_id in range(bs)])
 
@@ -339,7 +339,7 @@ class DriverBenchmarker(object):
 
     def _benchmark_arrival_process(self, replica_num, num_trials, batch_size, slo_millis, process_file):
         arrival_process = load_tagged_arrival_deltas(process_file)
-        predictor = Predictor(self.models_dict, trial_length=self.trial_length, warmup_batch_sizes=[48, 112])
+        predictor = Predictor(self.models_dict, trial_length=self.trial_length, warmup_batch_sizes=[])
 
         logger.info("Starting predictions...")
 
@@ -351,6 +351,7 @@ class DriverBenchmarker(object):
             first_delay_millis, first_replica_num = arrival_process[curr_idx]
             first_delay_seconds = first_delay_millis * .001
             curr_timestamp += first_delay_seconds
+            self._spin_sleep(first_delay_seconds)
             curr_idx += 1
             if first_replica_num == replica_num:
                 batch = [(curr_idx, benchmark_begin + timedelta(seconds=curr_timestamp))]
@@ -361,11 +362,15 @@ class DriverBenchmarker(object):
             return
 
         while curr_idx < len(arrival_process):
+
             pred_begin = datetime.now()
             predictor.predict(batch)
             pred_end = datetime.now()
             batch_latency = (pred_end - pred_begin).total_seconds()
             end_timestamp = curr_timestamp + batch_latency
+
+            if len(predictor.stats["thrus"]) > self.trial_length:
+                break
 
             batch = []
             new_idx = curr_idx
@@ -390,12 +395,12 @@ class DriverBenchmarker(object):
                         batch.append(request_queue.popleft())
 
                     if len(batch) == 0:
-                        print("PERFORMING A SLEEP FOR: {} SECONDS".format((new_timestamp - end_timestamp)))
                         # If no requests were sent during the prediction interval,
                         # we should sleep until requests are available. This is
                         # precisely the difference between "new_timestamp"
                         # and the prediction's "end_timestamp"
                         self._spin_sleep(new_timestamp - end_timestamp)
+
                         end_timestamp = new_timestamp
                         new_timestamp = prev_new_timestamp
 
@@ -444,6 +449,9 @@ class DriverBenchmarker(object):
         processor_thread.join()
 
     def _spin_sleep(self, request_delay_seconds):
+        if request_delay_seconds <= 0:
+            return
+
         sleep_end_time = datetime.now() + timedelta(seconds=request_delay_seconds)
         while datetime.now() < sleep_end_time:
             continue
