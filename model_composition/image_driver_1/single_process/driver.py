@@ -7,6 +7,7 @@ import logging
 import Queue
 import time
 
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from datetime import timedelta 
@@ -131,9 +132,10 @@ def condense_delays(arrival_process, replica_num):
 
 class Predictor(object):
 
-    def __init__(self, models_dict, trial_length):
+    def __init__(self, models_dict, trial_length, warmup_batch_sizes):
         self.task_execution_thread_pool = ThreadPoolExecutor(max_workers=2)
         self.stats_thread_pool = ThreadPoolExecutor(max_workers=2)
+        self.warmup_batch_sizes = warmup_batch_sizes
 
         # Stats
         self.init_stats()
@@ -159,21 +161,40 @@ class Predictor(object):
         # Input generation
         logger.info("Generating random inputs")
         self.resnet_inputs, self.inception_inputs = generate_inputs()
-        new_resnet = {}
-        new_inception = {}
-        for bs in range(200):
-            new_resnet[bs] = self.resnet_inputs[xrange(bs)]
-            new_inception[bs] = self.inception_inputs[xrange(bs)]
-        self.resnet_inputs = new_resnet
-        self.inception_inputs = new_inception
 
         logger.info("Warming up")
         self.warm_up()
 
     def warm_up(self):
-        for _ in range(100):
-            time = datetime.now()
-            self.predict([(msg_id, time) for msg_id in range(10)])
+        # for _ in range(100):
+        #     time = datetime.now()
+        #     self.predict([(msg_id, time) for msg_id in range(10)])
+        #
+        # for i in range(1000):
+        #     if i % 20 < 10:
+        #         batch_size = 28
+        #     else:
+        #         batch_size = 32
+        #     time = datetime.now()
+        #     self.predict([(msg_id, time) for msg_id in range(batch_size)])
+            
+        for batch_size in self.warmup_batch_sizes:
+            for _ in range(1000):
+                bs = int(batch_size * (1 + np.random.normal(0, .2)))
+                time = datetime.now()
+                self.predict([(msg_id, time) for msg_id in range(bs)])
+
+        self.init_stats()
+        self.stats = {
+            "thrus": [],
+            "p99_lats": [],
+            "mean_lats": [],
+            "all_lats": [],
+            "p99_batch_predict_lats": [],
+            "p99_queue_lats": [],
+            "mean_batch_sizes": [],
+            "per_message_lats": {}
+        }
 
     def init_stats(self):
         self.latencies = []
@@ -221,18 +242,13 @@ class Predictor(object):
         pred_begin = datetime.now()
 
         batch_size = len(requests)
-        resnet_inputs = self.resnet_inputs[batch_size]
-        inception_inputs = self.inception_inputs[batch_size]
+        idxs = np.random.randint(0, len(self.resnet_inputs), batch_size)
+        resnet_inputs = self.resnet_inputs[idxs]
+        inception_inputs = self.inception_inputs[idxs]
 
-        resnet_svm_future = self.task_execution_thread_pool.submit(
-            lambda inputs : self.kernel_svm_model.predict(self.resnet_model.predict(inputs)), resnet_inputs)
-        
-        inception_log_reg_future = self.task_execution_thread_pool.submit(
-            lambda inputs : self.log_reg_model.predict(self.inception_model.predict(inputs)), inception_inputs)
-
-        resnet_svm_classes = resnet_svm_future.result()
-        inception_log_reg_classes = inception_log_reg_future.result()
-
+        # self._predict_sequential(resnet_inputs, inception_inputs)
+        self._predict_parallel(resnet_inputs, inception_inputs)
+    
         pred_end = datetime.now()
 
         self.stats_thread_pool.submit(self._update_stats, requests, pred_begin, pred_end, batch_size)
@@ -254,7 +270,20 @@ class Predictor(object):
                 self.trial_num_complete = 0
         except Exception as e:
             print(e)
-    
+
+    def _predict_parallel(self, resnet_inputs, inception_inputs):
+        resnet_svm_future = self.task_execution_thread_pool.submit(
+            lambda inputs : self.kernel_svm_model.predict(self.resnet_model.predict(inputs)), resnet_inputs)
+        
+        inception_log_reg_future = self.task_execution_thread_pool.submit(
+            lambda inputs : self.log_reg_model.predict(self.inception_model.predict(inputs)), inception_inputs)
+
+        resnet_svm_classes = resnet_svm_future.result()
+        inception_log_reg_classes = inception_log_reg_future.result()
+
+    def _predict_sequential(self, resnet_inputs, inception_inputs):
+        self.kernel_svm_model.predict(self.resnet_model.predict(resnet_inputs))
+        self.log_reg_model.predict(self.inception_model.predict(inception_inputs))
 
 class DriverBenchmarker(object):
     def __init__(self, models_dict, trial_length):
@@ -268,6 +297,7 @@ class DriverBenchmarker(object):
     def run(self, num_trials, batch_size, num_cpus, replica_num, slo_millis, process_file=None, request_delay=None):
         if process_file:
             self._benchmark_arrival_process(replica_num, num_trials, batch_size, slo_millis, process_file)
+            # self._benchmark_arrival_process_BUGGED(replica_num, num_trials, batch_size, slo_millis, process_file)
         elif request_delay:
             self._benchmark_over_under(replica_num, num_trials, batch_size, slo_millis, request_delay)
         else:
@@ -279,7 +309,7 @@ class DriverBenchmarker(object):
 
         logger.info("Starting predictions")
 
-        predictor = Predictor(self.models_dict, trial_length=self.trial_length)
+        predictor = Predictor(self.models_dict, trial_length=self.trial_length, warmup_batch_sizes=[batch_size, batch_size * 2.2])
         while True:
             send_time = datetime.now()
             send_times = [send_time for _ in range(batch_size)]
@@ -312,19 +342,95 @@ class DriverBenchmarker(object):
         processor_thread.join()
 
     def _benchmark_arrival_process(self, replica_num, num_trials, batch_size, slo_millis, process_file):
+        arrival_process = load_tagged_arrival_deltas(process_file)
+        predictor = Predictor(self.models_dict, trial_length=self.trial_length, warmup_batch_sizes=[32, 70])
+
+        logger.info("Starting predictions...")
+
+        benchmark_begin = datetime.now()
+        curr_timestamp = 0
+        curr_idx = 0
+        request_queue = deque()
+        while curr_idx < len(arrival_process):
+            first_delay_millis, first_replica_num = arrival_process[curr_idx]
+            first_delay_seconds = first_delay_millis * .001
+            curr_timestamp += first_delay_seconds
+            curr_idx += 1
+            if first_replica_num == replica_num:
+                batch = [(curr_idx, benchmark_begin + timedelta(seconds=curr_timestamp))]
+                break
+
+        if len(batch) == 0:
+            print("Arrival process contained no tags for replica: {}".format(replica_num))
+            return
+
+        while curr_idx < len(arrival_process):
+            pred_begin = datetime.now()
+            predictor.predict(batch)
+            pred_end = datetime.now()
+            batch_latency = (pred_end - pred_begin).total_seconds()
+            end_timestamp = curr_timestamp + batch_latency
+
+            batch = []
+            new_idx = curr_idx
+            new_timestamp = curr_timestamp
+            while new_idx < len(arrival_process):
+                prev_new_timestamp = new_timestamp
+                request_delay_millis, request_replica_num = arrival_process[new_idx]
+                request_delay_seconds = request_delay_millis * .001
+                new_timestamp += request_delay_seconds
+                
+                if new_timestamp <= end_timestamp:
+                    if request_replica_num == replica_num:
+                        request_queue.append((new_idx, benchmark_begin + timedelta(seconds=new_timestamp)))
+
+                    new_idx += 1
+                
+                else:
+                    # We have added all requests received 
+                    # during the previous batch prediction to the queue.
+                    # We can now construct a batch.
+                    while len(batch) < batch_size and len(request_queue) > 0:
+                        batch.append(request_queue.popleft())
+
+                    if len(batch) == 0:
+                        print("PERFORMING A SLEEP FOR: {} SECONDS".format((new_timestamp - end_timestamp)))
+                        # If no requests were sent during the prediction interval,
+                        # we should sleep until requests are available. This is
+                        # precisely the difference between "new_timestamp"
+                        # and the prediction's "end_timestamp"
+                        self._spin_sleep(new_timestamp - end_timestamp)
+                        end_timestamp = new_timestamp
+                        new_timestamp = prev_new_timestamp
+
+                    else:
+                        # The delay until the next request should be reduced to account for the fact
+                        # that the batch prediction end time may (and likely does) fall in the interval
+                        # between two requests
+                        next_arrival_delay, next_arrival_replica = arrival_process[new_idx]
+                        arrival_process[new_idx] = (next_arrival_delay - (end_timestamp - prev_new_timestamp), next_arrival_replica)
+
+                        new_timestamp = end_timestamp
+                        curr_timestamp = new_timestamp
+                        curr_idx = new_idx
+                        break
+
+            if len(batch) == 0:
+                print("Process finished!")
+                break
+
+        save_results(self.configs, [predictor.stats], "single_proc_bs_{}_bench".format(batch_size), slo_millis, process_num=replica_num)
+
+    def _benchmark_arrival_process_BUGGED(self, replica_num, num_trials, batch_size, slo_millis, process_file):
         logger.info("Parsing arrival process")
         arrival_process = load_tagged_arrival_deltas(process_file)
-        arrival_process = condense_delays(arrival_process, replica_num)
-        with open("CONDENSED.deltas", "w+") as f:
-            for delay, tag in arrival_process:
-                line = "{},{}\n".format(delay, tag)
-                f.write(line)
+        # arrival_process = condense_delays(arrival_process, replica_num)
 
         logger.info("Initializing processor thread")
         processor_thread = Thread(target=self._run_async_query_processor, args=(replica_num, num_trials, batch_size, slo_millis, process_file))
         processor_thread.start()
         time.sleep(60)
-        
+
         logger.info("Starting predictions")
 
         for idx in range(len(arrival_process)):
