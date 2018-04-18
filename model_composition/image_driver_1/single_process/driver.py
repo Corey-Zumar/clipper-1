@@ -300,7 +300,7 @@ class DriverBenchmarker(object):
 
         logger.info("Starting predictions")
 
-        predictor = Predictor(self.models_dict, warmup_batch_sizes=[])
+        predictor = Predictor(self.models_dict, warmup_batch_sizes=[60])
         stats_manager = StatsManager(self.trial_length)
 
         curr_timestamp = 0

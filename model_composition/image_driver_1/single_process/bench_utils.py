@@ -31,7 +31,7 @@ def load_arrival_procs():
 
 def find_peak_arrival_proc(arrival_procs, target_thru):
     for mean_delta, proc in arrival_procs.iteritems():
-        mean_thru = calculate_peak_throughput(proc, slo_window_millis=500)
+        mean_thru = calculate_peak_throughput(proc, slo_window_millis=350)
         print(abs(mean_delta), mean_thru)
         if mean_thru <= target_thru:
             return mean_delta
