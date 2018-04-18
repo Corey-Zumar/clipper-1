@@ -307,9 +307,6 @@ class DriverBenchmarker(object):
     def _benchmark_batches(self, replica_num, num_trials, batch_size, slo_millis):
         logger.info("*** BATCH TUNING BENCHMARK ***")
 
-        logger.info("Generating random inputs")
-        resnet_inputs, inception_inputs = generate_inputs()
-
         logger.info("Starting predictions")
 
         predictor = Predictor(self.models_dict, warmup_batch_sizes=[60])
