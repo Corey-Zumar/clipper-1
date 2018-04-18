@@ -35,7 +35,7 @@ TF_LANG_DETECT = "tf-lang-detect"
 TF_NMT = "tf-nmt"
 TF_LSTM = "tf-lstm"
 
-REMOTE_ADDR = "172.30.0.164"
+REMOTE_ADDR = "localhost"
 
 
 def get_heavy_node_config(model_name,
@@ -239,7 +239,8 @@ def get_input_size(config):
 def setup_clipper(configs):
     cl = ClipperConnection(DockerContainerManager(redis_port=6380))
     cl.connect()
-    cl.stop_all(remote_addrs=[REMOTE_ADDR])
+    # cl.stop_all(remote_addrs=[REMOTE_ADDR])
+    cl.stop_all()
     cl.start_clipper(
         query_frontend_image="clipper/zmq_frontend:develop",
         redis_cpu_str="0",
@@ -484,14 +485,15 @@ def run_profiler(config, trial_length, driver_path, input_size, profiler_cores_s
     cl.set_full_batches()
     time.sleep(1)
     latency_results = run(0, 8, "latency", "batch", batch_size=config.batch_size)
-    cl.stop_all(remote_addrs=[REMOTE_ADDR])
+    # cl.stop_all(remote_addrs=[REMOTE_ADDR])
+    cl.stop_all()
     return throughput_results, latency_results
 
 
 if __name__ == "__main__":
     gpu = 0
-    model = TF_RESNET
-    batch_sizes = [1, 2, 4, 6, 8, 12]
+    model = TF_LANG_DETECT
+    batch_sizes = [1, 2, 4, 6, 8, 10, 12, 16, 24, 32, 48, 64]
     for batch_size in batch_sizes:
         config = get_heavy_node_config(
             model_name=model,
@@ -499,15 +501,15 @@ if __name__ == "__main__":
             num_replicas=1,
             cpus_per_replica=1,
             allocated_cpus=[8],
-            allocated_gpus=[7],
-            remote_addr=REMOTE_ADDR,
+            allocated_gpus=[7]
+            # remote_addr=REMOTE_ADDR,
         )
 
         input_size = get_input_size(config)
         throughput_results, latency_results = run_profiler(
             config, 2000, "../../release/src/inferline_client/profiler",
             input_size, "9,25,10,26,11,27,12,28")
-        fname = "k80-remote-{model}-batch-{batch}".format(
+        fname = "v100-remote-{model}-batch-{batch}".format(
             model=model, batch=batch_size, gpu=gpu)
         results_dir = "{model}-SMP-gpu-{gpu}-remote".format(model=model, gpu=gpu)
         driver_utils.save_results_cpp_client(
