@@ -4,7 +4,7 @@ FROM clipper/clipper-base:${CODE_VERSION}
 RUN cd /clipper/release \
     && make -j8 clipper_zmq_frontend
 
-RUN apt-get install -y gdb
+RUN apt-get update && apt-get install -y gdb
 
 ENTRYPOINT ["/clipper/release/src/zmq_frontend/clipper_zmq_frontend"]
 
