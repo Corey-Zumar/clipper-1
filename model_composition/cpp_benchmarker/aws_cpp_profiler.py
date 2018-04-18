@@ -367,17 +367,17 @@ def load_metrics(client_path, clipper_path):
                 clipper_metrics_str += "]"
             try:
                 client_metrics = json.loads(client_metrics_str)
-            except ValueError:
+            except ValueError as e:
                 logger.warn("Unable to parse client metrics: {}. Skipping...".format(e))
                 return None
             try:
                 clipper_metrics = json.loads(clipper_metrics_str)
-            except ValueError:
+            except ValueError as e:
                 logger.warn("Unable to parse clipper metrics: {}. Skipping...".format(e))
                 return None
         return client_metrics, clipper_metrics
 
-    except IOError:
+    except IOError as e:
         logger.warn("Unable to parse clipper metrics: {}. Skipping...".format(e))
         return None
 
