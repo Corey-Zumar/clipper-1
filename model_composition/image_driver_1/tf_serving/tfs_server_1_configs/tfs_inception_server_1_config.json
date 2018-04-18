@@ -1,0 +1,9 @@
+{
+  "model_name": "inception",
+  "num_replicas": 1,
+  "cpus_per_replica": 2,
+  "allocated_cpus": [3, 19],
+  "allocated_gpus": [0],
+  "host": "localhost",
+  "ports": [9508]
+}
