@@ -205,7 +205,6 @@ class Predictor(object):
 
     def __init__(self, models_dict, warmup_batch_sizes):
         self.task_execution_thread_pool = ThreadPoolExecutor(max_workers=2)
-        self.stats_thread_pool = ThreadPoolExecutor(max_workers=2)
         self.warmup_batch_sizes = warmup_batch_sizes
 
         # Models
@@ -288,63 +287,57 @@ class DriverBenchmarker(object):
     def run(self, num_trials, batch_size, num_cpus, replica_num, slo_millis, process_file=None, request_delay=None):
         if process_file:
             self._benchmark_arrival_process(replica_num, num_trials, batch_size, slo_millis, process_file)
-            # self._benchmark_arrival_process_BUGGED(replica_num, num_trials, batch_size, slo_millis, process_file)
         elif request_delay:
-            self._benchmark_over_under(replica_num, num_trials, batch_size, slo_millis, request_delay)
+            raise
         else:
             self._benchmark_batches(replica_num, num_trials, batch_size, slo_millis)
 
     def _benchmark_batches(self, replica_num, num_trials, batch_size, slo_millis):
+        logger.info("*** BATCH TUNING BENCHMARK ***")
+
         logger.info("Generating random inputs")
         resnet_inputs, inception_inputs = generate_inputs()
 
         logger.info("Starting predictions")
 
-        predictor = Predictor(self.models_dict, trial_length=self.trial_length, warmup_batch_sizes=[])
-        while True:
-            send_time = datetime.now()
-            batch = [(i, send_time) for i in range(batch_size)]
-            
-            predictor.predict(batch) 
+        predictor = Predictor(self.models_dict, warmup_batch_sizes=[])
+        stats_manager = StatsManager(self.trial_length)
 
-            if len(predictor.stats["thrus"]) > num_trials:
+        curr_timestamp = 0
+        while True:
+            batch = [(i, curr_timestamp) for i in range(batch_size)]
+            begin_time = datetime.now()
+            predictor.predict(batch)
+            end_time = datetime.now()
+            batch_latency = (end_time - begin_time).total_seconds()
+            end_timestamp = curr_timestamp + batch_latency
+
+            stats_manager.update_stats(batch, end_timestamp, batch_latency)
+
+            curr_timestamp = end_timestamp
+
+            if len(stats_manager.stats["thrus"]) > num_trials:
                 break
 
         save_results(self.configs, [predictor.stats], "single_proc_bs_{}_bench".format(batch_size), slo_millis, process_num=replica_num)
 
-    def _benchmark_request_delay(self, replica_num, num_trials, batch_size, slo_millis, request_delay_seconds):
-        logger.info("Initializing processor thread")
-        processor_thread = Thread(target=self._run_async_query_processor, args=(replica_num, num_trials, batch_size, slo_millis, None))
-        processor_thread.start()
-        time.sleep(60)
-        
-        logger.info("Starting predictions")
-
-        for i in range(10000):
-            send_time = datetime.now()
-            self.request_queue.put((msg_id, send_time))
-            time.sleep(request_delay_seconds)
-            # self._spin_sleep(request_delay_seconds)
-
-        processor_thread.join()
-
     def _benchmark_arrival_process(self, replica_num, num_trials, batch_size, slo_millis, process_file):
-        arrival_process = load_tagged_arrival_deltas(process_file)
-        print(calculate_mean_throughput([item[0] for item in arrival_process]))
-        # arrival_process = [(91, 0) for _ in range(50000)] 
+        logger.info("*** ARRIVAL PROCESS BENCHMARK ***")
+
+        arrival_deltas_millis = load_tagged_arrival_deltas(process_file)
+        arrival_deltas_seconds = [(.001 * delta, replica) for delta, replica in arrival_deltas_millis]
 
         predictor = Predictor(self.models_dict, warmup_batch_sizes=[])
         stats_manager = StatsManager(self.trial_length)
 
-        logger.info("Starting predictions...")
+        logger.info("Starting predictions")
 
         benchmark_begin = datetime.now()
         curr_timestamp = 0
         curr_idx = 0
         request_queue = deque()
-        while curr_idx < len(arrival_process):
-            first_delay_millis, first_replica_num = arrival_process[curr_idx]
-            first_delay_seconds = first_delay_millis * .001
+        while curr_idx < len(arrival_deltas_seconds):
+            first_delay_seconds, first_replica_num = arrival_deltas_seconds[curr_idx]
             curr_timestamp += first_delay_seconds
             curr_idx += 1
             if first_replica_num == replica_num:
@@ -355,7 +348,7 @@ class DriverBenchmarker(object):
             print("Arrival process contained no tags for replica: {}".format(replica_num))
             return
 
-        while curr_idx < len(arrival_process):
+        while curr_idx < len(arrival_deltas_seconds):
             pred_begin = datetime.now()
             predictor.predict(batch)
             pred_end = datetime.now()
@@ -371,10 +364,9 @@ class DriverBenchmarker(object):
             new_idx = curr_idx
             new_timestamp = curr_timestamp
 
-            while new_idx < len(arrival_process):
+            while new_idx < len(arrival_deltas_seconds):
                 prev_new_timestamp = new_timestamp
-                request_delay_millis, request_replica_num = arrival_process[new_idx]
-                request_delay_seconds = request_delay_millis * .001
+                request_delay_seconds, request_replica_num = arrival_deltas_seconds[new_idx]
                 new_timestamp += request_delay_seconds
                 
                 if new_timestamp <= end_timestamp:
@@ -402,9 +394,8 @@ class DriverBenchmarker(object):
                         # The delay until the next request should be reduced to account for the fact
                         # that the batch prediction end time may (and likely does) fall in the interval
                         # between two requests
-                        next_arrival_delay_millis, next_arrival_replica = arrival_process[new_idx]
-                        next_arrival_delay_seconds = next_arrival_delay_millis * .001
-                        arrival_process[new_idx] = (next_arrival_delay_seconds - (end_timestamp - prev_new_timestamp), next_arrival_replica)
+                        next_arrival_delay_seconds, next_arrival_replica = arrival_deltas_seconds[new_idx]
+                        arrival_deltas_seconds[new_idx] = (next_arrival_delay_seconds - (end_timestamp - prev_new_timestamp), next_arrival_replica)
 
                         new_timestamp = end_timestamp
                         curr_timestamp = new_timestamp
@@ -416,72 +407,6 @@ class DriverBenchmarker(object):
                 break
 
         save_results(self.configs, [stats_manager.stats], "single_proc_bs_{}_bench".format(batch_size), slo_millis, process_num=replica_num)
-
-    def _benchmark_arrival_process_BUGGED(self, replica_num, num_trials, batch_size, slo_millis, process_file):
-        logger.info("Parsing arrival process")
-        arrival_process = load_tagged_arrival_deltas(process_file)
-
-        logger.info("Initializing processor thread")
-        processor_thread = Thread(target=self._run_async_query_processor, args=(replica_num, num_trials, batch_size, slo_millis, process_file))
-        processor_thread.start()
-        time.sleep(60)
-
-        logger.info("Starting predictions")
-
-        queue_adds = 0
-        ingest_begin = datetime.now()
-        idx_begin = 0
-        for idx in range(len(arrival_process)):
-            request_delay_millis, request_replica_num = arrival_process[idx]
-            request_delay_seconds = request_delay_millis * .001
-
-            if request_replica_num == replica_num:
-                send_time = datetime.now()
-                msg_id = idx
-                self.request_queue.put((msg_id, send_time))
-                queue_adds += 1
-
-            if idx - idx_begin == 400:
-                print("Ingest thru: {}".format(float(queue_adds) / (datetime.now() - ingest_begin).total_seconds()))
-                idx_begin = idx
-                queue_adds = 0
-
-            time.sleep(request_delay_seconds)
-            # self._spin_sleep(request_delay_seconds)
-
-        processor_thread.join()
-
-    def _spin_sleep(self, request_delay_seconds):
-        if request_delay_seconds <= 0:
-            return
-
-        sleep_end_time = datetime.now() + timedelta(seconds=request_delay_seconds)
-        while datetime.now() < sleep_end_time:
-            continue
-
-    def _run_async_query_processor(self, replica_num, num_trials, batch_size, slo_millis, process_file):
-        predictor = Predictor(self.models_dict, trial_length=self.trial_length, warmup_batch_sizes=[])
-        loop_lats = []
-        prev_stats_len = 0
-        while True:
-            curr_batch = []
-            batch_item = self.request_queue.get(block=True)
-            curr_batch.append(batch_item)
-            while len(curr_batch) < batch_size and (not self.request_queue.empty()):
-                try:
-                    batch_item = self.request_queue.get_nowait()
-                    curr_batch.append(batch_item)
-                except Queue.Empty:
-                    break
-
-            predictor.predict(curr_batch)
-
-            if len(predictor.stats["thrus"]) > num_trials:
-                break
-
-        save_results(self.configs, [predictor.stats], "single_proc_arrival_procs", slo_millis, process_num=replica_num, arrival_process=process_file)
-        sys.exit(0)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Single Process Image Driver 1')
