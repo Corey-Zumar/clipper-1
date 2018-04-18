@@ -236,6 +236,7 @@ class Predictor(object):
             
         for batch_size in self.warmup_batch_sizes:
             warmup_lats = []
+            warmup_batch_sizes = []
             for i in range(1000):
                 bs = max(1, int(batch_size * (1 + np.random.normal(0, .2))))
                 time = datetime.now()
@@ -245,11 +246,14 @@ class Predictor(object):
                 end = datetime.now()
                 batch_latency = (end - begin).total_seconds()
                 warmup_lats.append(batch_latency)
+                warmup_batch_sizes.append(bs)
 
                 if i % 30 == 0:
                     p99_lat = np.percentile(warmup_lats, 99)
-                    logger.info("p99 warmup batch latency: {}".format(p99_lat))
+                    mean_batch = np.mean(warmup_batch_sizes)
+                    logger.info("Warmup - p99 batch latency: {}, mean_batch: {}".format(p99_lat, mean_batch))
                     warmup_lats = []
+                    warmup_batch_sizes = []
 
     def predict(self, requests):
         """
