@@ -232,12 +232,24 @@ class Predictor(object):
         #         batch_size = 32
         #     time = datetime.now()
         #     self.predict([(msg_id, time) for msg_id in range(batch_size)])
+
             
         for batch_size in self.warmup_batch_sizes:
-            for _ in range(1000):
+            warmup_lats = []
+            for i in range(1000):
                 bs = max(1, int(batch_size * (1 + np.random.normal(0, .2))))
                 time = datetime.now()
+                batch = [(msg_id, time) for msg_id in range(bs)]
+                begin = datetime.now()
                 self.predict([(msg_id, time) for msg_id in range(bs)])
+                end = datetime.now()
+                batch_latency = (end - begin).total_seconds()
+                warmup_lats.append(batch_latency)
+
+                if i % 30 == 0:
+                    p99_lat = np.percentile(warmup_lats, 99)
+                    logger.info("p99 warmup batch latency: {}".format(p99_lat))
+                    warmup_lats = []
 
     def predict(self, requests):
         """
