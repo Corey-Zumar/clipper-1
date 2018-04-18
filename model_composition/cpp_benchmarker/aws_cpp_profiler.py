@@ -354,27 +354,32 @@ def print_stats(client_metrics, clipper_metrics):
 
 
 def load_metrics(client_path, clipper_path):
-    with open(client_path, "r") as client_file, \
-            open(clipper_path, "r") as clipper_file:
-        client_metrics_str = client_file.read().strip()
-        clipper_metrics_str = clipper_file.read().strip()
-        if client_metrics_str[-1] == ",":
-            client_metrics_str = client_metrics_str.rstrip(",")
-            client_metrics_str += "]"
-        if clipper_metrics_str[-1] == ",":
-            clipper_metrics_str = clipper_metrics_str.rstrip(",")
-            clipper_metrics_str += "]"
-        try:
-            client_metrics = json.loads(client_metrics_str)
-        except ValueError:
-            # logger.warn("Unable to parse client metrics: {}. Skipping...".format(e))
-            return None
-        try:
-            clipper_metrics = json.loads(clipper_metrics_str)
-        except ValueError:
-            # logger.warn("Unable to parse clipper metrics: {}. Skipping...".format(e))
-            return None
-    return client_metrics, clipper_metrics
+    try:
+        with open(client_path, "r") as client_file, \
+                open(clipper_path, "r") as clipper_file:
+            client_metrics_str = client_file.read().strip()
+            clipper_metrics_str = clipper_file.read().strip()
+            if client_metrics_str[-1] == ",":
+                client_metrics_str = client_metrics_str.rstrip(",")
+                client_metrics_str += "]"
+            if clipper_metrics_str[-1] == ",":
+                clipper_metrics_str = clipper_metrics_str.rstrip(",")
+                clipper_metrics_str += "]"
+            try:
+                client_metrics = json.loads(client_metrics_str)
+            except ValueError:
+                logger.warn("Unable to parse client metrics: {}. Skipping...".format(e))
+                return None
+            try:
+                clipper_metrics = json.loads(clipper_metrics_str)
+            except ValueError:
+                logger.warn("Unable to parse clipper metrics: {}. Skipping...".format(e))
+                return None
+        return client_metrics, clipper_metrics
+
+    except IOError:
+        logger.warn("Unable to parse clipper metrics: {}. Skipping...".format(e))
+        return None
 
 
 def load_lineage(lineage_path):
