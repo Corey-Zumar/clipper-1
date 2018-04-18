@@ -39,6 +39,11 @@ KERNEL_SVM_OUTPUT_KEY = "outputs"
 LOG_REG_OUTPUT_KEY = "outputs"
 
 CONFIG_KEY_CLIENT_CONFIG_PATHS = "server_config_paths"
+CONFIG_KEY_NUM_TRIALS = "num_trials"
+CONFIG_KEY_TRIAL_LENGTH = "trial_length"
+CONFIG_KEY_NUM_CLIENTS = "num_clients"
+CONFIG_KEY_SLO_MILLIS = "slo_millis"
+CONFIG_KEY_PROCESS_PATH = "process_path"
 
 ########## Client Setup ##########
 
@@ -49,28 +54,52 @@ class ClientConfig:
         self.host = host
         self.port = port
 
+class ExperimentConfig(num_trials, trial_length, num_clients, slo_millis, process_path, model_configs):
+
+    def __init__(self):
+        self.num_trials = num_trials
+        self.trial_length = trial_length
+        self.num_clients = num_clients
+        self.slo_millis = slo_millis
+        self.process_path = process_path
+        self.model_configs = model_configs
+
 def load_experiment_config(config_path):
     with open(config_path, "r") as f:
-        experiment_config = json.load(config_path)
+        experiment_config_params = json.load(config_path)
 
-    client_config_paths = experiment_config[CONFIG_KEY_CLIENT_CONFIG_PATHS]
+    client_config_paths = experiment_config_params[CONFIG_KEY_CLIENT_CONFIG_PATHS]
 
-    output_configs = {}
+    num_trials = experiment_config_params[CONFIG_KEY_NUM_TRIALS]
+    trial_length = experiment_config_params[CONFIG_KEY_TRIAL_LENGTH]
+    num_clients = experiment_config_params[CONFIG_KEY_NUM_CLIENTS]
+    slo_millis = experiment_config_params[CONFIG_KEY_SLO_MILLIS]
+    process_path = experiment_config_params[CONFIG_KEY_PROCESS_PATH]
+
+
+    model_configs = {}
     for path in client_config_paths:
         client_configs = load_client_configs(path)
         for config in client_configs:
             model_name, host, ports = config
-            required_replicas = experiment_config[model_name]
+            required_replicas = experiment_config_params[model_name]
             
-            if model_name not in output_configs:
-                output_configs[model_name] = []
+            if model_name not in model_configs:
+                model_configs[model_name] = []
 
-            while len(output_configs[model_name]) < required_replicas and len(ports) > 0:
+            while len(model_configs[model_name]) < required_replicas and len(ports) > 0:
                 port = ports.pop(0)
                 new_config = ClientConfig(model_name, host, port)
-                output_configs[model_name].append(new_config)
+                model_configs[model_name].append(new_config)
 
-    return output_configs
+    experiment_config = ExperimentConfig(num_trials, 
+                                         trial_length, 
+                                         num_clients, 
+                                         slo_millis, 
+                                         process_path, 
+                                         model_configs)
+
+    return experiment_config 
 
 def create_clients(configs):
     """
@@ -254,7 +283,7 @@ class DriverBenchmarker(object):
         self.queue = queue
         self.configs = configs
 
-    def run(self, num_trials, request_delay=.01, arrival_process=None):
+    def run(self, num_trials, arrival_process):
         logger.info("Creating clients!")
         clients = create_clients(self.configs)
 
@@ -262,7 +291,6 @@ class DriverBenchmarker(object):
         base_inputs = [(self._get_resnet_input(), self._get_inception_input()) for _ in range(1000)]
         inputs = [i for _ in range(40) for i in base_inputs]
         logger.info("Starting predictions")
-        start_time = datetime.now()
         predictor = Predictor(trial_length=self.trial_length, clients=clients)
 
         for i in range(len(inputs)):
@@ -272,12 +300,26 @@ class DriverBenchmarker(object):
             if len(predictor.stats["thrus"]) >= num_trials:
                 break
 
-            if arrival_process is not None:
-                request_delay = arrival_process[i] * .001
+            request_delay = arrival_process[i] * .001
 
             time.sleep(request_delay)
 
         self.queue.put(predictor.stats)
+
+    def warm_up(self):
+        request_delay = .1
+        clients = create_clients(self.configs)
+
+        logger.info("Generating random inputs")
+        base_inputs = [(self._get_resnet_input(), self._get_inception_input()) for _ in range(1000)]
+        inputs = [i for _ in range(40) for i in base_inputs]
+        logger.info("Starting predictions")
+        predictor = Predictor(trial_length=self.trial_length, clients=clients)
+
+        for i in range(len(inputs)):
+            resnet_input, inception_input = inputs[i]
+            predictor.predict(resnet_input, inception_input)
+            time.sleep(request_delay)
 
     def _get_resnet_input(self):
         resnet_input = np.array(np.random.rand(224, 224, 3) * 255, dtype=np.float32)
@@ -287,53 +329,49 @@ class DriverBenchmarker(object):
         inception_input = np.array(np.random.rand(299, 299, 3) * 255, dtype=np.float32)
         return inception_input
 
-class RequestDelayConfig:
-    def __init__(self, request_delay):
-        self.request_delay = request_delay
-
-    def to_json(self):
-        return json.dumps(self.__dict__)
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Clipper image driver 1')
-    parser.add_argument('-rd', '--request_delay', type=float, default=.015, help="The delay, in seconds, between requests")
-    parser.add_argument('-t', '--num_trials', type=int, default=20, help="The number of trials to conduct")
-    parser.add_argument('-l', '--trial_length', type=int, default=100, help="The length of each trial, in number of requests")
-    parser.add_argument('-n', '--num_clients', type=int, default=16, help='number of clients')
-    parser.add_argument('-p', '--process_file', type=str, help='The arrival process file path')
     parser.add_argument('-w', '--warmup', action='store_true')
-    parser.add_argument('-s',  '--slo_millis', type=int, help="The latency SLO, in milliseconds")
     parser.add_argument('-e', '--experiment_config_path', type=str)
 
     args = parser.parse_args()
 
-    model_configs = load_experiment_config(args.experiment_config_path)
-    
-    queue = Queue()
+    experiment_config = load_experiment_config(args.experiment_config_path)
 
-    arrival_process = None
-    if args.process_file:
-        arrival_process = tfs_utils.load_arrival_deltas(args.process_file)
+
+    if args.warmup:
+        benchmarker = DriverBenchmarker(experiment_config.trial_length, queue, model_configs)
+        benchmarker.warm_up()
+
+    else:
+        queue = Queue()
+
+        arrival_process = tfs_utils.load_arrival_deltas(experiment_config.process_path)
         mean_throughput = tfs_utils.calculate_mean_throughput(arrival_process)
         peak_throughput = tfs_utils.calculate_peak_throughput(arrival_process)
 
         print("Mean throughput: {}\nPeak throughput: {}".format(mean_throughput, peak_throughput))
-        
-    procs = []
-    for i in range(args.num_clients):
-        benchmarker = DriverBenchmarker(args.trial_length, queue, model_configs)
-        p = Process(target=benchmarker.run, args=(args.num_trials, args.request_delay, arrival_process))
-        p.start()
-        procs.append(p)
+            
+        procs = []
+        for i in range(experiment_config.num_clients):
+            benchmarker = DriverBenchmarker(experiment_config.trial_length, queue, model_configs)
+            p = Process(target=benchmarker.run, args=(experiment_config.num_trials, arrival_process))
+            p.start()
+            procs.append(p)
 
-    all_stats = []
-    for i in range(args.num_clients):
-        all_stats.append(queue.get())
+        all_stats = []
+        for i in range(experiment_config.num_clients):
+            all_stats.append(queue.get())
 
-    # Save Results
+        # Save Results
 
-    all_configs = model_configs.values()
+        all_configs = model_configs.values()
 
-    fname = "{clients}_clients".format(clients=args.num_clients)
-    tfs_utils.save_results(all_configs, all_stats, "tf_image_driver_1_exps", prefix=fname, slo_millis=args.slo_millis, arrival_process=args.process_file)
-    sys.exit(0)
+        fname = "{clients}_clients".format(clients=experiment_config.num_clients)
+        tfs_utils.save_results(all_configs, 
+                               all_stats, 
+                               "tf_image_driver_1_exps", 
+                               prefix=fname, 
+                               slo_millis=experiment_config.slo_millis, 
+                               arrival_process=experiment_config.process_file)
+        sys.exit(0)

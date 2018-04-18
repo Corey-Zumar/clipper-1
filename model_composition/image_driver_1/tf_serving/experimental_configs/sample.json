@@ -1,7 +1,15 @@
 {
-  "client_config_paths": ["../tfs_server_1_configs", "../tfs_server_2_configs"],
+  "client_config_paths": [
+                          "clipper/model_composition/image_driver_1/tf_serving/tfs_server_1_configs", 
+                          "clipper/model_composition/image_driver_1/tf_serving/tfs_server_2_configs"
+                          ],
   "resnet": 1,
   "inception": 1,
   "kernel_svm": 1,
-  "log_reg": 1
+  "log_reg": 1,
+  "num_trials": 20,
+  "trial_length": 100,
+  "num_clients": 1,
+  "slo_millis": 350,
+  "process_path": "clipper/model_composition/image_driver_1/tf_serving/cached_arrival_processes/10.deltas"
 }
