@@ -32,6 +32,7 @@ LOG_REG_PORTS = range(9516, 9524)
 KERNEL_SVM_PORTS = range(9524, 9532)
 
 CONFIG_KEY_MODEL_NAME = "model_name"
+CONFIG_KEY_BATCH_SIZE = "batch_size"
 CONFIG_KEY_NUM_REPLICAS = "num_replicas"
 CONFIG_KEY_CPUS_PER_REPLICA = "cpus_per_replica"
 CONFIG_KEY_ALLOCATED_CPUS = "allocated_cpus"
@@ -93,12 +94,14 @@ def load_server_configs(configs_dir_path):
             config_params = json.load(f)
 
         model_name = config_params[CONFIG_KEY_MODEL_NAME]
+        batch_size = config_params[CONFIG_KEY_BATCH_SIZE]
         num_replicas = config_params[CONFIG_KEY_NUM_REPLICAS]
         cpus_per_replica = config_params[CONFIG_KEY_CPUS_PER_REPLICA]
         allocated_cpus = config_params[CONFIG_KEY_ALLOCATED_CPUS]
         allocated_gpus = config_params[CONFIG_KEY_ALLOCATED_GPUS]
 
         config = get_heavy_node_config(model_name=model_name,
+                                       batch_size=batch_size,
                                        num_replicas=num_replicas,
                                        cpus_per_replica=cpus_per_replica,
                                        allocated_cpus=allocated_cpus,
