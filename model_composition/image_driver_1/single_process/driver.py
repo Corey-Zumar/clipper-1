@@ -319,7 +319,7 @@ class DriverBenchmarker(object):
             if len(stats_manager.stats["thrus"]) > num_trials:
                 break
 
-        save_results(self.configs, [predictor.stats], "single_proc_bs_{}_bench".format(batch_size), slo_millis, process_num=replica_num)
+        save_results(self.configs, [stats_manager.stats], "single_proc_bs_{}_bench".format(batch_size), slo_millis, process_num=replica_num)
 
     def _benchmark_arrival_process(self, replica_num, num_trials, batch_size, slo_millis, process_file):
         logger.info("*** ARRIVAL PROCESS BENCHMARK ***")
@@ -327,7 +327,7 @@ class DriverBenchmarker(object):
         arrival_deltas_millis = load_tagged_arrival_deltas(process_file)
         arrival_deltas_seconds = [(.001 * delta, replica) for delta, replica in arrival_deltas_millis]
 
-        predictor = Predictor(self.models_dict, warmup_batch_sizes=[])
+        predictor = Predictor(self.models_dict, warmup_batch_sizes=[32,70])
         stats_manager = StatsManager(self.trial_length)
 
         logger.info("Starting predictions")
