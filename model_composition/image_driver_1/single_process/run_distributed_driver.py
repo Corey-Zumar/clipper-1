@@ -8,7 +8,7 @@ CONFIG_KEY_BATCH_SIZE = "batch_size"
 CONFIG_KEY_CPU_AFFINITIES = "cpu_affinities"
 CONFIG_KEY_GPU_AFFINITIES = "gpu_affinities"
 CONFIG_KEY_TAGGED_PROCESS_PATH = "tagged_process_path"
-CONFIG_KEY_NUM_REPLICAS = "num_replicas"
+CONFIG_KEY_REPLICA_NUMS = "replica_nums"
 CONFIG_KEY_TRIAL_LENGTH = "trial_length"
 CONFIG_KEY_NUM_TRIALS = "num_trials"
 CONFIG_KEY_SLO_MILLIS = "slo_millis"
@@ -23,19 +23,20 @@ def launch_processes(config):
     batch_size = config[CONFIG_KEY_BATCH_SIZE]
     cpu_affinities = config[CONFIG_KEY_CPU_AFFINITIES]
     process_path = config[CONFIG_KEY_TAGGED_PROCESS_PATH]
-    num_replicas = int(config[CONFIG_KEY_NUM_REPLICAS])
+    replica_nums = config[CONFIG_KEY_REPLICA_NUMS]
     trial_length = config[CONFIG_KEY_TRIAL_LENGTH]
     num_trials = config[CONFIG_KEY_NUM_TRIALS]
     slo_millis = config[CONFIG_KEY_SLO_MILLIS]
     gpu_affinities = config[CONFIG_KEY_GPU_AFFINITIES]
 
-
-    for replica_num in range(num_replicas): 
-        cpu_affinity = cpu_affinities[replica_num]
+    for idx in range(len(replica_nums)):
+        replica_num = replica_nums[idx]
+        
+        cpu_affinity = cpu_affinities[idx]
         cpu_aff_list = cpu_affinity.split(" ")
         comma_delimited_cpu_aff = ",".join(cpu_aff_list)
 
-        gpu_affinity = gpu_affinities[replica_num]
+        gpu_affinity = gpu_affinities[idx]
         resnet_gpu, inception_gpu = gpu_affinity.split(" ")
 
         process_cmd = "(export CUDA_VISIBLE_DEVICES=\"{res_gpu},{incep_gpu}\";" \
