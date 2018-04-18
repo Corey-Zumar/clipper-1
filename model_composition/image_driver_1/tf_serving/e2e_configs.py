@@ -31,6 +31,14 @@ RESNET_152_PORTS = range(9508, 9516)
 LOG_REG_PORTS = range(9516, 9524)
 KERNEL_SVM_PORTS = range(9524, 9532)
 
+CONFIG_KEY_MODEL_NAME = "model_name"
+CONFIG_KEY_NUM_REPLICAS = "num_replicas"
+CONFIG_KEY_CPUS_PER_REPLICA = "cpus_per_replica"
+CONFIG_KEY_ALLOCATED_CPUS = "allocated_cpus"
+CONFIG_KEY_ALLOCATED_GPUS = "allocated_gpus"
+CONFIG_KEY_HOST = "host"
+CONFIG_KEY_PORTS = "ports"
+
 def get_heavy_node_config(model_name, batch_size, num_replicas, allocated_cpus, cpus_per_replica=2, allocated_gpus=[]):
     if model_name == INCEPTION_FEATS_MODEL_NAME:
         return tfs_utils.TFSHeavyNodeConfig(name=INCEPTION_FEATS_MODEL_NAME,
@@ -77,76 +85,41 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, allocated_cpus, 
                                             gpus=allocated_gpus,
                                             batch_size=batch_size)
 
-def get_setup_model_configs():
-    resnet_feats_config = get_heavy_node_config(model_name=RESNET_152_MODEL_NAME,
-                                                batch_size=1,
-                                                num_replicas=3,
-                                                cpus_per_replica=2,
-                                                allocated_cpus=[0,16,1,17,2,18,3,19,4,20],
-                                                allocated_gpus=[0,1,2])
+def load_server_configs(configs_dir_path):
+    config_paths = [os.path.join(configs_dir_path, path) for path in os.listdir(configs_dir_path) if ".json" in path]
+    server_configs = []
+    for path in config_paths:
+        with open(path, "r") as f:
+            config_params = json.load(f)
 
-    inception_feats_config = get_heavy_node_config(model_name=INCEPTION_FEATS_MODEL_NAME,
-                                                   batch_size=1,
-                                                   num_replicas=1,
-                                                   cpus_per_replica=2,
-                                                   allocated_cpus=[5,21,6,22,7,23],
-                                                   allocated_gpus=[3])
-    
-    kernel_svm_config = get_heavy_node_config(model_name=KERNEL_SVM_MODEL_NAME,
-                                              batch_size=1,
-                                              num_replicas=2,
-                                              cpus_per_replica=2,
-                                              allocated_cpus=[8,24,9,25])
+        model_name = config_params[CONFIG_KEY_MODEL_NAME]
+        num_replicas = config_params[CONFIG_KEY_NUM_REPLICAS]
+        cpus_per_replica = config_params[CONFIG_KEY_CPUS_PER_REPLICA]
+        allocated_cpus = config_params[CONFIG_KEY_ALLOCATED_CPUS]
+        allocated_gpus = config_params[CONFIG_KEY_ALLOCATED_GPUS]
 
+        config = get_heavy_node_config(model_name=model_name,
+                                       num_replicas=num_replicas,
+                                       cpus_per_replica=cpus_per_replica,
+                                       allocated_cpus=allocated_cpus,
+                                       allocated_gpus=allocated_gpus)
 
-    log_reg_config = get_heavy_node_config(model_name=LOG_REG_MODEL_NAME,
-                                           batch_size=1,
-                                           num_replicas=2,
-                                           cpus_per_replica=2,
-                                           allocated_cpus=[10,26,11,27])
+        server_configs.append(config)
 
-    model_configs = {
-        RESNET_152_MODEL_NAME : resnet_feats_config,
-        KERNEL_SVM_MODEL_NAME : kernel_svm_config,
-        INCEPTION_FEATS_MODEL_NAME : inception_feats_config,
-        LOG_REG_MODEL_NAME : log_reg_config
-    }
+    return server_configs
 
-    return model_configs
+def load_client_configs(configs_dir_path):
+    config_paths = [os.path.join(configs_dir_path, path) for path in os.listdir(configs_dir_path) if ".json" in path]
+    server_configs = []
+    for path in config_paths:
+        with open(path, "r") as f:
+            config_params = json.load(f)
 
-def get_benchmark_model_configs():
-    resnet_feats_config = get_heavy_node_config(model_name=RESNET_152_MODEL_NAME,
-                                                batch_size=1,
-                                                num_replicas=2,
-                                                cpus_per_replica=2,
-                                                allocated_cpus=[0,16,1,17,2,18,3,19,4,20],
-                                                allocated_gpus=[0,1,2])
+        model_name = config_params[CONFIG_KEY_MODEL_NAME]
+        host = config_params[CONFIG_KEY_HOST]
+        ports = config_params[CONFIG_KEY_PORTS]
 
-    inception_feats_config = get_heavy_node_config(model_name=INCEPTION_FEATS_MODEL_NAME,
-                                                   batch_size=1,
-                                                   num_replicas=1,
-                                                   cpus_per_replica=2,
-                                                   allocated_cpus=[5,21,6,22,7,23],
-                                                   allocated_gpus=[3])
-    
-    kernel_svm_config = get_heavy_node_config(model_name=KERNEL_SVM_MODEL_NAME,
-                                              batch_size=1,
-                                              num_replicas=1,
-                                              cpus_per_replica=2,
-                                              allocated_cpus=[8,24,9,25])
+        server_configs.append((model_name, host, ports))
 
+    return server_configs
 
-    log_reg_config = get_heavy_node_config(model_name=LOG_REG_MODEL_NAME,
-                                           batch_size=1,
-                                           num_replicas=1,
-                                           cpus_per_replica=2,
-                                           allocated_cpus=[10,26,11,27])
-
-    model_configs = {
-        RESNET_152_MODEL_NAME : resnet_feats_config,
-        KERNEL_SVM_MODEL_NAME : kernel_svm_config,
-        INCEPTION_FEATS_MODEL_NAME : inception_feats_config,
-        LOG_REG_MODEL_NAME : log_reg_config
-    }
-
-    return model_configs

@@ -1,0 +1,7 @@
+{
+  "client_config_paths": ["../tfs_server_1_configs", "../tfs_server_2_configs"],
+  "resnet": 1,
+  "inception": 1,
+  "kernel_svm": 1,
+  "log_reg": 1
+}

@@ -15,7 +15,7 @@ from multiprocessing import Process, Queue
 from tf_serving_utils import GRPCClient, ReplicaAddress
 from tf_serving_utils import tfs_utils
 
-from e2e_configs import get_setup_model_configs, get_benchmark_model_configs 
+from e2e_configs import load_client_configs  
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -38,9 +38,39 @@ RESNET_FEATS_OUTPUT_KEY = "feats"
 KERNEL_SVM_OUTPUT_KEY = "outputs"
 LOG_REG_OUTPUT_KEY = "outputs"
 
-TFS_ADDRESS = "localhost"
+CONFIG_KEY_CLIENT_CONFIG_PATHS = "server_config_paths"
 
 ########## Client Setup ##########
+
+class ClientConfig:
+
+    def __init__(model_name, host, port):
+        self.model_name = model_name
+        self.host = host
+        self.port = port
+
+def load_experiment_config(config_path):
+    with open(config_path, "r") as f:
+        experiment_config = json.load(config_path)
+
+    client_config_paths = experiment_config[CONFIG_KEY_CLIENT_CONFIG_PATHS]
+
+    output_configs = {}
+    for path in client_config_paths:
+        client_configs = load_client_configs(path)
+        for config in client_configs:
+            model_name, host, ports = config
+            required_replicas = experiment_config[model_name]
+            
+            if model_name not in output_configs:
+                output_configs[model_name] = []
+
+            while len(output_configs[model_name]) < required_replicas and len(ports) > 0:
+                port = ports.pop(0)
+                new_config = ClientConfig(model_name, host, port)
+                output_configs[model_name].append(new_config)
+
+    return output_configs
 
 def create_clients(configs):
     """
@@ -273,14 +303,12 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--process_file', type=str, help='The arrival process file path')
     parser.add_argument('-w', '--warmup', action='store_true')
     parser.add_argument('-s',  '--slo_millis', type=int, help="The latency SLO, in milliseconds")
+    parser.add_argument('-e', '--experiment_config_path', type=str)
 
     args = parser.parse_args()
-    
-    if args.warmup:
-        model_configs = get_setup_model_configs()
-    else:
-        model_configs = get_benchmark_model_configs()
 
+    model_configs = load_experiment_config(args.experiment_config_path)
+    
     queue = Queue()
 
     arrival_process = None
