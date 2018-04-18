@@ -16,7 +16,7 @@ from threading import Thread, Lock
 from single_proc_utils import HeavyNodeConfig, save_results
 from models import tf_resnet_model, inception_feats_model, tf_kernel_svm_model, tf_log_reg_model
 
-from e2e_utils import load_tagged_arrival_deltas, load_arrival_deltas 
+from e2e_utils import load_tagged_arrival_deltas, load_arrival_deltas, calculate_mean_throughput 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
     datefmt='%y-%m-%d:%H:%M:%S',
@@ -130,15 +130,12 @@ def condense_delays(arrival_process, replica_num):
 
 ########## Benchmarking ##########
 
-class Predictor(object):
+class StatsManager(object):
 
-    def __init__(self, models_dict, trial_length, warmup_batch_sizes):
-        self.task_execution_thread_pool = ThreadPoolExecutor(max_workers=2)
+    def __init__(self, trial_length):
         self.stats_thread_pool = ThreadPoolExecutor(max_workers=2)
-        self.warmup_batch_sizes = warmup_batch_sizes
 
-        # Stats
-        self.init_stats()
+        self._init_stats()
         self.stats = {
             "thrus": [],
             "p99_lats": [],
@@ -151,6 +148,65 @@ class Predictor(object):
         }
         self.total_num_complete = 0
         self.trial_length = trial_length
+
+        self.start_timestamp = 0
+
+    def update_stats(self, completed_requests, end_timestamp, batch_latency):
+        try:
+            batch_size = len(completed_requests)
+            self.batch_predict_latencies.append(batch_latency)
+            self.batch_sizes.append(batch_size)
+            for msg_id, send_time in completed_requests:
+                e2e_latency = end_timestamp - send_time
+                self.latencies.append(e2e_latency)
+                self.stats["per_message_lats"][msg_id] = e2e_latency
+
+            self.trial_num_complete += batch_size
+
+            if self.trial_num_complete >= self.trial_length:
+                self._print_stats(end_timestamp)
+                self._init_stats()
+        except Exception as e:
+            print(e)
+
+    def _init_stats(self):
+        self.latencies = []
+        self.batch_predict_latencies = []
+        self.batch_sizes = []
+        self.trial_num_complete = 0
+        self.cur_req_id = 0
+        self.start_time = datetime.now()
+
+    def _print_stats(self, end_timestamp):
+        thru = float(self.trial_num_complete) / (end_timestamp - self.start_timestamp)
+        self.start_timestamp = end_timestamp
+
+        lats = np.array(self.latencies)
+        batch_predict_lats = np.array(self.batch_predict_latencies)
+        p99 = np.percentile(lats, 99)
+        p99_batch_predict = np.percentile(batch_predict_lats, 99)
+        mean_batch_size = np.mean(self.batch_sizes)
+        mean = np.mean(lats)
+        self.stats["thrus"].append(thru)
+        self.stats["all_lats"].append(self.latencies)
+        self.stats["p99_lats"].append(p99)
+        self.stats["mean_lats"].append(mean)
+        self.stats["p99_batch_predict_lats"].append(self.batch_predict_latencies)
+        self.stats["mean_batch_sizes"].append(mean_batch_size)
+        logger.info("p99_lat: {p99}, mean_lat: {mean}, p99_batch_predict: {p99_batch_pred},"
+                    " thruput: {thru}, mean_batch: {mb}".format(p99=p99,
+                                                          mean=mean,
+                                                          thru=thru, 
+                                                          p99_batch_pred=p99_batch_predict,
+                                                          mb=mean_batch_size))
+
+
+class Predictor(object):
+
+    def __init__(self, models_dict, warmup_batch_sizes):
+        self.task_execution_thread_pool = ThreadPoolExecutor(max_workers=2)
+        self.stats_thread_pool = ThreadPoolExecutor(max_workers=2)
+        self.warmup_batch_sizes = warmup_batch_sizes
 
         # Models
         self.resnet_model = models_dict[TF_RESNET_MODEL_NAME]
@@ -184,48 +240,6 @@ class Predictor(object):
                 time = datetime.now()
                 self.predict([(msg_id, time) for msg_id in range(bs)])
 
-        self.init_stats()
-        self.stats = {
-            "thrus": [],
-            "p99_lats": [],
-            "mean_lats": [],
-            "all_lats": [],
-            "p99_batch_predict_lats": [],
-            "p99_queue_lats": [],
-            "mean_batch_sizes": [],
-            "per_message_lats": {}
-        }
-
-    def init_stats(self):
-        self.latencies = []
-        self.batch_predict_latencies = []
-        self.batch_sizes = []
-        self.trial_num_complete = 0
-        self.cur_req_id = 0
-        self.start_time = datetime.now()
-
-    def print_stats(self):
-        lats = np.array(self.latencies)
-        batch_predict_lats = np.array(self.batch_predict_latencies)
-        p99 = np.percentile(lats, 99)
-        p99_batch_predict = np.percentile(batch_predict_lats, 99)
-        mean_batch_size = np.mean(self.batch_sizes)
-        mean = np.mean(lats)
-        end_time = datetime.now()
-        thru = float(self.trial_num_complete) / (end_time - self.start_time).total_seconds()
-        self.stats["thrus"].append(thru)
-        self.stats["all_lats"].append(self.latencies)
-        self.stats["p99_lats"].append(p99)
-        self.stats["mean_lats"].append(mean)
-        self.stats["p99_batch_predict_lats"].append(self.batch_predict_latencies)
-        self.stats["mean_batch_sizes"].append(mean_batch_size)
-        logger.info("p99_lat: {p99}, mean_lat: {mean}, p99_batch_predict: {p99_batch_pred},"
-                    " thruput: {thru}, mean_batch: {mb}".format(p99=p99,
-                                                          mean=mean,
-                                                          thru=thru, 
-                                                          p99_batch_pred=p99_batch_predict,
-                                                          mb=mean_batch_size))
-
     def predict(self, requests):
         """
         Parameters
@@ -239,8 +253,7 @@ class Predictor(object):
         requests : [(int, datetime)]
             A list of (msg_id, send_time) tuples
         """
-        pred_begin = datetime.now()
-
+        
         batch_size = len(requests)
         idxs = np.random.randint(0, len(self.resnet_inputs), batch_size)
         resnet_inputs = self.resnet_inputs[idxs]
@@ -248,28 +261,6 @@ class Predictor(object):
 
         # self._predict_sequential(resnet_inputs, inception_inputs)
         self._predict_parallel(resnet_inputs, inception_inputs)
-    
-        pred_end = datetime.now()
-
-        self.stats_thread_pool.submit(self._update_stats, requests, pred_begin, pred_end, batch_size)
-
-    def _update_stats(self, requests, pred_begin_time, pred_end_time, batch_size):
-        try:
-            self.batch_predict_latencies.append((pred_end_time - pred_begin_time).total_seconds())
-            self.batch_sizes.append(batch_size)
-            for msg_id, send_time in requests:
-                e2e_latency = (pred_end_time - send_time).total_seconds()
-                self.latencies.append(e2e_latency)
-                self.stats["per_message_lats"][msg_id] = e2e_latency
-
-            self.trial_num_complete += batch_size
-
-            if self.trial_num_complete >= self.trial_length:
-                self.print_stats()
-                self.init_stats()
-                self.trial_num_complete = 0
-        except Exception as e:
-            print(e)
 
     def _predict_parallel(self, resnet_inputs, inception_inputs):
         resnet_svm_future = self.task_execution_thread_pool.submit(
@@ -339,7 +330,11 @@ class DriverBenchmarker(object):
 
     def _benchmark_arrival_process(self, replica_num, num_trials, batch_size, slo_millis, process_file):
         arrival_process = load_tagged_arrival_deltas(process_file)
-        predictor = Predictor(self.models_dict, trial_length=self.trial_length, warmup_batch_sizes=[])
+        print(calculate_mean_throughput([item[0] for item in arrival_process]))
+        # arrival_process = [(91, 0) for _ in range(50000)] 
+
+        predictor = Predictor(self.models_dict, warmup_batch_sizes=[])
+        stats_manager = StatsManager(self.trial_length)
 
         logger.info("Starting predictions...")
 
@@ -351,10 +346,9 @@ class DriverBenchmarker(object):
             first_delay_millis, first_replica_num = arrival_process[curr_idx]
             first_delay_seconds = first_delay_millis * .001
             curr_timestamp += first_delay_seconds
-            self._spin_sleep(first_delay_seconds)
             curr_idx += 1
             if first_replica_num == replica_num:
-                batch = [(curr_idx, benchmark_begin + timedelta(seconds=curr_timestamp))]
+                batch = [(curr_idx - 1, curr_timestamp)]
                 break
 
         if len(batch) == 0:
@@ -362,19 +356,21 @@ class DriverBenchmarker(object):
             return
 
         while curr_idx < len(arrival_process):
-
             pred_begin = datetime.now()
             predictor.predict(batch)
             pred_end = datetime.now()
             batch_latency = (pred_end - pred_begin).total_seconds()
             end_timestamp = curr_timestamp + batch_latency
 
-            if len(predictor.stats["thrus"]) > self.trial_length:
+            stats_manager.update_stats(batch, end_timestamp, batch_latency)
+
+            if len(stats_manager.stats["thrus"]) > self.trial_length:
                 break
 
             batch = []
             new_idx = curr_idx
             new_timestamp = curr_timestamp
+
             while new_idx < len(arrival_process):
                 prev_new_timestamp = new_timestamp
                 request_delay_millis, request_replica_num = arrival_process[new_idx]
@@ -383,7 +379,7 @@ class DriverBenchmarker(object):
                 
                 if new_timestamp <= end_timestamp:
                     if request_replica_num == replica_num:
-                        request_queue.append((new_idx, benchmark_begin + timedelta(seconds=new_timestamp)))
+                        request_queue.append((new_idx, new_timestamp))
 
                     new_idx += 1
                 
@@ -399,8 +395,6 @@ class DriverBenchmarker(object):
                         # we should sleep until requests are available. This is
                         # precisely the difference between "new_timestamp"
                         # and the prediction's "end_timestamp"
-                        self._spin_sleep(new_timestamp - end_timestamp)
-
                         end_timestamp = new_timestamp
                         new_timestamp = prev_new_timestamp
 
@@ -408,8 +402,9 @@ class DriverBenchmarker(object):
                         # The delay until the next request should be reduced to account for the fact
                         # that the batch prediction end time may (and likely does) fall in the interval
                         # between two requests
-                        next_arrival_delay, next_arrival_replica = arrival_process[new_idx]
-                        arrival_process[new_idx] = (next_arrival_delay - (end_timestamp - prev_new_timestamp), next_arrival_replica)
+                        next_arrival_delay_millis, next_arrival_replica = arrival_process[new_idx]
+                        next_arrival_delay_seconds = next_arrival_delay_millis * .001
+                        arrival_process[new_idx] = (next_arrival_delay_seconds - (end_timestamp - prev_new_timestamp), next_arrival_replica)
 
                         new_timestamp = end_timestamp
                         curr_timestamp = new_timestamp
@@ -420,12 +415,11 @@ class DriverBenchmarker(object):
                 print("Process finished!")
                 break
 
-        save_results(self.configs, [predictor.stats], "single_proc_bs_{}_bench".format(batch_size), slo_millis, process_num=replica_num)
+        save_results(self.configs, [stats_manager.stats], "single_proc_bs_{}_bench".format(batch_size), slo_millis, process_num=replica_num)
 
     def _benchmark_arrival_process_BUGGED(self, replica_num, num_trials, batch_size, slo_millis, process_file):
         logger.info("Parsing arrival process")
         arrival_process = load_tagged_arrival_deltas(process_file)
-        # arrival_process = condense_delays(arrival_process, replica_num)
 
         logger.info("Initializing processor thread")
         processor_thread = Thread(target=self._run_async_query_processor, args=(replica_num, num_trials, batch_size, slo_millis, process_file))
@@ -434,6 +428,9 @@ class DriverBenchmarker(object):
 
         logger.info("Starting predictions")
 
+        queue_adds = 0
+        ingest_begin = datetime.now()
+        idx_begin = 0
         for idx in range(len(arrival_process)):
             request_delay_millis, request_replica_num = arrival_process[idx]
             request_delay_seconds = request_delay_millis * .001
@@ -442,6 +439,12 @@ class DriverBenchmarker(object):
                 send_time = datetime.now()
                 msg_id = idx
                 self.request_queue.put((msg_id, send_time))
+                queue_adds += 1
+
+            if idx - idx_begin == 400:
+                print("Ingest thru: {}".format(float(queue_adds) / (datetime.now() - ingest_begin).total_seconds()))
+                idx_begin = idx
+                queue_adds = 0
 
             time.sleep(request_delay_seconds)
             # self._spin_sleep(request_delay_seconds)
@@ -457,7 +460,7 @@ class DriverBenchmarker(object):
             continue
 
     def _run_async_query_processor(self, replica_num, num_trials, batch_size, slo_millis, process_file):
-        predictor = Predictor(self.models_dict, trial_length=self.trial_length)
+        predictor = Predictor(self.models_dict, trial_length=self.trial_length, warmup_batch_sizes=[])
         loop_lats = []
         prev_stats_len = 0
         while True:
