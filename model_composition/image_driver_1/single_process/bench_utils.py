@@ -9,6 +9,8 @@ from e2e_utils import load_arrival_deltas, calculate_mean_throughput, calculate_
 
 ARRIVAL_PROCS_DIR = "cached_arrival_processes"
 
+THROUGHPUT_UTILIZATION_DECAY_FACTOR = .8
+
 def get_mean_throughput(config_path):
     with open(config_path, "r") as f:
         config_json = json.load(f)
@@ -51,6 +53,9 @@ if __name__ == "__main__":
     arrival_procs = load_arrival_procs()
     mean_thruput = get_mean_throughput(path)
     target_thruput = num_replicas * mean_thruput
+
+    # IMPORTANT: DECAY THROUGHPUT BY THE SPECIFIED DECAY FACTOR
+    target_thruput = target_thruput * THROUGHPUT_UTILIZATION_DECAY_FACTOR
 
     peak_delta = find_peak_arrival_proc(arrival_procs, target_thruput)
     print(abs(peak_delta))
