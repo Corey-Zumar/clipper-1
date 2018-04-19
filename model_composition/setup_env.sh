@@ -15,8 +15,8 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 CLIPPER_ROOT=$DIR/..
 
-pip install -e $CLIPPER_ROOT/clipper_admin
+pip2 install -e $CLIPPER_ROOT/clipper_admin
 
-pip install -e $CLIPPER_ROOT/model_composition/containerized_utils
+pip2 install -e $CLIPPER_ROOT/model_composition/containerized_utils
 
-pip install -e $CLIPPER_ROOT/model_composition/single_proc_utils
+pip2 install -e $CLIPPER_ROOT/model_composition/single_proc_utils

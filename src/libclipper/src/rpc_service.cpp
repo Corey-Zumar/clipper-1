@@ -51,10 +51,9 @@ RPCService::RPCService()
 
 RPCService::~RPCService() { stop(); }
 
-void RPCService::start(
-    const string ip, int send_port, int recv_port,
-    std::function<void(ContainerId)> &&container_ready_callback,
-    std::function<void(RPCResponse)> &&new_response_callback) {
+void RPCService::start(const string ip, int send_port, int recv_port,
+                       std::function<void(ContainerId)> &&container_ready_callback,
+                       std::function<void(RPCResponse)> &&new_response_callback) {
   container_ready_callback_ = container_ready_callback;
   new_response_callback_ = new_response_callback;
   if (active_) {
@@ -219,11 +218,9 @@ void RPCService::receive_message(socket_t &socket) {
   // This message is a response to a container query
   message_t msg_id;
   message_t msg_output_header;
-  message_t msg_output_types;
 
   socket.recv(&msg_id, 0);
   socket.recv(&msg_output_header, 0);
-  socket.recv(&msg_output_types, 0);
 
   uint64_t *output_header = static_cast<uint64_t *>(msg_output_header.data());
   uint64_t num_outputs = output_header[0];
@@ -232,8 +229,6 @@ void RPCService::receive_message(socket_t &socket) {
   uint64_t output_data_size =
       static_cast<uint64_t>(std::accumulate(output_header, output_header + num_outputs, 0));
 
-  int *output_types = static_cast<int *>(msg_output_types.data());
-
   std::shared_ptr<void> output_data(malloc(output_data_size), free);
   uint8_t *output_data_raw = static_cast<uint8_t *>(output_data.get());
 
@@ -241,14 +236,14 @@ void RPCService::receive_message(socket_t &socket) {
   outputs.reserve(num_outputs);
 
   uint64_t curr_start = 0;
-  for (uint64_t i = 0; i < (num_outputs * 2); i += 2) {
+  for (uint64_t i = 0; i < (num_outputs * 3); i += 3) {
     uint64_t output_size = output_header[i];
     uint32_t output_batch_id = output_header[i + 1];
-    DataType output_type = static_cast<DataType>(output_types[i]);
+    DataType output_type = static_cast<DataType>(output_header[i + 2]);
 
     socket.recv(output_data_raw + curr_start, output_size, 0);
-    outputs.emplace(output_batch_id,
-                    OutputData::create_output(output_type, output_data, curr_start, curr_start + output_size));
+    outputs.emplace(output_batch_id, OutputData::create_output(output_type, output_data, curr_start,
+                                                               curr_start + output_size));
 
     curr_start += output_size;
     output_data_raw += output_size;
@@ -316,12 +311,13 @@ void RPCService::handle_new_connection(socket_t &socket, int &zmq_connection_id,
   for (size_t i = 0; i < num_models; ++i) {
     message_t msg_model_name;
     message_t msg_model_version;
-    
+
     socket.recv(&msg_model_name, 0);
     socket.recv(&msg_model_version, 0);
 
     std::string model_name(static_cast<char *>(msg_model_name.data()), msg_model_name.size());
-    std::string model_version(static_cast<char *>(msg_model_version.data()), msg_model_version.size());
+    std::string model_version(static_cast<char *>(msg_model_version.data()),
+                              msg_model_version.size());
 
     VersionedModelId model_id(model_name, model_version);
 

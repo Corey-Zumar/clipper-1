@@ -45,6 +45,10 @@ BYTES_PER_FLOAT = 4
 BYTES_PER_BYTE = 1
 BYTES_PER_CHAR = 1
 
+# Initial size of the buffers used for sending response
+# header data and receiving request header data
+INITIAL_HEADER_BUFFER_SIZE = 1024
+
 # A mapping from python output data types
 # to their corresponding clipper data types for serialization
 SUPPORTED_OUTPUT_TYPES_MAPPING = {
@@ -66,6 +70,17 @@ def input_type_to_dtype(input_type):
     elif input_type == DATA_TYPE_STRINGS:
         return np.str_
 
+def dtype_to_output_type(dtype):
+    if dtype == np.int8:
+        return DATA_TYPE_BYTES
+    elif dtype == np.int32:
+        return DATA_TYPE_INTS
+    elif dtype == np.float32:
+        return DATA_TYPE_FLOATS
+    elif dtype == np.float64:
+        return DATA_TYPE_DOUBLES
+    elif dtype == np.str_:
+        return DATA_TYPE_STRINGS
 
 def input_type_to_string(input_type):
     if input_type == DATA_TYPE_BYTES:
@@ -119,33 +134,41 @@ def handle_predictions(predict_fn, request_queue, response_queue):
 
         outputs = predict_fn(prediction_request.inputs)
         # Type check the outputs:
-        if not type(outputs) == list:
-            raise PredictionError("Model did not return a list")
-        if len(outputs) != len(prediction_request.inputs):
-            raise PredictionError(
-                "Expected model to return %d outputs, found %d outputs" %
-                (len(prediction_request.inputs), len(outputs)))
+        if not type(outputs) == dict:
+            raise PredictionError("Model did not return a dict")
 
-        outputs_type = type(outputs[0])
-        if outputs_type == np.ndarray:
-            outputs_type = outputs[0].dtype
-        if outputs_type not in SUPPORTED_OUTPUT_TYPES_MAPPING.keys():
-            raise PredictionError(
-                "Model outputs list contains outputs of invalid type: {}!".
-                format(outputs_type))
+        response = PredictionResponse(prediction_request.msg_id)
 
-        if outputs_type == str:
-            for i in range(0, len(outputs)):
-                outputs[i] = unicode(outputs[i], "utf-8").encode("utf-8")
-        else:
-            for i in range(0, len(outputs)):
-                outputs[i] = outputs[i].tobytes()
+        for model_name in outputs:
+            if model_name not in outputs:
+                raise PredictionError(
+                        "Prediction function did not produce any outputs for model: {}".format(model_name))
 
-        total_length_elements = sum(len(o) for o in outputs)
+            model_outputs = outputs[model_name]
 
-        response = PredictionResponse(prediction_request.msg_id,
-                                        len(outputs), total_length_elements,
-                                        outputs_type)
+            if len(model_outputs) != len(prediction_request.inputs[model_name]):
+                raise PredictionError(
+                    "Expected prediction function to return %d outputs for model %s, found %d outputs" %
+                    (model_name, len(prediction_request.inputs), len(model_outputs)))
+
+            outputs_type = type(model_outputs[0])
+            if outputs_type == np.ndarray:
+                outputs_type = outputs[0].dtype
+            if outputs_type not in SUPPORTED_OUTPUT_TYPES_MAPPING.keys():
+                raise PredictionError(
+                    "Outputs list for model {} contains outputs of invalid type: {}!".
+                    format(model_name, outputs_type))
+
+            if outputs_type == str:
+                for i in range(0, len(model_outputs)):
+                    model_outputs[i] = unicode(model_outputs[i], "utf-8").encode("utf-8")
+            else:
+                for i in range(0, len(model_outputs)):
+                    model_outputs[i] = model_outputs[i].tobytes()
+
+            for i in range(len(model_outputs)):
+                response.add_output(output, outputs_type) 
+
         for output in outputs:
             response.add_output(output)
 
@@ -264,35 +287,41 @@ class Server(threading.Thread):
             input_header = self.recv_socket.recv()
             parsed_input_header = np.frombuffer(input_header, dtype=np.uint32)
             [
-                input_type,
                 num_inputs,
-                input_sizes
+                input_metadata_items
             ] = [
                 parsed_input_header[0],
-                parsed_input_header[1],
-                parsed_input_header[2:]
+                parsed_input_header[1:]
             ]
 
-            if int(input_type) != int(self.model_input_type):
-                print((
-                    "Received incorrect input. Expected {expected}, "
-                    "received {received}").format(
-                        expected=input_type_to_string(
-                            int(self.model_input_type)),
-                        received=input_type_to_string(
-                            int(input_type))))
-                raise
+            parsed_input_types = [input_type_to_dtype([(3 * i) + 1]) for i in range(num_inputs)]
 
-            inputs = []
-            for _ in range(num_inputs):
+            inputs = {}
+            model_batch_ids = {}
+            for i in range(num_inputs):
+                model_name = self.recv_socket.recv_string()
                 input_item = self.recv_socket.recv()
-                input_item = np.frombuffer(input_item, dtype=input_type_to_dtype(input_type))
-                inputs.append(input_item)
+                input_item = np.frombuffer(input_item, dtype=parsed_input_types[i])
+                
+                print(model_name)
+                if model_name not in inputs:
+                    inputs[model_name] = [input_item]
+                else:
+                    inputs[model_name].append(input_item)
+
+                model_batch_id = input_metadata_items[(3 * i) + 0]
+                if model_name not in model_batch_ids:
+                    model_batch_ids[model_name] = [model_batch_id]
+                else:
+                    model_batch_ids[model_name].append(model_batch_id)
+
+            print(inputs)
+            print(model_batch_ids)
 
             t2 = datetime.now()
 
             prediction_request = PredictionRequest(
-                msg_id_bytes, inputs)
+                msg_id_bytes, inputs, model_batch_ids)
 
             self.request_queue.put(prediction_request)
             self.full_buffers += 1
@@ -335,77 +364,111 @@ class PredictionRequest:
         One of [[byte]], [[int]], [[float]], [[double]], [string]
     """
 
-    def __init__(self, msg_id, inputs):
+    def __init__(self, msg_id, inputs, model_batch_ids):
         self.msg_id = msg_id
         self.inputs = inputs
+        self.model_batch_ids = model_batch_ids
 
     def __str__(self):
         return self.inputs
 
-
 class PredictionResponse:
-    output_buffer = bytearray(1024)
+    header_buffer = bytearray(INITIAL_HEADER_BUFFER_SIZE)
 
-    def __init__(self, msg_id, num_outputs, content_length, py_output_type):
+    def __init__(self, msg_id):
         """
         Parameters
         ----------
         msg_id : bytes
             The message id associated with the PredictRequest
             for which this is a response
-        num_outputs : int
-            The number of outputs to be included in the prediction response
-        content_length: int
-            The total length of all outputs, in bytes
-        py_output_type : type
-            The python data type of output element content
         """
         self.msg_id = msg_id
-        self.num_outputs = num_outputs
-        self.output_type = SUPPORTED_OUTPUT_TYPES_MAPPING[py_output_type]
-        self.expand_buffer_if_necessary(num_outputs, content_length)
+        self.outputs = []
+        self.num_outputs = 0
 
-        self.memview = memoryview(self.output_buffer)
-        struct.pack_into("<I", self.output_buffer, 0, num_outputs)
-        self.content_end_position = BYTES_PER_INT + (
-            BYTES_PER_INT * num_outputs)
-        self.current_output_sizes_position = BYTES_PER_INT
-
-    def add_output(self, output):
+    def add_output(self, output, output_type, batch_id):
         """
         Parameters
         ----------
-        output : str
-            A byte-serialized output or utf-8 encoded string
+        output : string
+        batch_id : int
         """
-        output_len = len(output)
-        struct.pack_into("<I", self.output_buffer,
-                         self.current_output_sizes_position, output_len)
-        self.current_output_sizes_position += BYTES_PER_INT
-        self.memview[self.content_end_position:
-                     self.content_end_position + output_len] = output
-        self.content_end_position += output_len
+        output = unicode(output, "utf-8").encode("utf-8")
+        self.outputs.append((output, batch_id))
+        self.num_outputs += 1
 
-    def send(self, socket, connection_id):
+    def send(self, socket, event_history):
+        """
+        Sends the encapsulated response data via
+        the specified socket
+
+        Parameters
+        ----------
+        socket : zmq.Socket
+        event_history : EventHistory
+            The RPC event history that should be
+            updated as a result of this operation
+        """
+        assert self.num_outputs > 0
+        output_header, header_length_bytes = self._create_output_header()
         socket.send("", flags=zmq.SNDMORE)
-        socket.send(
-            struct.pack("<I", connection_id),
-            flags=zmq.SNDMORE)
         socket.send(
             struct.pack("<I", MESSAGE_TYPE_CONTAINER_CONTENT),
             flags=zmq.SNDMORE)
         socket.send(self.msg_id, flags=zmq.SNDMORE)
-        socket.send(struct.pack("<I", self.output_type), flags=zmq.SNDMORE)
-        socket.send(
-            struct.pack("<I", self.content_end_position), flags=zmq.SNDMORE)
-        socket.send(self.output_buffer[0:self.content_end_position])
+        socket.send(struct.pack("<Q", header_length_bytes), flags=zmq.SNDMORE)
+        socket.send(output_header, flags=zmq.SNDMORE)
+        for idx in range(self.num_outputs):
+            if idx == self.num_outputs - 1:
+                # Don't use the `SNDMORE` flag if
+                # this is the last output being sent
+                socket.send(self.outputs[idx])
+            else:
+                socket.send(self.outputs[idx], flags=zmq.SNDMORE)
 
-    def expand_buffer_if_necessary(self, num_outputs, content_length_bytes):
-        new_size_bytes = BYTES_PER_INT + (
-            BYTES_PER_INT * num_outputs) + content_length_bytes
-        if len(self.output_buffer) < new_size_bytes:
-            self.output_buffer = bytearray(new_size_bytes * 2)
+        event_history.insert(EVENT_HISTORY_SENT_CONTAINER_CONTENT)
 
+    def _expand_buffer_if_necessary(self, size):
+        """
+        If necessary, expands the reusable output
+        header buffer to accomodate content of the
+        specified size
+
+        size : int
+            The size, in bytes, that the buffer must be
+            able to store
+        """
+        if len(PredictionResponse.header_buffer) < size:
+            PredictionResponse.header_buffer = bytearray(size * 2)
+
+    def _create_output_header(self):
+        """
+        Returns
+        ----------
+        (bytearray, int)
+            A tuple with the output header as the first
+            element and the header length as the second
+            element
+        """
+        header_length = BYTES_PER_LONG * ((3 * len(self.outputs)) + 1)
+        self._expand_buffer_if_necessary(header_length)
+        header_idx = 0
+        struct.pack_into("<Q", PredictionResponse.header_buffer, header_idx,
+                         self.num_outputs)
+        header_idx += BYTES_PER_LONG
+        for output, output_type, batch_id in self.outputs:
+            struct.pack_into("<Q", PredictionResponse.header_buffer,
+                             header_idx, len(output))
+            header_idx += BYTES_PER_LONG
+            struct.pack_into("<I", PredictionResponse.header_buffer,
+                             header_idx, output_type)
+            header_idx += BYTES_PER_INT
+            struct.pack_into("<I", PredictionResponse.header_buffer,
+                             header_idx, batch_id)
+            header_idx += BYTES_PER_INT
+
+        return PredictionResponse.header_buffer[:header_length], header_length
 
 class FeedbackRequest():
     def __init__(self, msg_id, content):
