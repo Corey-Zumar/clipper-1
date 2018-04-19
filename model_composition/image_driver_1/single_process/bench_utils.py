@@ -19,13 +19,17 @@ def get_mean_throughput(config_path):
     print(np.mean(thrus))
     return np.mean(thrus)
 
-def load_arrival_procs():
+def load_arrival_procs(cv):
     deltas_dict = {}
-    fnames = [os.path.join(ARRIVAL_PROCS_DIR, fname) for fname in os.listdir(ARRIVAL_PROCS_DIR) if "deltas" in fname]
+    fnames = [os.path.join(ARRIVAL_PROCS_DIR, fname) for fname in os.listdir(ARRIVAL_PROCS_DIR) if ("deltas" in fname) and str(cv) in fname]
     for fname in fnames:
         print(fname)
         deltas_subname = fname.split("/")[1]
-        delta = int(deltas_subname.split(".")[0])
+        if "_" in deltas_subname:
+            delta = int(deltas_subname.split("_")[0])
+        else:
+            delta = int(deltas_subname.split(".")[0])
+
         deltas_dict[-1 * delta] = load_arrival_deltas(fname)
 
     return OrderedDict(sorted(deltas_dict.items()))
@@ -48,9 +52,10 @@ def find_mean_arrival_proc(arrival_procs, target_thru):
 
 if __name__ == "__main__":
     path = sys.argv[1]
-    num_replicas = int(sys.argv[2])
+    cv = float(sys.argv[2])
+    num_replicas = int(sys.argv[3])
 
-    arrival_procs = load_arrival_procs()
+    arrival_procs = load_arrival_procs(cv)
     mean_thruput = get_mean_throughput(path)
     target_thruput = num_replicas * mean_thruput
 
