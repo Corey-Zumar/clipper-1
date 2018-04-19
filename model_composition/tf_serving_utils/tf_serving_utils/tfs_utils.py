@@ -7,6 +7,7 @@ import subprocess
 import requests
 import numpy as np
 import json
+import hashlib
 
 from datetime import datetime
 
@@ -27,6 +28,11 @@ TFS_BASE_PATH = "~/tfserving"
 MODEL_SERVER_RELATIVE_PATH = "bazel-bin/tensorflow_serving/model_servers/tensorflow_model_server"
 
 MILLISECONDS_PER_SECOND = 1000
+
+def hash_file(fname):
+    with open(fname, "rb") as f:
+        fbytes = f.read()
+        return hashlib.sha256(fbytes).hexdigest()
 
 def load_arrival_deltas(path):
     with open(path, "r") as f:
@@ -132,6 +138,7 @@ def save_results(configs, client_metrics, results_dir, prefix="results", slo_mil
         arrival_deltas = load_arrival_deltas(arrival_process)
         mean_throughput = calculate_mean_throughput(arrival_deltas)
         peak_throughput = calculate_peak_throughput(arrival_deltas, slo_millis)
+        process_hash = hash_file(arrival_process)
 
         results_obj["arrival_process"] = {
             "filename" : arrival_process,
