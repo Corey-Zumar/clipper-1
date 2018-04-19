@@ -21,8 +21,8 @@
 // #include <clipper/persistent_state.hpp>
 #include <clipper/redis.hpp>
 // #include <clipper/selection_policies.hpp>
+#include <clipper/containers.hpp>
 #include <clipper/util.hpp>
-#include <clipper/container.hpp>
 
 using HttpServer = SimpleWeb::Server<SimpleWeb::HTTP>;
 using clipper::VersionedModelId;
@@ -63,8 +63,8 @@ const std::string GET_APPLICATION = ADMIN_PATH + "/get_application$";
 const std::string GET_LINKED_MODELS = ADMIN_PATH + "/get_linked_models";
 const std::string GET_ALL_MODELS = ADMIN_PATH + "/get_all_models$";
 const std::string GET_MODEL = ADMIN_PATH + "/get_model$";
-const std::string GET_ALL_CONTAINERS = ADMIN_PATH + "/get_all_containers$";
-const std::string GET_CONTAINER = ADMIN_PATH + "/get_container$";
+// const std::string GET_ALL_CONTAINERS = ADMIN_PATH + "/get_all_containers$";
+// const std::string GET_CONTAINER = ADMIN_PATH + "/get_container$";
 
 const std::string ADD_APPLICATION_JSON_SCHEMA = R"(
   {
@@ -142,15 +142,13 @@ const std::string SELECTION_JSON_SCHEMA = R"(
 
 void respond_http(std::string content, std::string message,
                   std::shared_ptr<HttpServer::Response> response) {
-  *response << "HTTP/1.1 " << message
-            << "\r\nContent-Length: " << content.length() << "\r\n\r\n"
+  *response << "HTTP/1.1 " << message << "\r\nContent-Length: " << content.length() << "\r\n\r\n"
             << content << "\n";
 }
 
 /* Generate a user-facing error message containing the exception
  * content and the expected JSON schema. */
-std::string json_error_msg(const std::string& exception_msg,
-                           const std::string& expected_schema) {
+std::string json_error_msg(const std::string& exception_msg, const std::string& expected_schema) {
   std::stringstream ss;
   ss << "Error parsing JSON: " << exception_msg << ". "
      << "Expected JSON schema: " << expected_schema;
@@ -161,272 +159,222 @@ class RequestHandler {
  public:
   RequestHandler(int portno, int num_threads) : server_(portno, num_threads) {
     clipper::Config& conf = clipper::get_config();
-    while (!redis_connection_.connect(conf.get_redis_address(),
-                                      conf.get_redis_port())) {
+    while (!redis_connection_.connect(conf.get_redis_address(), conf.get_redis_port())) {
       clipper::log_error(LOGGING_TAG_MANAGEMENT_FRONTEND,
                          "Management frontend failed to connect to Redis",
                          "Retrying in 1 second...");
       std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-    while (!redis_subscriber_.connect(conf.get_redis_address(),
-                                      conf.get_redis_port())) {
-      clipper::log_error(
-          LOGGING_TAG_MANAGEMENT_FRONTEND,
-          "Management frontend subscriber failed to connect to Redis",
-          "Retrying in 1 second...");
+    while (!redis_subscriber_.connect(conf.get_redis_address(), conf.get_redis_port())) {
+      clipper::log_error(LOGGING_TAG_MANAGEMENT_FRONTEND,
+                         "Management frontend subscriber failed to connect to Redis",
+                         "Retrying in 1 second...");
       std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     server_.add_endpoint(
-        ADD_APPLICATION, "POST",
-        [this](std::shared_ptr<HttpServer::Response> response,
-               std::shared_ptr<HttpServer::Request> request) {
+        ADD_APPLICATION, "POST", [this](std::shared_ptr<HttpServer::Response> response,
+                                        std::shared_ptr<HttpServer::Request> request) {
           try {
-            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND,
-                              "Add application POST request");
+            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND, "Add application POST request");
             std::string result = add_application(request->content.string());
             respond_http(result, "200 OK", response);
           } catch (const json_parse_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), ADD_APPLICATION_JSON_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), ADD_APPLICATION_JSON_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const json_semantic_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), ADD_APPLICATION_JSON_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), ADD_APPLICATION_JSON_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const std::invalid_argument& e) {
             respond_http(e.what(), "400 Bad Request", response);
           }
         });
     server_.add_endpoint(
-        ADD_MODEL_LINKS, "POST",
-        [this](std::shared_ptr<HttpServer::Response> response,
-               std::shared_ptr<HttpServer::Request> request) {
+        ADD_MODEL_LINKS, "POST", [this](std::shared_ptr<HttpServer::Response> response,
+                                        std::shared_ptr<HttpServer::Request> request) {
           try {
             clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND,
                               "Add application links POST request");
             std::string result = add_model_links(request->content.string());
             respond_http(result, "200 OK", response);
           } catch (const json_parse_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), ADD_MODEL_LINKS_JSON_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), ADD_MODEL_LINKS_JSON_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const json_semantic_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), ADD_MODEL_LINKS_JSON_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), ADD_MODEL_LINKS_JSON_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const std::invalid_argument& e) {
             respond_http(e.what(), "400 Bad Request", response);
           }
         });
+    server_.add_endpoint(ADD_MODEL, "POST", [this](std::shared_ptr<HttpServer::Response> response,
+                                                   std::shared_ptr<HttpServer::Request> request) {
+      try {
+        clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND, "Add model POST request");
+        std::string result = add_model(request->content.string());
+        respond_http(result, "200 OK", response);
+      } catch (const json_parse_error& e) {
+        std::string err_msg = json_error_msg(e.what(), ADD_MODEL_JSON_SCHEMA);
+        respond_http(err_msg, "400 Bad Request", response);
+      } catch (const json_semantic_error& e) {
+        std::string err_msg = json_error_msg(e.what(), ADD_MODEL_JSON_SCHEMA);
+        respond_http(err_msg, "400 Bad Request", response);
+      } catch (const std::invalid_argument& e) {
+        respond_http(e.what(), "400 Bad Request", response);
+      }
+    });
     server_.add_endpoint(
-        ADD_MODEL, "POST",
-        [this](std::shared_ptr<HttpServer::Response> response,
-               std::shared_ptr<HttpServer::Request> request) {
+        SET_MODEL_VERSION, "POST", [this](std::shared_ptr<HttpServer::Response> response,
+                                          std::shared_ptr<HttpServer::Request> request) {
           try {
-            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND,
-                              "Add model POST request");
-            std::string result = add_model(request->content.string());
-            respond_http(result, "200 OK", response);
-          } catch (const json_parse_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), ADD_MODEL_JSON_SCHEMA);
-            respond_http(err_msg, "400 Bad Request", response);
-          } catch (const json_semantic_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), ADD_MODEL_JSON_SCHEMA);
-            respond_http(err_msg, "400 Bad Request", response);
-          } catch (const std::invalid_argument& e) {
-            respond_http(e.what(), "400 Bad Request", response);
-          }
-        });
-    server_.add_endpoint(
-        SET_MODEL_VERSION, "POST",
-        [this](std::shared_ptr<HttpServer::Response> response,
-               std::shared_ptr<HttpServer::Request> request) {
-          try {
-            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND,
-                              "Set model version POST request");
+            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND, "Set model version POST request");
             std::string result = set_model_version(request->content.string());
             respond_http(result, "200 OK", response);
           } catch (const json_parse_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), SET_VERSION_JSON_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), SET_VERSION_JSON_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const json_semantic_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), SET_VERSION_JSON_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), SET_VERSION_JSON_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const std::invalid_argument& e) {
             respond_http(e.what(), "400 Bad Request", response);
           }
         });
     server_.add_endpoint(
-        GET_ALL_APPLICATIONS, "POST",
-        [this](std::shared_ptr<HttpServer::Response> response,
-               std::shared_ptr<HttpServer::Request> request) {
+        GET_ALL_APPLICATIONS, "POST", [this](std::shared_ptr<HttpServer::Response> response,
+                                             std::shared_ptr<HttpServer::Request> request) {
           try {
-            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND,
-                              "Get all applications POST request");
-            std::string result =
-                get_all_applications(request->content.string());
+            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND, "Get all applications POST request");
+            std::string result = get_all_applications(request->content.string());
             respond_http(result, "200 OK", response);
           } catch (const json_parse_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), VERBOSE_OPTION_JSON_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), VERBOSE_OPTION_JSON_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const json_semantic_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), VERBOSE_OPTION_JSON_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), VERBOSE_OPTION_JSON_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const std::invalid_argument& e) {
             respond_http(e.what(), "400 Bad Request", response);
           }
         });
     server_.add_endpoint(
-        GET_APPLICATION, "POST",
-        [this](std::shared_ptr<HttpServer::Response> response,
-               std::shared_ptr<HttpServer::Request> request) {
+        GET_APPLICATION, "POST", [this](std::shared_ptr<HttpServer::Response> response,
+                                        std::shared_ptr<HttpServer::Request> request) {
           try {
-            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND,
-                              "Get application info POST request");
+            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND, "Get application info POST request");
             std::string result = get_application(request->content.string());
             respond_http(result, "200 OK", response);
           } catch (const json_parse_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), GET_APPLICATION_REQUESTS_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), GET_APPLICATION_REQUESTS_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const json_semantic_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), GET_APPLICATION_REQUESTS_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), GET_APPLICATION_REQUESTS_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const std::invalid_argument& e) {
             respond_http(e.what(), "400 Bad Request", response);
           }
         });
     server_.add_endpoint(
-        GET_LINKED_MODELS, "POST",
-        [this](std::shared_ptr<HttpServer::Response> response,
-               std::shared_ptr<HttpServer::Request> request) {
+        GET_LINKED_MODELS, "POST", [this](std::shared_ptr<HttpServer::Response> response,
+                                          std::shared_ptr<HttpServer::Request> request) {
           try {
             clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND,
                               "Get application links POST request");
             std::string result = get_linked_models(request->content.string());
             respond_http(result, "200 OK", response);
           } catch (const json_parse_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), GET_LINKED_MODELS_REQUESTS_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), GET_LINKED_MODELS_REQUESTS_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const json_semantic_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), GET_LINKED_MODELS_REQUESTS_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), GET_LINKED_MODELS_REQUESTS_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const std::invalid_argument& e) {
             respond_http(e.what(), "400 Bad Request", response);
           }
         });
     server_.add_endpoint(
-        GET_ALL_MODELS, "POST",
-        [this](std::shared_ptr<HttpServer::Response> response,
-               std::shared_ptr<HttpServer::Request> request) {
+        GET_ALL_MODELS, "POST", [this](std::shared_ptr<HttpServer::Response> response,
+                                       std::shared_ptr<HttpServer::Request> request) {
           try {
-            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND,
-                              "Get all models POST request");
+            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND, "Get all models POST request");
             std::string result = get_all_models(request->content.string());
             respond_http(result, "200 OK", response);
           } catch (const json_parse_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), VERBOSE_OPTION_JSON_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), VERBOSE_OPTION_JSON_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const json_semantic_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), VERBOSE_OPTION_JSON_SCHEMA);
+            std::string err_msg = json_error_msg(e.what(), VERBOSE_OPTION_JSON_SCHEMA);
             respond_http(err_msg, "400 Bad Request", response);
           } catch (const std::invalid_argument& e) {
             respond_http(e.what(), "400 Bad Request", response);
           }
         });
-    server_.add_endpoint(
-        GET_MODEL, "POST",
-        [this](std::shared_ptr<HttpServer::Response> response,
-               std::shared_ptr<HttpServer::Request> request) {
-          try {
-            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND,
-                              "Get model info POST request");
-            std::string result = get_model(request->content.string());
-            respond_http(result, "200 OK", response);
-          } catch (const json_parse_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), GET_MODEL_REQUESTS_SCHEMA);
-            respond_http(err_msg, "400 Bad Request", response);
-          } catch (const json_semantic_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), GET_MODEL_REQUESTS_SCHEMA);
-            respond_http(err_msg, "400 Bad Request", response);
-          } catch (const std::invalid_argument& e) {
-            respond_http(e.what(), "400 Bad Request", response);
-          }
-        });
-    server_.add_endpoint(
-        GET_ALL_CONTAINERS, "POST",
-        [this](std::shared_ptr<HttpServer::Response> response,
-               std::shared_ptr<HttpServer::Request> request) {
-          try {
-            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND,
-                              "Get all containers POST request");
-            std::string result = get_all_containers(request->content.string());
-            respond_http(result, "200 OK", response);
-          } catch (const json_parse_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), VERBOSE_OPTION_JSON_SCHEMA);
-            respond_http(err_msg, "400 Bad Request", response);
-          } catch (const json_semantic_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), VERBOSE_OPTION_JSON_SCHEMA);
-            respond_http(err_msg, "400 Bad Request", response);
-          } catch (const std::invalid_argument& e) {
-            respond_http(e.what(), "400 Bad Request", response);
-          }
-        });
-    server_.add_endpoint(
-        GET_CONTAINER, "POST",
-        [this](std::shared_ptr<HttpServer::Response> response,
-               std::shared_ptr<HttpServer::Request> request) {
-          try {
-            clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND,
-                              "Get model info POST request");
-            std::string result = get_container(request->content.string());
-            respond_http(result, "200 OK", response);
-          } catch (const json_parse_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), GET_CONTAINER_REQUESTS_SCHEMA);
-            respond_http(err_msg, "400 Bad Request", response);
-          } catch (const json_semantic_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), GET_CONTAINER_REQUESTS_SCHEMA);
-            respond_http(err_msg, "400 Bad Request", response);
-          } catch (const std::invalid_argument& e) {
-            respond_http(e.what(), "400 Bad Request", response);
-          }
-        });
-    server_.add_endpoint(
-        GET_SELECTION_STATE, "POST",
-        [this](std::shared_ptr<HttpServer::Response> response,
-               std::shared_ptr<HttpServer::Request> request) {
-          try {
-            std::string result = get_selection_state(request->content.string());
-            respond_http(result, "200 OK", response);
-          } catch (const json_parse_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), SELECTION_JSON_SCHEMA);
-            respond_http(err_msg, "400 Bad Request", response);
-          } catch (const json_semantic_error& e) {
-            std::string err_msg =
-                json_error_msg(e.what(), SELECTION_JSON_SCHEMA);
-            respond_http(err_msg, "400 Bad Request", response);
-          } catch (const std::invalid_argument& e) {
-            respond_http(e.what(), "400 Bad Request", response);
-          }
-        });
+    server_.add_endpoint(GET_MODEL, "POST", [this](std::shared_ptr<HttpServer::Response> response,
+                                                   std::shared_ptr<HttpServer::Request> request) {
+      try {
+        clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND, "Get model info POST request");
+        std::string result = get_model(request->content.string());
+        respond_http(result, "200 OK", response);
+      } catch (const json_parse_error& e) {
+        std::string err_msg = json_error_msg(e.what(), GET_MODEL_REQUESTS_SCHEMA);
+        respond_http(err_msg, "400 Bad Request", response);
+      } catch (const json_semantic_error& e) {
+        std::string err_msg = json_error_msg(e.what(), GET_MODEL_REQUESTS_SCHEMA);
+        respond_http(err_msg, "400 Bad Request", response);
+      } catch (const std::invalid_argument& e) {
+        respond_http(e.what(), "400 Bad Request", response);
+      }
+    });
+    // server_.add_endpoint(
+    //     GET_ALL_CONTAINERS, "POST", [this](std::shared_ptr<HttpServer::Response> response,
+    //                                        std::shared_ptr<HttpServer::Request> request) {
+    //       try {
+    //         clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND, "Get all containers POST
+    //         request");
+    //         std::string result = get_all_containers(request->content.string());
+    //         respond_http(result, "200 OK", response);
+    //       } catch (const json_parse_error& e) {
+    //         std::string err_msg = json_error_msg(e.what(), VERBOSE_OPTION_JSON_SCHEMA);
+    //         respond_http(err_msg, "400 Bad Request", response);
+    //       } catch (const json_semantic_error& e) {
+    //         std::string err_msg = json_error_msg(e.what(), VERBOSE_OPTION_JSON_SCHEMA);
+    //         respond_http(err_msg, "400 Bad Request", response);
+    //       } catch (const std::invalid_argument& e) {
+    //         respond_http(e.what(), "400 Bad Request", response);
+    //       }
+    //     });
+    // server_.add_endpoint(
+    //     GET_CONTAINER, "POST", [this](std::shared_ptr<HttpServer::Response> response,
+    //                                   std::shared_ptr<HttpServer::Request> request) {
+    //       try {
+    //         clipper::log_info(LOGGING_TAG_MANAGEMENT_FRONTEND, "Get model info POST request");
+    //         std::string result = get_container(request->content.string());
+    //         respond_http(result, "200 OK", response);
+    //       } catch (const json_parse_error& e) {
+    //         std::string err_msg = json_error_msg(e.what(), GET_CONTAINER_REQUESTS_SCHEMA);
+    //         respond_http(err_msg, "400 Bad Request", response);
+    //       } catch (const json_semantic_error& e) {
+    //         std::string err_msg = json_error_msg(e.what(), GET_CONTAINER_REQUESTS_SCHEMA);
+    //         respond_http(err_msg, "400 Bad Request", response);
+    //       } catch (const std::invalid_argument& e) {
+    //         respond_http(e.what(), "400 Bad Request", response);
+    //       }
+    //     });
+    server_.add_endpoint(GET_SELECTION_STATE, "POST",
+                         [this](std::shared_ptr<HttpServer::Response> response,
+                                std::shared_ptr<HttpServer::Request> request) {
+                           try {
+                             std::string result = get_selection_state(request->content.string());
+                             respond_http(result, "200 OK", response);
+                           } catch (const json_parse_error& e) {
+                             std::string err_msg = json_error_msg(e.what(), SELECTION_JSON_SCHEMA);
+                             respond_http(err_msg, "400 Bad Request", response);
+                           } catch (const json_semantic_error& e) {
+                             std::string err_msg = json_error_msg(e.what(), SELECTION_JSON_SCHEMA);
+                             respond_http(err_msg, "400 Bad Request", response);
+                           } catch (const std::invalid_argument& e) {
+                             respond_http(e.what(), "400 Bad Request", response);
+                           }
+                         });
   }
 
   ~RequestHandler() {
@@ -441,8 +389,7 @@ class RequestHandler {
    * @throws Throws a std::invalud_argument error if `value` contains prohibited
    * characters.
    */
-  void validate_group_str_for_redis(const std::string& value,
-                                    const char* label) {
+  void validate_group_str_for_redis(const std::string& value, const char* label) {
     if (clipper::redis::contains_prohibited_chars_for_group(value)) {
       std::stringstream ss;
 
@@ -480,8 +427,7 @@ class RequestHandler {
     std::vector<std::string> model_names = get_string_array(d, "model_names");
 
     // Confirm that the app exists
-    auto app_info =
-        clipper::redis::get_application(redis_connection_, app_name);
+    auto app_info = clipper::redis::get_application(redis_connection_, app_name);
     if (app_info.size() == 0) {
       std::stringstream ss;
       ss << "No app with name " << app_name << " exists.";
@@ -494,21 +440,19 @@ class RequestHandler {
     std::unordered_map<std::string, std::string> model_info;
     std::string model_input_type;
     for (auto const& model_name : model_names) {
-      model_version = clipper::redis::get_current_model_version(
-          redis_connection_, model_name);
+      model_version = clipper::redis::get_current_model_version(redis_connection_, model_name);
       if (!model_version) {
         std::stringstream ss;
         ss << "No model with name " << model_name << " exists.";
         throw std::invalid_argument(ss.str());
       } else {
-        model_info = clipper::redis::get_model(
-            redis_connection_, VersionedModelId(model_name, *model_version));
+        model_info = clipper::redis::get_model(redis_connection_,
+                                               VersionedModelId(model_name, *model_version));
         model_input_type = model_info["input_type"];
         if (model_input_type != app_input_type) {
           std::stringstream ss;
-          ss << "Model with name " << model_name
-             << " has incompatible input_type " << model_input_type
-             << ". Requested app to link to has input_type " << app_input_type
+          ss << "Model with name " << model_name << " has incompatible input_type "
+             << model_input_type << ". Requested app to link to has input_type " << app_input_type
              << ".";
           throw std::invalid_argument(ss.str());
         }
@@ -519,8 +463,8 @@ class RequestHandler {
     if (model_names.size() != 1) {
       std::stringstream ss;
       if (model_names.size() == 0) {
-        ss << "Please provide the name of the model with which you want"
-           << app_name << " to be linked";
+        ss << "Please provide the name of the model with which you want" << app_name
+           << " to be linked";
       } else {
         ss << "Applications must be linked with at most one model. ";
         ss << "Attempted to add links to " << model_names.size() << " models.";
@@ -531,29 +475,26 @@ class RequestHandler {
     }
 
     // Make sure that there will only be one link
-    auto existing_linked_models =
-        clipper::redis::get_linked_models(redis_connection_, app_name);
+    auto existing_linked_models = clipper::redis::get_linked_models(redis_connection_, app_name);
 
     if (existing_linked_models.size() > 0) {
       // We asserted earlier that `model_names` has size 1
       std::string new_model_name = model_names[0];
 
-      if (std::find(existing_linked_models.begin(),
-                    existing_linked_models.end(),
-                    new_model_name) != existing_linked_models.end()) {
+      if (std::find(existing_linked_models.begin(), existing_linked_models.end(), new_model_name) !=
+          existing_linked_models.end()) {
         return "Success!";
       } else {
         // We guarantee that there is only one existing model
         std::string existing_model_name = existing_linked_models[0];
         std::stringstream ss;
-        ss << "A model with name " << existing_model_name
-           << " is already linked to " << app_name << ".";
+        ss << "A model with name " << existing_model_name << " is already linked to " << app_name
+           << ".";
         throw std::invalid_argument(ss.str());
       }
     }
 
-    if (clipper::redis::add_model_links(redis_connection_, app_name,
-                                        model_names)) {
+    if (clipper::redis::add_model_links(redis_connection_, app_name, model_names)) {
       return "Success!";
     } else {
       std::stringstream ss;
@@ -579,8 +520,7 @@ class RequestHandler {
     parse_json(json, d);
 
     std::string app_name = get_string(d, "name");
-    DataType input_type =
-        clipper::parse_input_type(get_string(d, "input_type"));
+    DataType input_type = clipper::parse_input_type(get_string(d, "input_type"));
     std::string default_output = get_string(d, "default_output");
 
     std::string selection_policy = "DefaultOutputSelectionPolicy";
@@ -589,8 +529,7 @@ class RequestHandler {
     std::unordered_map<std::string, std::string> existing_app_data =
         clipper::redis::get_application(redis_connection_, app_name);
     if (existing_app_data.empty()) {
-      if (clipper::redis::add_application(redis_connection_, app_name,
-                                          input_type, selection_policy,
+      if (clipper::redis::add_application(redis_connection_, app_name, input_type, selection_policy,
                                           default_output, latency_slo_micros)) {
         return "Success!";
       } else {
@@ -647,47 +586,39 @@ class RequestHandler {
 
     if (!existing_model_data.empty()) {
       std::stringstream ss;
-      ss << "Error model " << model_name << ":" << model_version
-         << " already exists";
+      ss << "Error model " << model_name << ":" << model_version << " already exists";
       throw std::invalid_argument(ss.str());
     }
 
     check_updated_model_consistent_with_app_links(model_name, input_type);
 
-    if (clipper::redis::add_model(redis_connection_, model_id, input_type,
-                                  labels, container_name, model_data_path,
-                                  batch_size)) {
+    if (clipper::redis::add_model(redis_connection_, model_id, input_type, labels, container_name,
+                                  model_data_path, batch_size)) {
       attempt_model_version_update(model_id.get_name(), model_id.get_id());
       return "Success!";
     }
     std::stringstream ss;
-    ss << "Error adding model " << model_id.get_name() << ":"
-       << model_id.get_id() << " to Redis";
+    ss << "Error adding model " << model_id.get_name() << ":" << model_id.get_id() << " to Redis";
     throw std::invalid_argument(ss.str());
   }
 
-  void check_updated_model_consistent_with_app_links(
-      std::string model_name, clipper::DataType proposed_input_type) {
-    auto app_names =
-        clipper::redis::get_all_application_names(redis_connection_);
+  void check_updated_model_consistent_with_app_links(std::string model_name,
+                                                     clipper::DataType proposed_input_type) {
+    auto app_names = clipper::redis::get_all_application_names(redis_connection_);
     std::vector<std::string> linked_models;
     std::unordered_map<std::string, std::string> app_info;
     for (auto const& app_name : app_names) {
-      linked_models =
-          clipper::redis::get_linked_models(redis_connection_, app_name);
+      linked_models = clipper::redis::get_linked_models(redis_connection_, app_name);
       if (std::find(linked_models.begin(), linked_models.end(), model_name) !=
           linked_models.end()) {
         app_info = clipper::redis::get_application(redis_connection_, app_name);
-        clipper::DataType app_input_type =
-            clipper::parse_input_type(app_info["input_type"]);
+        clipper::DataType app_input_type = clipper::parse_input_type(app_info["input_type"]);
         if (proposed_input_type != app_input_type) {
           std::stringstream ss;
-          ss << "Model with name " << model_name << " is already linked to app "
-             << app_name << " using input type "
-             << get_readable_input_type(app_input_type)
+          ss << "Model with name " << model_name << " is already linked to app " << app_name
+             << " using input type " << get_readable_input_type(app_input_type)
              << ". The input type you provided for a new version of the model, "
-             << get_readable_input_type(proposed_input_type)
-             << ", is not compatible.";
+             << get_readable_input_type(proposed_input_type) << ", is not compatible.";
           throw std::invalid_argument(ss.str());
         }
       }
@@ -731,16 +662,14 @@ class RequestHandler {
         /* We need to add each app's name to its returned JSON object. */
         add_string(app_doc, "name", app_name);
         /* We need to add the app's linked models to its returned JSON object */
-        linked_models =
-            clipper::redis::get_linked_models(redis_connection_, app_name);
+        linked_models = clipper::redis::get_linked_models(redis_connection_, app_name);
         add_string_array(app_doc, "linked_models", linked_models);
         response_doc.PushBack(app_doc, response_doc.GetAllocator());
       }
     } else {
       for (const std::string& app_name : app_names) {
         rapidjson::Value v;
-        v.SetString(app_name.c_str(), app_name.length(),
-                    response_doc.GetAllocator());
+        v.SetString(app_name.c_str(), app_name.length(), response_doc.GetAllocator());
         response_doc.PushBack(v, response_doc.GetAllocator());
       }
     }
@@ -777,8 +706,7 @@ class RequestHandler {
       /* If an app does exist, we need to add its name to the map. */
       redis_app_metadata_to_json(response_doc, app_metadata);
       add_string(response_doc, "name", app_name);
-      auto linked_models =
-          clipper::redis::get_linked_models(redis_connection_, app_name);
+      auto linked_models = clipper::redis::get_linked_models(redis_connection_, app_name);
       add_string_array(response_doc, "linked_models", linked_models);
     }
 
@@ -806,16 +734,14 @@ class RequestHandler {
     std::string app_name = get_string(d, "app_name");
 
     // Confirm that the app exists
-    auto app_info =
-        clipper::redis::get_application(redis_connection_, app_name);
+    auto app_info = clipper::redis::get_application(redis_connection_, app_name);
     if (app_info.size() == 0) {
       std::stringstream ss;
       ss << "No app with name " << app_name << " exists.";
       throw std::invalid_argument(ss.str());
     }
 
-    auto model_names =
-        clipper::redis::get_linked_models(redis_connection_, app_name);
+    auto model_names = clipper::redis::get_linked_models(redis_connection_, app_name);
     rapidjson::Document response_doc;
     set_string_array(response_doc, model_names);
 
@@ -844,8 +770,7 @@ class RequestHandler {
 
     bool verbose = get_bool(d, "verbose");
 
-    std::vector<VersionedModelId> models =
-        clipper::redis::get_all_models(redis_connection_);
+    std::vector<VersionedModelId> models = clipper::redis::get_all_models(redis_connection_);
 
     rapidjson::Document response_doc;
     response_doc.SetArray();
@@ -858,9 +783,8 @@ class RequestHandler {
             clipper::redis::get_model(redis_connection_, model);
         rapidjson::Document model_doc(&response_doc.GetAllocator());
         redis_model_metadata_to_json(model_doc, model_metadata);
-        bool is_current_version =
-            clipper::redis::get_current_model_version(
-                redis_connection_, model.get_name()) == model.get_id();
+        bool is_current_version = clipper::redis::get_current_model_version(
+                                      redis_connection_, model.get_name()) == model.get_id();
         add_bool(model_doc, "is_current_version", is_current_version);
         response_doc.PushBack(model_doc, response_doc.GetAllocator());
       }
@@ -868,14 +792,13 @@ class RequestHandler {
       for (auto model : models) {
         std::string model_str = model.serialize();
         rapidjson::Value v;
-        v.SetString(model_str.c_str(), model_str.length(),
-                    response_doc.GetAllocator());
+        v.SetString(model_str.c_str(), model_str.length(), response_doc.GetAllocator());
         response_doc.PushBack(v, response_doc.GetAllocator());
       }
     }
     std::string result = to_json_string(response_doc);
-    clipper::log_info_formatted(LOGGING_TAG_MANAGEMENT_FRONTEND,
-                                "get_all_models response: {}", result);
+    clipper::log_info_formatted(LOGGING_TAG_MANAGEMENT_FRONTEND, "get_all_models response: {}",
+                                result);
     return result;
   }
 
@@ -912,9 +835,8 @@ class RequestHandler {
       /* We assume that redis::get_model returns an empty map iff no model
        * exists */
       redis_model_metadata_to_json(response_doc, model_metadata);
-      bool is_current_version =
-          clipper::redis::get_current_model_version(
-              redis_connection_, model.get_name()) == model.get_id();
+      bool is_current_version = clipper::redis::get_current_model_version(
+                                    redis_connection_, model.get_name()) == model.get_id();
       add_bool(response_doc, "is_current_version", is_current_version);
     }
 
@@ -937,47 +859,44 @@ class RequestHandler {
    * Else, the encoded map contains objects with full container information.
    *
    */
-  std::string get_all_containers(const std::string& json) {
-    rapidjson::Document d;
-    parse_json(json, d);
-
-    bool verbose = get_bool(d, "verbose");
-
-    std::vector<std::vector<ContainerModelDataItem>> containers =
-        clipper::redis::get_all_containers(redis_connection_);
-
-    rapidjson::Document response_doc;
-    response_doc.SetArray();
-
-    if (verbose) {
-      for (auto container : containers) {
-        
-
-        auto container_metadata =
-            clipper::redis::get_container(redis_connection_, container.first,
-                                          container.second);
-        rapidjson::Document container_doc(&response_doc.GetAllocator());
-        redis_container_metadata_to_json(container_doc, container_metadata);
-        response_doc.PushBack(container_doc, response_doc.GetAllocator());
-      }
-    } else {
-      for (auto container : containers) {
-        std::stringstream ss;
-        ss << container.first.serialize();
-        ss << ":";
-        ss << container.second;
-        std::string container_str = ss.str();
-        rapidjson::Value v;
-        v.SetString(container_str.c_str(), container_str.length(),
-                    response_doc.GetAllocator());
-        response_doc.PushBack(v, response_doc.GetAllocator());
-      }
-    }
-    std::string result = to_json_string(response_doc);
-    clipper::log_info_formatted(LOGGING_TAG_MANAGEMENT_FRONTEND,
-                                "get_all_containers response: {}", result);
-    return result;
-  }
+  // std::string get_all_containers(const std::string& json) {
+  //   rapidjson::Document d;
+  //   parse_json(json, d);
+  //
+  //   bool verbose = get_bool(d, "verbose");
+  //
+  //   std::vector<std::vector<ContainerModelDataItem>> containers =
+  //       clipper::redis::get_all_containers(redis_connection_);
+  //
+  //   rapidjson::Document response_doc;
+  //   response_doc.SetArray();
+  //
+  //   if (verbose) {
+  //     for (auto container : containers) {
+  //       auto container_metadata =
+  //           clipper::redis::get_container(redis_connection_, container.first, container.second);
+  //       rapidjson::Document container_doc(&response_doc.GetAllocator());
+  //       redis_container_metadata_to_json(container_doc, container_metadata);
+  //       response_doc.PushBack(container_doc, response_doc.GetAllocator());
+  //     }
+  //   } else {
+  //     for (auto container : containers) {
+  //       std::stringstream ss;
+  //       ss << container.first.serialize();
+  //       ss << ":";
+  //       ss << container.second;
+  //       std::string container_str = ss.str();
+  //       rapidjson::Value v;
+  //       v.SetString(container_str.c_str(), container_str.length(), response_doc.GetAllocator());
+  //       response_doc.PushBack(v, response_doc.GetAllocator());
+  //     }
+  //   }
+  //   std::string result = to_json_string(response_doc);
+  //   clipper::log_info_formatted(LOGGING_TAG_MANAGEMENT_FRONTEND, "get_all_containers response:
+  //   {}",
+  //                               result);
+  //   return result;
+  // }
 
   /**
    * Creates an endpoint that listens for requests to retrieve info about
@@ -994,29 +913,29 @@ class RequestHandler {
    * attribute name-value pairs.
    *
    */
-  std::string get_container(const std::string& json) {
-    rapidjson::Document d;
-    parse_json(json, d);
-
-    std::string model_name = get_string(d, "model_name");
-    std::string model_version = get_string(d, "model_version");
-    int replica_id = get_int(d, "replica_id");
-    VersionedModelId model = VersionedModelId(model_name, model_version);
-
-    std::unordered_map<std::string, std::string> container_metadata =
-        clipper::redis::get_container(redis_connection_, model, replica_id);
-
-    rapidjson::Document response_doc;
-    response_doc.SetObject();
-
-    if (container_metadata.size() > 0) {
-      /* We assume that redis::get_container returns an empty map iff no
-       * container exists */
-      redis_container_metadata_to_json(response_doc, container_metadata);
-    }
-
-    return to_json_string(response_doc);
-  }
+  // std::string get_container(const std::string& json) {
+  //   rapidjson::Document d;
+  //   parse_json(json, d);
+  //
+  //   std::string model_name = get_string(d, "model_name");
+  //   std::string model_version = get_string(d, "model_version");
+  //   int replica_id = get_int(d, "replica_id");
+  //   VersionedModelId model = VersionedModelId(model_name, model_version);
+  //
+  //   std::unordered_map<std::string, std::string> container_metadata =
+  //       clipper::redis::get_container(redis_connection_, model, replica_id);
+  //
+  //   rapidjson::Document response_doc;
+  //   response_doc.SetObject();
+  //
+  //   if (container_metadata.size() > 0) {
+  //     #<{(| We assume that redis::get_container returns an empty map iff no
+  //      * container exists |)}>#
+  //     redis_container_metadata_to_json(response_doc, container_metadata);
+  //   }
+  //
+  //   return to_json_string(response_doc);
+  // }
 
   /**
    * Creates an endpoint that looks up the debug string
@@ -1042,8 +961,7 @@ class RequestHandler {
                                    clipper::DEFAULT_USER_ID);
       uid = clipper::DEFAULT_USER_ID;
     }
-    auto app_metadata =
-        clipper::redis::get_application(redis_connection_, app_name);
+    auto app_metadata = clipper::redis::get_application(redis_connection_, app_name);
     return app_metadata["default_output"];
   }
 
@@ -1081,17 +999,15 @@ class RequestHandler {
     }
     if (!version_exists) {
       std::stringstream ss;
-      ss << "Cannot set non-existent version " << new_model_version
-         << " for model " << model_name;
+      ss << "Cannot set non-existent version " << new_model_version << " for model " << model_name;
       std::string err_msg = ss.str();
       clipper::log_error(LOGGING_TAG_MANAGEMENT_FRONTEND, err_msg);
       throw std::invalid_argument(err_msg);
     }
 
-    auto model_info = clipper::redis::get_model(
-        redis_connection_, VersionedModelId(model_name, new_model_version));
-    clipper::DataType input_type =
-        clipper::parse_input_type(model_info["input_type"]);
+    auto model_info = clipper::redis::get_model(redis_connection_,
+                                                VersionedModelId(model_name, new_model_version));
+    clipper::DataType input_type = clipper::parse_input_type(model_info["input_type"]);
     check_updated_model_consistent_with_app_links(model_name, input_type);
 
     attempt_model_version_update(model_name, new_model_version);
@@ -1104,11 +1020,10 @@ class RequestHandler {
    */
   void attempt_model_version_update(const std::string& model_name,
                                     const std::string& new_model_version) {
-    if (!clipper::redis::set_current_model_version(
-            redis_connection_, model_name, new_model_version)) {
+    if (!clipper::redis::set_current_model_version(redis_connection_, model_name,
+                                                   new_model_version)) {
       std::stringstream ss;
-      ss << "ERROR: Version " << new_model_version
-         << " does not exist for model " << model_name;
+      ss << "ERROR: Version " << new_model_version << " does not exist for model " << model_name;
       throw std::invalid_argument(ss.str());
     }
   }
