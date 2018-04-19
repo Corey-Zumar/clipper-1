@@ -1,8 +1,14 @@
 {
   "client_config_paths": [
-                          "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/tfs_server_1_configs", 
-                          "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/tfs_server_2_configs"
-                          ],
+    {
+      "host": "172.32.18.222",
+      "config_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/tfs_server_1_configs"
+    },
+    {
+      "host": "172.32.18.225",
+      "config_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/tfs_server_2_configs"
+    }
+  ],
   "resnet": 1,
   "inception": 1,
   "kernel_svm": 1,

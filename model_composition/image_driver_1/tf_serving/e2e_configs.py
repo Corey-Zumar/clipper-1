@@ -32,7 +32,6 @@ CONFIG_KEY_NUM_REPLICAS = "num_replicas"
 CONFIG_KEY_CPUS_PER_REPLICA = "cpus_per_replica"
 CONFIG_KEY_ALLOCATED_CPUS = "allocated_cpus"
 CONFIG_KEY_ALLOCATED_GPUS = "allocated_gpus"
-CONFIG_KEY_HOST = "host"
 CONFIG_KEY_PORTS = "ports"
 
 def get_heavy_node_config(model_name, batch_size, num_replicas, ports, allocated_cpus, cpus_per_replica=2, allocated_gpus=[]):
@@ -116,10 +115,9 @@ def load_client_configs(configs_dir_path):
             config_params = json.load(f)
 
         model_name = config_params[CONFIG_KEY_MODEL_NAME]
-        host = config_params[CONFIG_KEY_HOST]
         ports = config_params[CONFIG_KEY_PORTS]
 
-        server_configs.append((model_name, host, ports))
+        server_configs.append((model_name, ports))
 
     return server_configs
 

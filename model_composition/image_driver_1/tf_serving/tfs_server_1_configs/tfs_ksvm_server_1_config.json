@@ -5,6 +5,5 @@
   "cpus_per_replica": 2,
   "allocated_cpus": [8, 24, 9, 25],
   "allocated_gpus": [],
-  "host": "172.32.18.222",
   "ports": [9524, 9525]
 }

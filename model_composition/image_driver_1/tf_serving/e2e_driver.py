@@ -39,6 +39,9 @@ KERNEL_SVM_OUTPUT_KEY = "outputs"
 LOG_REG_OUTPUT_KEY = "outputs"
 
 CONFIG_KEY_CLIENT_CONFIG_PATHS = "client_config_paths"
+CONFIG_KEY_CLIENT_CONFIG_ITEM_PATH = "config_path"
+CONFIG_KEY_CLIENT_CONFIG_HOST = "host"
+
 CONFIG_KEY_NUM_TRIALS = "num_trials"
 CONFIG_KEY_TRIAL_LENGTH = "trial_length"
 CONFIG_KEY_NUM_CLIENTS = "num_clients"
@@ -68,7 +71,7 @@ def load_experiment_config(config_path):
     with open(config_path, "r") as f:
         experiment_config_params = json.load(f)
 
-    client_config_paths = experiment_config_params[CONFIG_KEY_CLIENT_CONFIG_PATHS]
+    client_config_items = experiment_config_params[CONFIG_KEY_CLIENT_CONFIG_PATHS]
 
     num_trials = experiment_config_params[CONFIG_KEY_NUM_TRIALS]
     trial_length = experiment_config_params[CONFIG_KEY_TRIAL_LENGTH]
@@ -76,12 +79,14 @@ def load_experiment_config(config_path):
     slo_millis = experiment_config_params[CONFIG_KEY_SLO_MILLIS]
     process_path = experiment_config_params[CONFIG_KEY_PROCESS_PATH]
 
-
     model_configs = {}
-    for path in client_config_paths:
-        client_configs = load_client_configs(path)
+    for item in client_config_items:
+        config_path = item[CONFIG_KEY_CLIENT_CONFIG_ITEM_PATH]
+        host = item[CONFIG_KEY_CLIENT_CONFIG_HOST]
+
+        client_configs = load_client_configs(config_path)
         for config in client_configs:
-            model_name, host, ports = config
+            model_name, ports = config
             required_replicas = experiment_config_params[model_name]
             
             if model_name not in model_configs:
@@ -113,7 +118,7 @@ def create_clients(configs):
     clients = {}
     for key in configs:
         replica_addrs = [ReplicaAddress(client_config.host, int(client_config.port)) for client_config in configs[key]]
-        print(replica_addrs)
+        print(key, replica_addrs)
         client = GRPCClient(replica_addrs)
         client.start()
         clients[key] = client
