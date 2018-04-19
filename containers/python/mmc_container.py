@@ -8,7 +8,7 @@ class MMCContainer(rpc.ModelContainerBase):
     def __init__(self, prediction="1.0"):
         self.prediction = prediction
 
-    def _predict(self, inputs):
+    def predict(self, inputs):
         outputs = {}
         for model_name in inputs:
             outputs[model_name] = [self.prediction] * len(inputs[model_name])

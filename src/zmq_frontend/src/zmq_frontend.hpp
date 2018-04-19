@@ -229,17 +229,15 @@ class ServerImpl {
           [this, app_metrics, request_id, client_id, create_time](Output output) mutable {
             std::chrono::time_point<std::chrono::system_clock> end =
                 std::chrono::system_clock::now();
-                   long duration_micros =
-                       std::chrono::duration_cast<std::chrono::microseconds>(end - create_time)
-                           .count();
+            long duration_micros =
+                std::chrono::duration_cast<std::chrono::microseconds>(end - create_time).count();
 
-                   app_metrics.latency_->insert(duration_micros);
-                   // app_metrics.latency_list_->insert(duration_micros);
-                   app_metrics.num_predictions_->increment(1);
-                   app_metrics.throughput_->mark(1);
+            app_metrics.latency_->insert(duration_micros);
+            // app_metrics.latency_list_->insert(duration_micros);
+            app_metrics.num_predictions_->increment(1);
+            app_metrics.throughput_->mark(1);
 
-                   rpc_service_->send_response(
-                       std::make_tuple(std::move(output), request_id, client_id));
+            rpc_service_->send_response(std::make_tuple(std::move(output), request_id, client_id));
           });
     };
 

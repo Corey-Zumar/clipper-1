@@ -217,9 +217,11 @@ void RPCService::receive_message(socket_t &socket) {
   }
   // This message is a response to a container query
   message_t msg_id;
+  message_t msg_header_length;
   message_t msg_output_header;
 
   socket.recv(&msg_id, 0);
+  socket.recv(&msg_header_length, 0);
   socket.recv(&msg_output_header, 0);
 
   uint64_t *output_header = static_cast<uint64_t *>(msg_output_header.data());
@@ -238,8 +240,8 @@ void RPCService::receive_message(socket_t &socket) {
   uint64_t curr_start = 0;
   for (uint64_t i = 0; i < (num_outputs * 3); i += 3) {
     uint64_t output_size = output_header[i];
-    uint32_t output_batch_id = output_header[i + 1];
-    DataType output_type = static_cast<DataType>(output_header[i + 2]);
+    DataType output_type = static_cast<DataType>(output_header[i + 1]);
+    uint32_t output_batch_id = output_header[i + 2];
 
     socket.recv(output_data_raw + curr_start, output_size, 0);
     outputs.emplace(output_batch_id, OutputData::create_output(output_type, output_data, curr_start,

@@ -44,6 +44,7 @@ BYTES_PER_INT = 4
 BYTES_PER_FLOAT = 4
 BYTES_PER_BYTE = 1
 BYTES_PER_CHAR = 1
+BYTES_PER_LONG = 8
 
 # Initial size of the buffers used for sending response
 # header data and receiving request header data
@@ -69,18 +70,6 @@ def input_type_to_dtype(input_type):
         return np.float64
     elif input_type == DATA_TYPE_STRINGS:
         return np.str_
-
-def dtype_to_output_type(dtype):
-    if dtype == np.int8:
-        return DATA_TYPE_BYTES
-    elif dtype == np.int32:
-        return DATA_TYPE_INTS
-    elif dtype == np.float32:
-        return DATA_TYPE_FLOATS
-    elif dtype == np.float64:
-        return DATA_TYPE_DOUBLES
-    elif dtype == np.str_:
-        return DATA_TYPE_STRINGS
 
 def input_type_to_string(input_type):
     if input_type == DATA_TYPE_BYTES:
@@ -135,7 +124,7 @@ def handle_predictions(predict_fn, request_queue, response_queue):
         outputs = predict_fn(prediction_request.inputs)
         # Type check the outputs:
         if not type(outputs) == dict:
-            raise PredictionError("Model did not return a dict")
+            raise PredictionError("Model did not return a dict. Instead, returned an object of type: {}".format(type(outputs)))
 
         response = PredictionResponse(prediction_request.msg_id)
 
@@ -159,7 +148,9 @@ def handle_predictions(predict_fn, request_queue, response_queue):
                     "Outputs list for model {} contains outputs of invalid type: {}!".
                     format(model_name, outputs_type))
 
-            if outputs_type == str:
+            outputs_type = SUPPORTED_OUTPUT_TYPES_MAPPING[outputs_type]
+
+            if outputs_type == DATA_TYPE_STRINGS:
                 for i in range(0, len(model_outputs)):
                     model_outputs[i] = unicode(model_outputs[i], "utf-8").encode("utf-8")
             else:
@@ -167,10 +158,8 @@ def handle_predictions(predict_fn, request_queue, response_queue):
                     model_outputs[i] = model_outputs[i].tobytes()
 
             for i in range(len(model_outputs)):
-                response.add_output(output, outputs_type) 
-
-        for output in outputs:
-            response.add_output(output)
+                batch_id = prediction_request.model_batch_ids[model_name][i]
+                response.add_output(model_outputs[i], outputs_type, batch_id) 
 
         response_queue.put(response)
 
@@ -386,7 +375,7 @@ class PredictionResponse:
         self.msg_id = msg_id
         self.outputs = []
         self.num_outputs = 0
-
+ 
     def add_output(self, output, output_type, batch_id):
         """
         Parameters
@@ -395,10 +384,10 @@ class PredictionResponse:
         batch_id : int
         """
         output = unicode(output, "utf-8").encode("utf-8")
-        self.outputs.append((output, batch_id))
+        self.outputs.append((output, output_type, batch_id))
         self.num_outputs += 1
 
-    def send(self, socket, event_history):
+    def send(self, socket, connection_id):
         """
         Sends the encapsulated response data via
         the specified socket
@@ -406,28 +395,26 @@ class PredictionResponse:
         Parameters
         ----------
         socket : zmq.Socket
-        event_history : EventHistory
-            The RPC event history that should be
-            updated as a result of this operation
         """
         assert self.num_outputs > 0
         output_header, header_length_bytes = self._create_output_header()
         socket.send("", flags=zmq.SNDMORE)
+        socket.send(struct.pack("<I", connection_id), flags=zmq.SNDMORE)
         socket.send(
             struct.pack("<I", MESSAGE_TYPE_CONTAINER_CONTENT),
             flags=zmq.SNDMORE)
         socket.send(self.msg_id, flags=zmq.SNDMORE)
+        print("HEADER LENGTH: {}".format(header_length_bytes))
         socket.send(struct.pack("<Q", header_length_bytes), flags=zmq.SNDMORE)
         socket.send(output_header, flags=zmq.SNDMORE)
         for idx in range(self.num_outputs):
+            output_item = self.outputs[idx][0]
             if idx == self.num_outputs - 1:
                 # Don't use the `SNDMORE` flag if
                 # this is the last output being sent
-                socket.send(self.outputs[idx])
+                socket.send(output_item)
             else:
-                socket.send(self.outputs[idx], flags=zmq.SNDMORE)
-
-        event_history.insert(EVENT_HISTORY_SENT_CONTAINER_CONTENT)
+                socket.send(output_item, flags=zmq.SNDMORE)
 
     def _expand_buffer_if_necessary(self, size):
         """

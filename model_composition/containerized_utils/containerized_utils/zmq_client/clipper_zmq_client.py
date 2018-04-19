@@ -89,6 +89,7 @@ class Client:
         while active:
             timeout = 1000 if connected else 5000
             receivable_sockets = dict(poller.poll(timeout))
+            print("HEREEEEE")
             if socket in receivable_sockets and receivable_sockets[socket] == zmq.POLLIN:
                 if connected:
                     self._receive_response(socket)
@@ -125,6 +126,7 @@ class Client:
         socket.recv()
         request_id_bytes = socket.recv()
         data_type_bytes = socket.recv()
+        output_length_bytes = socket.recv()
         output_data = socket.recv()
 
         request_id = struct.unpack("<I", request_id_bytes)[0]
