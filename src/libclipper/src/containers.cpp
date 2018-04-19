@@ -37,7 +37,8 @@ ModelContainer::ModelContainer(ContainerId container_id,
       batch_size_(batch_size),
       latency_hist_("container:" + std::to_string(container_id) + ":prediction_latency",
                     "microseconds", HISTOGRAM_SAMPLE_SIZE) {
-  log_info_formatted(LOGGING_TAG_CONTAINERS, "Creating new ModelContainer with id {}", std::to_string(container_id));
+  log_info_formatted(LOGGING_TAG_CONTAINERS, "Creating new ModelContainer with id {}",
+                     std::to_string(container_id));
 
   for (auto &data_item : model_data) {
     model_data_.emplace(data_item.first, data_item.second);
@@ -54,12 +55,12 @@ void ModelContainer::set_batch_size(int batch_size) {
   batch_size_ = batch_size;
 }
 
-
 int ModelContainer::get_replica_id(VersionedModelId model_id) const {
   auto id_search = model_data_.find(model_id);
   if (id_search == model_data_.end()) {
     std::stringstream ss;
-    ss << "Attempted to find replica id for unregistered model " << model_id.get_name() << ":" << model_id.get_id();
+    ss << "Attempted to find replica id for unregistered model " << model_id.get_name() << ":"
+       << model_id.get_id();
     throw std::runtime_error(ss.str());
   }
   return id_search->second;
@@ -95,7 +96,7 @@ void ActiveContainers::add_container(ContainerId container_id,
   for (const auto &model_data_item : new_container->model_data_) {
     const VersionedModelId &vm = model_data_item.first;
     int replica_id = model_data_item.second;
-    auto entry = by_model_containers_[vm];
+    auto &entry = by_model_containers_[vm];
     entry.emplace(replica_id, new_container);
     assert(by_model_containers_[vm].size() > 0);
   }
@@ -133,7 +134,8 @@ std::shared_ptr<ModelContainer> ActiveContainers::get_model_replica(const Versio
   }
 }
 
-std::shared_ptr<ModelContainer> ActiveContainers::get_container_by_id(const ContainerId container_id) {
+std::shared_ptr<ModelContainer> ActiveContainers::get_container_by_id(
+    const ContainerId container_id) {
   boost::shared_lock<boost::shared_mutex> l{m_};
 
   auto container_entry = by_id_containers_.find(container_id);

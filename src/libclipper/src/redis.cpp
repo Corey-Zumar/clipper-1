@@ -47,9 +47,9 @@ std::unordered_map<string, string> parse_redis_map(const std::vector<string>& re
 std::string gen_model_replica_key(const VersionedModelId& key, int model_replica_id) {
   std::stringstream ss;
   ss << key.get_name();
-  ss << ITEM_DELIMITER;
+  ss << ITEM_PART_CONCATENATOR;
   ss << key.get_id();
-  ss << ITEM_DELIMITER;
+  ss << ITEM_PART_CONCATENATOR;
   ss << std::to_string(model_replica_id);
   return ss.str();
 }
@@ -60,19 +60,19 @@ std::vector<ContainerModelDataItem> parse_models_key(const std::string& key) {
   std::vector<ContainerModelDataItem> model_data_items;
   model_data_items.reserve(model_keys.size());
   for (auto& model_key : model_keys) {
-    size_t pos = model_key.find(ITEM_DELIMITER);
+    size_t pos = model_key.find(ITEM_PART_CONCATENATOR);
     if (pos == std::string::npos) {
       throw std::invalid_argument("Couldn't parse model replica key \"" + key + "\"");
     }
     std::string model_name = model_key.substr(0, pos);
-    model_key.erase(0, pos + ITEM_DELIMITER.length());
+    model_key.erase(0, pos + ITEM_PART_CONCATENATOR.length());
 
-    pos = model_key.find(ITEM_DELIMITER);
+    pos = model_key.find(ITEM_PART_CONCATENATOR);
     if (pos == std::string::npos) {
       throw std::invalid_argument("Couldn't parse model replica key \"" + key + "\"");
     }
     std::string model_version = model_key.substr(0, pos);
-    model_key.erase(0, pos + ITEM_DELIMITER.length());
+    model_key.erase(0, pos + ITEM_PART_CONCATENATOR.length());
     int replica_id = std::stoi(model_key);
     VersionedModelId model = VersionedModelId(model_name, model_version);
     model_data_items.push_back(std::make_pair(model, replica_id));
@@ -376,7 +376,8 @@ get_container(Redox& redis, const ContainerId container_id) {
   return get_container_by_key(redis, container_key);
 }
 
-std::pair<std::vector<ContainerModelDataItem>, std::unordered_map<std::string, std::string>> get_container_by_key(Redox& redis, const std::string& key) {
+std::pair<std::vector<ContainerModelDataItem>, std::unordered_map<std::string, std::string>>
+get_container_by_key(Redox& redis, const std::string& key) {
   if (send_cmd_no_reply<string>(redis, {"SELECT", std::to_string(REDIS_CONTAINER_DB_NUM)})) {
     std::vector<std::string> container_data;
     auto result = send_cmd_with_reply<vector<string>>(redis, {"HGETALL", key});
