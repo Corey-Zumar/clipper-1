@@ -2,6 +2,8 @@
 #define CLIPPER_LIB_TASK_EXECUTOR_H
 
 #include <chrono>
+#include <cstdlib>
+#include <ctime>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -118,12 +120,10 @@ struct DeadlineCompare {
 };
 
 // thread safe model queue
-class ModelQueue {
+class ContainerQueue {
  public:
-  ModelQueue(std::string name)
+  ContainerQueue(std::string name)
       : queue_(ModelPQueue{}),
-        lock_latency_hist_(metrics::MetricsRegistry::get_metrics().create_histogram(
-            name + ":lock_latency", "microseconds", 4096)),
         queue_size_hist_(metrics::MetricsRegistry::get_metrics().create_histogram(
             name + ":queue_size", "microseconds", 1000)) {}
   // queue_size_list_(
@@ -135,26 +135,19 @@ class ModelQueue {
   //         "timestamp")) {}
 
   // Disallow copy and assign
-  ModelQueue(const ModelQueue &) = delete;
-  ModelQueue &operator=(const ModelQueue &) = delete;
+  ContainerQueue(const ContainerQueue &) = delete;
+  ContainerQueue &operator=(const ContainerQueue &) = delete;
 
-  ModelQueue(ModelQueue &&) = default;
-  ModelQueue &operator=(ModelQueue &&) = default;
+  ContainerQueue(ContainerQueue &&) = default;
+  ContainerQueue &operator=(ContainerQueue &&) = default;
 
-  ~ModelQueue() = default;
+  ~ContainerQueue() = default;
 
   void add_task(PredictTask task) {
-    std::chrono::time_point<std::chrono::system_clock> start_time =
-        std::chrono::system_clock::now();
     std::lock_guard<std::mutex> lock(queue_mutex_);
 
     std::chrono::time_point<std::chrono::system_clock> current_time =
         std::chrono::system_clock::now();
-
-    auto lock_latency = current_time - start_time;
-    long lock_latency_micros =
-        std::chrono::duration_cast<std::chrono::microseconds>(lock_latency).count();
-    lock_latency_hist_->insert(static_cast<int64_t>(lock_latency_micros));
 
     Deadline deadline = current_time + std::chrono::microseconds(task.latency_slo_micros_);
     queue_.emplace(deadline, std::move(task));
@@ -219,7 +212,6 @@ class ModelQueue {
   ModelPQueue queue_;
   std::mutex queue_mutex_;
   std::condition_variable queue_not_empty_condition_;
-  std::shared_ptr<metrics::Histogram> lock_latency_hist_;
   std::shared_ptr<metrics::Histogram> queue_size_hist_;
   // std::shared_ptr<metrics::DataList<size_t>> queue_size_list_;
   // std::shared_ptr<metrics::DataList<long long>> queue_arrivals_list_;
@@ -292,8 +284,12 @@ class TaskExecutor {
         active_containers_(std::make_shared<ActiveContainers>()),
         rpc_(std::make_unique<rpc::RPCService>()),
         // cache_(std::make_unique<QueryCache>(0)),
-        model_queues_({}),
         model_metrics_({}) {
+    // Seed the random number generator used for container queue selection
+    // TODO(czumar): Do something better than randomly generating a number
+    // to select the container queue for a task
+    std::srand(std::time(nullptr));
+
     log_info(LOGGING_TAG_TASK_EXECUTOR, "TaskExecutor started");
     rpc_->start("*", RPC_SERVICE_SEND_PORT, RPC_SERVICE_RECV_PORT,
                 [ this, task_executor_valid = active_ ](ContainerId container_id) {
@@ -366,19 +362,11 @@ class TaskExecutor {
             int connection_id = std::stoi(container_metadata["zmq_connection_id"]);
             active_containers_->add_container(container_id, container_models, connection_id);
 
-            for (ContainerModelDataItem &model : container_models) {
-              VersionedModelId &vm = model.first;
-              bool created_queue = create_model_queue_if_necessary(vm);
-              if (created_queue) {
-                log_info_formatted(LOGGING_TAG_TASK_EXECUTOR,
-                                   "Created queue for new model: {} : {}", vm.get_name(),
-                                   vm.get_id());
-              }
-            }
+            create_container_queue(container_id, container_models);
 
             TaskExecutionThreadPool::create_queue(container_id);
-            TaskExecutionThreadPool::submit_job(container_id,
-                                                [this, container_id]() { on_container_ready(container_id); });
+            TaskExecutionThreadPool::submit_job(
+                container_id, [this, container_id]() { on_container_ready(container_id); });
 
           } else if (!*task_executor_valid) {
             log_info(LOGGING_TAG_TASK_EXECUTOR,
@@ -386,7 +374,6 @@ class TaskExecutor {
                      "subscribe_to_container_changes callback because "
                      "TaskExecutor has been destroyed.");
           }
-
         });
     throughput_meter_ =
         metrics::MetricsRegistry::get_metrics().create_meter("internal:aggregate_model_throughput");
@@ -406,8 +393,20 @@ class TaskExecutor {
     predictions_counter_->increment(1);
     // add each task to the queue corresponding to its associated model
     boost::shared_lock<boost::shared_mutex> lock(model_queues_mutex_);
-    auto model_queue_entry = model_queues_.find(task.model_);
-    if (model_queue_entry != model_queues_.end()) {
+    auto model_container_queues_entry = model_queues_.find(task.model_);
+    if (model_container_queues_entry != model_queues_.end()) {
+      std::vector<std::shared_ptr<ContainerQueue>> &container_queues =
+          model_container_queues_entry->second;
+
+      if (container_queues.empty()) {
+        // TODO(czumar): This behavior should be allowed. Support it!
+        throw std::runtime_error(
+            "Scheduling a prediction for which there are no connected containers!");
+      }
+
+      int queue_idx = std::rand() % container_queues.size();
+      std::shared_ptr<ContainerQueue> &selected_queue = container_queues[queue_idx];
+
       {
         std::unique_lock<std::mutex> l(prediction_callback_map_mutex_);
         prediction_callback_map_.emplace(
@@ -417,7 +416,7 @@ class TaskExecutor {
       //                             std::move(task_completion_callback));
       // if (!cached) {
       task.recv_time_ = std::chrono::system_clock::now();
-      model_queue_entry->second->add_task(task);
+      selected_queue->add_task(task);
       log_info_formatted(LOGGING_TAG_TASK_EXECUTOR, "Adding task to queue. QueryID: {}, model: {}",
                          task.query_id_, task.model_.serialize());
 
@@ -429,8 +428,8 @@ class TaskExecutor {
   }
 
   void drain_queues() {
-    boost::unique_lock<boost::shared_mutex> lock(model_queues_mutex_);
-    for (auto entry : model_queues_) {
+    boost::unique_lock<boost::shared_mutex> lock(container_queues_mutex_);
+    for (auto &entry : container_queues_) {
       entry.second->drain_queue();
     }
   }
@@ -451,7 +450,9 @@ class TaskExecutor {
   std::shared_ptr<metrics::Counter> predictions_counter_;
   std::shared_ptr<metrics::Meter> throughput_meter_;
   boost::shared_mutex model_queues_mutex_;
-  std::unordered_map<VersionedModelId, std::shared_ptr<ModelQueue>> model_queues_;
+  boost::shared_mutex container_queues_mutex_;
+  std::unordered_map<VersionedModelId, std::vector<std::shared_ptr<ContainerQueue>>> model_queues_;
+  std::unordered_map<ContainerId, std::shared_ptr<ContainerQueue>> container_queues_;
   boost::shared_mutex model_metrics_mutex_;
   std::unordered_map<VersionedModelId, ModelMetrics> model_metrics_;
   static constexpr int INITIAL_MODEL_QUEUES_MAP_SIZE = 100;
@@ -460,28 +461,27 @@ class TaskExecutor {
   std::mutex prediction_callback_map_mutex_;
   std::atomic_bool use_full_batches_{false};
 
-  bool create_model_queue_if_necessary(const VersionedModelId &model_id) {
-    try {
-      // Adds a new <model_id, task_queue> entry to the queues map, if one
-      // does not already exist
-      boost::unique_lock<boost::shared_mutex> l(model_queues_mutex_);
-      bool queue_created = false;
-      auto model_queue_entry = model_queues_.find(model_id);
-      if (model_queue_entry == model_queues_.end()) {
-        auto queue_added = model_queues_.emplace(
-            std::make_pair(model_id, std::make_shared<ModelQueue>(model_id.serialize())));
-        queue_created = queue_added.second;
-        if (!queue_created) {
-          throw std::runtime_error("TaskExecutor failed to create queue!");
-        } else {
-          boost::unique_lock<boost::shared_mutex> l(model_metrics_mutex_);
-          model_metrics_.insert(std::make_pair(model_id, ModelMetrics(model_id)));
-        }
+  void create_container_queue(ContainerId container_id,
+                              std::vector<ContainerModelDataItem> &container_models) {
+    auto container_queue = std::make_shared<ContainerQueue>(std::to_string(container_id));
+    boost::unique_lock<boost::shared_mutex> container_queues_lock(container_queues_mutex_);
+    container_queues_.emplace(container_id, container_queue);
+    container_queues_lock.unlock();
+
+    boost::unique_lock<boost::shared_mutex> model_queues_lock(model_queues_mutex_);
+    for (auto &model : container_models) {
+      VersionedModelId &model_id = model.first;
+      auto model_container_queues_search = model_queues_.find(model_id);
+      if (model_container_queues_search == model_queues_.end()) {
+        std::vector<std::shared_ptr<ContainerQueue>> container_queues;
+        container_queues.reserve(1);
+        container_queues.push_back(container_queue);
+        model_queues_.emplace(model_id, std::move(container_queues));
+      } else {
+        std::vector<std::shared_ptr<ContainerQueue>> &container_queues =
+            model_container_queues_search->second;
+        container_queues.push_back(container_queue);
       }
-      return queue_created;
-    } catch (std::exception &e) {
-      log_error(LOGGING_TAG_TASK_EXECUTOR, e.what());
-      return false;
     }
   }
 
@@ -494,31 +494,23 @@ class TaskExecutor {
           "TaskExecutor failed to find previously registered active "
           "container!");
     }
-    boost::shared_lock<boost::shared_mutex> l(model_queues_mutex_);
+    boost::unique_lock<boost::shared_mutex> l(model_queues_mutex_);
 
-    VersionedModelId first_model;
-    for (auto &model_data_item : container->model_data_) {
-      first_model = model_data_item.first;
-      break;
-    }
-
-    // TODO: Figure out how to fairly wait on multiple queues
-
-    auto model_queue_entry = model_queues_.find(first_model);
-    if (model_queue_entry == model_queues_.end()) {
+    auto container_queue_entry = container_queues_.find(container_id);
+    if (container_queue_entry == container_queues_.end()) {
       throw std::runtime_error(
-          "Failed to find model queue associated with a previously registered "
+          "Failed to find container queue associated with a previously registered "
           "container!");
     }
-    std::shared_ptr<ModelQueue> current_model_queue = model_queue_entry->second;
+    std::shared_ptr<ContainerQueue> container_queue = container_queue_entry->second;
 
     // NOTE: It is safe to unlock here because we copy the shared_ptr to
-    // the ModelQueue object so even if that entry in the map gets deleted,
-    // the ModelQueue object won't be destroyed until our copy of the pointer
+    // the ContainerQueue object so even if that entry in the map gets deleted,
+    // the ContainerQueue object won't be destroyed until our copy of the pointer
     // goes out of scope.
     l.unlock();
 
-    std::vector<PredictTask> batch = current_model_queue->get_batch(
+    std::vector<PredictTask> batch = container_queue->get_batch(
         [container](Deadline deadline) { return container->get_batch_size(deadline); },
         use_full_batches_);
 
@@ -541,15 +533,15 @@ class TaskExecutor {
         uint32_t batch_id = batch_ids[i];
         outbound_messages.emplace(
             std::piecewise_construct, std::forward_as_tuple(batch_id),
-            std::forward_as_tuple(current_time, container->container_id_, b.model_, container->get_replica_id(b.model_), b.input_, b.query_id_));
+            std::forward_as_tuple(current_time, container->container_id_, b.model_,
+                                  container->get_replica_id(b.model_), b.input_, b.query_id_));
       }
-
 
       int message_id = rpc_->send_message(std::move(rpc_message), container->connection_id_);
       inflight_messages_.emplace(message_id, std::move(outbound_messages));
     } else {
       // log_error_formatted(LOGGING_TAG_TASK_EXECUTOR,
-      //                     "ModelQueue returned empty batch for model {}, replica {}",
+      //                     "ContainerQueue returned empty batch for model {}, replica {}",
       //                     model_id.serialize(), std::to_string(replica_id));
     }
   }
@@ -557,7 +549,7 @@ class TaskExecutor {
   void on_response_recv(rpc::RPCResponse response) {
     int msg_id = std::get<0>(response);
     std::unordered_map<uint32_t, std::shared_ptr<OutputData>> &outputs = std::get<1>(response);
-    
+
     std::unique_lock<std::mutex> inflight_messages_lock(inflight_messages_mutex_);
     std::unordered_map<uint32_t, InflightMessage> inbound_messages = inflight_messages_[msg_id];
     size_t batch_size = inbound_messages.size();
