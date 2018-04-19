@@ -419,7 +419,7 @@ class DriverBenchmarker(object):
                 print("Process finished!")
                 break
 
-        save_results(self.configs, [stats_manager.stats], "single_proc_bs_{}_bench".format(batch_size), slo_millis, process_num=replica_num)
+        save_results(self.configs, [stats_manager.stats], "single_proc_bs_{}_bench".format(batch_size), slo_millis, process_num=replica_num, arrival_process=process_file)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Single Process Image Driver 1')
@@ -435,8 +435,6 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--slo_millis', type=int, help="The SLO, in milliseconds")
     
     args = parser.parse_args()
-
-    arrival_process = None
 
     if not args.cpus:
         raise Exception("The set of allocated cpus must be specified via the '--cpus' flag!")

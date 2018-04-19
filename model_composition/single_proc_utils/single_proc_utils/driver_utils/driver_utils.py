@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import datetime
+import hashlib
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -9,6 +10,11 @@ logging.basicConfig(
     level=logging.INFO)
 
 logger = logging.getLogger(__name__)
+
+def hash_file(path):
+    with open(path, 'rb') as f:
+        file_bytes = f.read()
+        return hashlib.sha256(file_bytes).hexdigest()
 
 class HeavyNodeConfig(object):
     def __init__(self,
@@ -52,7 +58,8 @@ def save_results(configs, client_metrics, results_dir, slo, process_num=None, ar
     num_replicas = configs[0].num_replicas
 
     if arrival_process:
-        results_obj["arrival_process"] = arrival_process
+        process_hash = hash_file(arrival_process)
+        results_obj["arrival_process"] = {"file_path" : arrival_process, "hash" : process_hash}
 
     results_path_base = "results-bs-{}-reps-{}-slo-{}".format(batch_size, num_replicas, slo)
     
