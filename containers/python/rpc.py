@@ -119,7 +119,7 @@ def handle_predictions(predict_fn, request_queue, response_queue):
         prediction_request = request_queue.get(block=True)
         t1 = datetime.now()
 
-        print("batch_delay: {} us".format((t1 - t2).microseconds))
+        print("batch_delay: {} us".format((t1 - t2).total_seconds()))
 
         outputs = predict_fn(prediction_request.inputs)
         # Type check the outputs:
@@ -164,7 +164,7 @@ def handle_predictions(predict_fn, request_queue, response_queue):
         response_queue.put(response)
 
         t2 = datetime.now()
-        print("handle: {pred_time} us".format(pred_time=(t2 - t1).microseconds))
+        print("handle: {pred_time} us".format(pred_time=(t2 - t1).total_seconds()))
         sys.stdout.flush()
         sys.stderr.flush()
 
@@ -247,7 +247,7 @@ class Server(threading.Thread):
         return self.event_history.get_events()
 
     def send_response(self):
-        if not self.response_queue.empty() or self.full_buffers == 2:
+        if not self.response_queue.empty() or self.full_buffers == 1:
             response = self.response_queue.get()
             self.full_buffers -= 1
             # t3 = datetime.now()
@@ -292,7 +292,6 @@ class Server(threading.Thread):
                 input_item = self.recv_socket.recv()
                 input_item = np.frombuffer(input_item, dtype=parsed_input_types[i])
                 
-                print(model_name)
                 if model_name not in inputs:
                     inputs[model_name] = [input_item]
                 else:
@@ -303,9 +302,6 @@ class Server(threading.Thread):
                     model_batch_ids[model_name] = [model_batch_id]
                 else:
                     model_batch_ids[model_name].append(model_batch_id)
-
-            print(inputs)
-            print(model_batch_ids)
 
             t2 = datetime.now()
 

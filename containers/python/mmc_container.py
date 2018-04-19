@@ -3,12 +3,15 @@ import rpc
 import os
 import sys
 import numpy as np
+import time
 
 class MMCContainer(rpc.ModelContainerBase):
     def __init__(self, prediction="1.0"):
         self.prediction = prediction
 
     def predict(self, inputs):
+        time.sleep(1)
+        print(inputs)
         outputs = {}
         for model_name in inputs:
             outputs[model_name] = [self.prediction] * len(inputs[model_name])
