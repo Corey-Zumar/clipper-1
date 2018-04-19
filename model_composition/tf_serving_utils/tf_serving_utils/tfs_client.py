@@ -25,6 +25,12 @@ class ReplicaAddress:
     def get_channel(self):
         return implementations.insecure_channel(self.host_name, int(self.port))
 
+    def __str__(self):
+        return "{}:{}".format(self.host_name, self.port)
+
+    def __repr__(self):
+        return "{}:{}".format(self.host_name, self.port)
+
 class GRPCClient:
 
     def __init__(self, replica_addrs):
@@ -36,6 +42,7 @@ class GRPCClient:
             the client should communicate with
         """
 
+        self.replica_addrs = replica_addrs
         self.clients = [self._create_client(address) for address in replica_addrs]
         self.request_queue = Queue()
 
@@ -86,4 +93,10 @@ class GRPCClient:
             input_item, callback = self.request_queue.get(block=True)
             response = self.clients[replica_num].Predict(input_item, REQUEST_TIME_OUT_SECONDS)
             callback(response)
+
+    def __str__(self):
+        return ",".join(self.replica_addrs)
+
+    def __repr__(self):
+        return ",".join(self.replica_addrs)
 

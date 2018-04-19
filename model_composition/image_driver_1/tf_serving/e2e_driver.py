@@ -38,7 +38,7 @@ RESNET_FEATS_OUTPUT_KEY = "feats"
 KERNEL_SVM_OUTPUT_KEY = "outputs"
 LOG_REG_OUTPUT_KEY = "outputs"
 
-CONFIG_KEY_CLIENT_CONFIG_PATHS = "server_config_paths"
+CONFIG_KEY_CLIENT_CONFIG_PATHS = "client_config_paths"
 CONFIG_KEY_NUM_TRIALS = "num_trials"
 CONFIG_KEY_TRIAL_LENGTH = "trial_length"
 CONFIG_KEY_NUM_CLIENTS = "num_clients"
@@ -49,14 +49,14 @@ CONFIG_KEY_PROCESS_PATH = "process_path"
 
 class ClientConfig:
 
-    def __init__(model_name, host, port):
+    def __init__(self, model_name, host, port):
         self.model_name = model_name
         self.host = host
         self.port = port
 
-class ExperimentConfig(num_trials, trial_length, num_clients, slo_millis, process_path, model_configs):
+class ExperimentConfig:
 
-    def __init__(self):
+    def __init__(self, num_trials, trial_length, num_clients, slo_millis, process_path, model_configs):
         self.num_trials = num_trials
         self.trial_length = trial_length
         self.num_clients = num_clients
@@ -66,7 +66,7 @@ class ExperimentConfig(num_trials, trial_length, num_clients, slo_millis, proces
 
 def load_experiment_config(config_path):
     with open(config_path, "r") as f:
-        experiment_config_params = json.load(config_path)
+        experiment_config_params = json.load(f)
 
     client_config_paths = experiment_config_params[CONFIG_KEY_CLIENT_CONFIG_PATHS]
 
@@ -105,13 +105,15 @@ def create_clients(configs):
     """
     Parameters
     ------------
+    configs : [ClientConfig]
     configs : dict
-        Dictionary of TFSHeavyNodeConfig objects,
+        Dictionary of ClientConfig objects,
         keyed on model names
     """
     clients = {}
     for key in configs:
-        replica_addrs = [ReplicaAddress(TFS_ADDRESS, int(port)) for port in configs[key].ports]
+        replica_addrs = [ReplicaAddress(client_config.host, int(client_config.port)) for client_config in configs[key]]
+        print(replica_addrs)
         client = GRPCClient(replica_addrs)
         client.start()
         clients[key] = client
@@ -340,7 +342,9 @@ if __name__ == "__main__":
 
 
     if args.warmup:
-        benchmarker = DriverBenchmarker(experiment_config.trial_length, queue, model_configs)
+        benchmarker = DriverBenchmarker(experiment_config.trial_length, 
+                                        queue, 
+                                        experiment_config.model_configs)
         benchmarker.warm_up()
 
     else:
@@ -354,7 +358,9 @@ if __name__ == "__main__":
             
         procs = []
         for i in range(experiment_config.num_clients):
-            benchmarker = DriverBenchmarker(experiment_config.trial_length, queue, model_configs)
+            benchmarker = DriverBenchmarker(experiment_config.trial_length, 
+                                            queue, 
+                                            experiment_config.model_configs)
             p = Process(target=benchmarker.run, args=(experiment_config.num_trials, arrival_process))
             p.start()
             procs.append(p)
