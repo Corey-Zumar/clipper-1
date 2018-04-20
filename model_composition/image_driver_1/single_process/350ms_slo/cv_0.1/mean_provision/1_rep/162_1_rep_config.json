@@ -2,7 +2,7 @@
     "batch_size" : 60,
     "cpu_affinities": ["0 16 1 17 2 18 3 19"],
     "gpu_affinities": ["0 1"],
-    "tagged_process_path": "350ms_slo/cv_0.1/mean_provision/1_rep/162_tagged_1.deltas",
+    "tagged_process_path": "350ms_slo/cv_0.1/mean_provision/1_rep/162_0.1_tagged_1.deltas",
     "replica_nums": [0],
     "trial_length": 800,
     "num_trials": 30,
