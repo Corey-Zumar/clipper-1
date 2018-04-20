@@ -1,0 +1,10 @@
+{
+    "batch_size" : 1,
+    "cpu_affinities": ["0 16 1 17 2 18 3 19"],
+    "gpu_affinities": ["0 1"],
+    "tagged_process_path": "min_lat_slo/peak_provision/1_rep/1_tagged_1.deltas",
+    "replica_nums": [0],
+    "trial_length": 30,
+    "num_trials": 30,
+    "slo_millis": 0
+}
