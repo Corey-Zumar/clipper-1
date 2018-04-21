@@ -39,23 +39,26 @@ def load_relevant_arrival_procs(procs_dir, cv):
     return OrderedDict(sorted(deltas_dict.items()))
 
 def probe_throughputs(eval_fn, arrival_process):
-    min = 0
-    max = len(arrival_process)
+    curr_min = 0
+    curr_max = len(arrival_process)
     highest_successful_config = None
     while True:
-        if max == min:
+        if curr_max == curr_min:
             break
-        middle = min + math.ceil((max - min) / 2)
+        middle = curr_min + math.ceil((curr_max - curr_min) / 2)
         print("PROBING. min: {}, max: {}, middle: {}".format(
-            min, max, middle))
+            curr_min, curr_max, middle))
 
         result = eval_fn(int(middle))
 
         if result:
-            min = middle
+            curr_min = middle
             highest_successful_config = result
         else:
-            max = middle - 1
+            # Pad middle by a small number to account for the fact
+            # that peak throughput does not always monotonically
+            # increase with lambda
+            curr_max = min(curr_max - 1, (middle + 16) - 1)
     return highest_successful_config
         
 
