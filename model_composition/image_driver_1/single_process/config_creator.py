@@ -139,8 +139,10 @@ def create_configs(arrival_procs_path,
         target_thruput = num_replicas * mean_profile_thruput * utilization_factor
         target_thrus = [target_thruput]
 
-        peak_lambda, peak_thru = bench_utils.find_peak_arrival_proc(arrival_procs, target_thrus)[target_thruput]
+        peak_lambda, peak_thru = bench_utils.find_peak_arrival_proc(arrival_procs, target_thrus, slo_millis)[target_thruput]
         mean_lambda, mean_thru = bench_utils.find_mean_arrival_proc(arrival_procs, target_thrus)[target_thruput] 
+
+        print(target_thruput, peak_lambda, peak_thru, mean_thru)
 
         peak_lambda = int(peak_lambda)
         mean_lambda = int(mean_lambda)

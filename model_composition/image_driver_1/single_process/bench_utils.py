@@ -10,14 +10,11 @@ from e2e_utils import load_arrival_deltas, calculate_mean_throughput, calculate_
 
 ARRIVAL_PROCS_DIR = "cached_arrival_processes"
 
-THROUGHPUT_UTILIZATION_DECAY_FACTOR = .8
-
 def get_mean_throughput(config_path):
     with open(config_path, "r") as f:
         config_json = json.load(f)
 
     thrus = [float(thru) for thru in config_json["client_metrics"][0]["thrus"]]
-    print(np.mean(thrus) * THROUGHPUT_UTILIZATION_DECAY_FACTOR)
     return np.mean(thrus)
 
 def load_relevant_arrival_procs(procs_dir, cv):
@@ -62,11 +59,11 @@ def probe_throughputs(eval_fn, arrival_process):
     return highest_successful_config
         
 
-def find_peak_arrival_proc(arrival_procs, target_thrus):
+def find_peak_arrival_proc(arrival_procs, target_thrus, slo_window_millis=350):
     
     def eval_fn(middle, target_thru):
         key = arrival_procs.keys()[middle]
-        peak_thru = calculate_peak_throughput(arrival_procs[key], slo_window_millis=350)
+        peak_thru = calculate_peak_throughput(arrival_procs[key], slo_window_millis=slo_window_millis)
         if peak_thru <= target_thru:
             return (key, peak_thru)
         else:
