@@ -7,7 +7,7 @@ from subprocess import Popen
 CONFIG_KEY_BATCH_SIZE = "batch_size"
 CONFIG_KEY_CPU_AFFINITIES = "cpu_affinities"
 CONFIG_KEY_GPU_AFFINITIES = "gpu_affinities"
-CONFIG_KEY_TAGGED_PROCESS_PATH = "tagged_process_path"
+CONFIG_KEY_PROCESS_PATH = "process_path"
 CONFIG_KEY_REPLICA_NUMS = "replica_nums"
 CONFIG_KEY_TRIAL_LENGTH = "trial_length"
 CONFIG_KEY_NUM_TRIALS = "num_trials"
@@ -22,7 +22,7 @@ def load_config(config_path):
 def launch_processes(config):
     batch_size = config[CONFIG_KEY_BATCH_SIZE]
     cpu_affinities = config[CONFIG_KEY_CPU_AFFINITIES]
-    process_path = config[CONFIG_KEY_TAGGED_PROCESS_PATH]
+    process_path = config[CONFIG_KEY_PROCESS_PATH]
     replica_nums = config[CONFIG_KEY_REPLICA_NUMS]
     trial_length = config[CONFIG_KEY_TRIAL_LENGTH]
     num_trials = config[CONFIG_KEY_NUM_TRIALS]

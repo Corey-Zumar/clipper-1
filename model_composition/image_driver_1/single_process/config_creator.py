@@ -2,6 +2,7 @@ import sys
 import os
 import argparse
 import json
+import shutil
 
 import bench_utils
 import e2e_utils
@@ -9,7 +10,7 @@ import e2e_utils
 import numpy as np
 
 from run_distributed_driver import CONFIG_KEY_BATCH_SIZE, CONFIG_KEY_CPU_AFFINITIES, CONFIG_KEY_GPU_AFFINITIES
-from run_distributed_driver import CONFIG_KEY_TAGGED_PROCESS_PATH, CONFIG_KEY_REPLICA_NUMS, CONFIG_KEY_TRIAL_LENGTH
+from run_distributed_driver import CONFIG_KEY_PROCESS_PATH, CONFIG_KEY_REPLICA_NUMS, CONFIG_KEY_TRIAL_LENGTH
 from run_distributed_driver import CONFIG_KEY_NUM_TRIALS, CONFIG_KEY_SLO_MILLIS
 
 HIERARCHY_KEY_MEAN_PATHS = "mean"
@@ -76,7 +77,7 @@ def create_configs_hierarchy(configs_base_dir_path, max_num_replicas, cv):
 
     return path_outputs
             
-def create_config_json(tagged_process_path,
+def create_config_json(process_path,
                        replicas_per_machine,
                        gpus_per_replica,
                        pcpus_per_replica,
@@ -95,7 +96,7 @@ def create_config_json(tagged_process_path,
 
     config_json = {
         CONFIG_KEY_BATCH_SIZE : batch_size,
-        CONFIG_KEY_TAGGED_PROCESS_PATH : tagged_process_path,
+        CONFIG_KEY_PROCESS_PATH : process_path,
         CONFIG_KEY_REPLICA_NUMS : replica_nums,
         CONFIG_KEY_TRIAL_LENGTH : trial_length,
         CONFIG_KEY_NUM_TRIALS : CONFIG_NUM_TRIALS,
@@ -129,7 +130,8 @@ def create_configs(arrival_procs_path,
                    slo_millis,
                    cv, 
                    utilization_factor, 
-                   configs_base_dir):
+                   configs_base_dir,
+                   tag_procs):
 
     configs_hierarchy = create_configs_hierarchy(configs_base_dir, max_num_replicas, cv)
     arrival_procs = bench_utils.load_relevant_arrival_procs(arrival_procs_path, cv)
@@ -141,8 +143,6 @@ def create_configs(arrival_procs_path,
 
         peak_lambda, peak_thru = bench_utils.find_peak_arrival_proc(arrival_procs, target_thrus, slo_millis)[target_thruput]
         mean_lambda, mean_thru = bench_utils.find_mean_arrival_proc(arrival_procs, target_thrus)[target_thruput] 
-
-        print(target_thruput, peak_lambda, peak_thru, mean_thru)
 
         peak_lambda = int(peak_lambda)
         mean_lambda = int(mean_lambda)
@@ -157,26 +157,45 @@ def create_configs(arrival_procs_path,
                                                      lambda_val=peak_lambda, 
                                                      tagged_num_replicas=None)
 
+        
         hierarchy_mean_path = configs_hierarchy[HIERARCHY_KEY_MEAN_PATHS][num_replicas] 
-        mean_process_path_tagged = get_arrival_process_path(hierarchy_mean_path, 
-                                                            cv=cv, 
-                                                            lambda_val=mean_lambda, 
-                                                            tagged_num_replicas=None)
-
-
         hierarchy_peak_path = configs_hierarchy[HIERARCHY_KEY_PEAK_PATHS][num_replicas] 
-        peak_process_path_tagged = get_arrival_process_path(hierarchy_peak_path,                                                            cv=cv, 
-                                                            lambda_val=peak_lambda, 
-                                                            tagged_num_replicas=None)
 
-        e2e_utils.tag_arrival_process(mean_process_path, mean_process_path_tagged, num_replicas) 
-        e2e_utils.tag_arrival_process(peak_process_path, peak_process_path_tagged, num_replicas)
+        if tag_procs:
+            mean_process_path_output = get_arrival_process_path(hierarchy_mean_path, 
+                                                                cv=cv, 
+                                                                lambda_val=mean_lambda, 
+                                                                tagged_num_replicas=num_replicas)
+
+
+            peak_process_path_output = get_arrival_process_path(hierarchy_peak_path,                                                            cv=cv, 
+                                                                lambda_val=peak_lambda, 
+                                                                tagged_num_replicas=num_replicas)
+
+            e2e_utils.tag_arrival_process(mean_process_path, mean_process_path_output, num_replicas) 
+            e2e_utils.tag_arrival_process(peak_process_path, peak_process_path_output, num_replicas)
+
+        else:
+            mean_process_path_output = get_arrival_process_path(hierarchy_mean_path, 
+                                                                  cv=cv, 
+                                                                  lambda_val=mean_lambda, 
+                                                                  tagged_num_replicas=None)
+
+
+            peak_process_path_output = get_arrival_process_path(hierarchy_peak_path,                                                            
+                                                                  cv=cv, 
+                                                                  lambda_val=peak_lambda, 
+                                                                  tagged_num_replicas=None)
+
+
+            shutil.copyfile(mean_process_path, mean_process_path_output) 
+            shutil.copyfile(peak_process_path, peak_process_path_output) 
 
         i = 0
         j = 0
         while i < num_replicas:
             replica_nums = range(i, min(num_replicas, i + replicas_per_machine))
-            mean_config_json = create_config_json(mean_process_path_tagged,
+            mean_config_json = create_config_json(mean_process_path_output,
                                                   replicas_per_machine,
                                                   gpus_per_replica, 
                                                   pcpus_per_replica, 
@@ -194,7 +213,7 @@ def create_configs(arrival_procs_path,
             with open(mean_config_path, "w") as f:
                 json.dump(mean_config_json, f, indent=4)
 
-            peak_config_json = create_config_json(peak_process_path_tagged,
+            peak_config_json = create_config_json(peak_process_path_output,
                                                   replicas_per_machine,
                                                   gpus_per_replica, 
                                                   pcpus_per_replica, 
@@ -228,6 +247,7 @@ if __name__ == "__main__":
     parser.add_argument('-sm', '--slo_millis', type=int, help="The latency SLO, in milliseconds, that will be recorded when running experiments")
     parser.add_argument('-gr', '--gpus_per_replica', type=int, default=2, help="The number of GPUs required to run a single replica of SPD")
     parser.add_argument('-cr', '--cpus_per_replica', type=int, default=4, help="The number of PHYSICAL CPUs required to run a single replica of SPD")
+    parser.add_argument('-t', '--tag_procs', action="store_true", help="If specified, tags arrival processes in accordance with replica configurations")
 
     args = parser.parse_args()
 
@@ -241,5 +261,6 @@ if __name__ == "__main__":
                    slo_millis=args.slo_millis,
                    cv=args.cv, 
                    utilization_factor=args.utilization_factor,
-                   configs_base_dir=args.configs_base_dir)
+                   configs_base_dir=args.configs_base_dir,
+                   tag_procs=args.tag_procs)
 
