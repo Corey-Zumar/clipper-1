@@ -20,12 +20,12 @@ def get_mean_throughput(config_path):
     print(np.mean(thrus) * THROUGHPUT_UTILIZATION_DECAY_FACTOR)
     return np.mean(thrus)
 
-def load_arrival_procs(cv):
+def load_relevant_arrival_procs(procs_dir, cv):
     deltas_dict = {}
     if cv == 1:
-        fnames = [os.path.join(ARRIVAL_PROCS_DIR, fname) for fname in os.listdir(ARRIVAL_PROCS_DIR) if ("deltas" in fname) and "_" not in fname]
+        fnames = [os.path.join(procs_dir, fname) for fname in os.listdir(procs_dir) if ("deltas" in fname) and "_" not in fname]
     else:
-        fnames = [os.path.join(ARRIVAL_PROCS_DIR, fname) for fname in os.listdir(ARRIVAL_PROCS_DIR) if ("deltas" in fname) and str(cv) in fname]
+        fnames = [os.path.join(procs_dir, fname) for fname in os.listdir(procs_dir) if ("deltas" in fname) and str(cv) in fname]
     for fname in fnames:
         print(fname)
         deltas_subname = fname.split("/")[1]
@@ -59,9 +59,9 @@ def probe_throughputs(eval_fn, arrival_process):
     return highest_successful_config
         
 
-def find_peak_arrival_proc(arrival_procs, target_thru):
+def find_peak_arrival_proc(arrival_procs, target_thrus):
     
-    def eval_fn(middle):
+    def eval_fn(middle, target_thru):
         key = arrival_procs.keys()[middle]
         peak_thru = calculate_peak_throughput(arrival_procs[key], slo_window_millis=350)
         if peak_thru <= target_thru:
@@ -69,11 +69,16 @@ def find_peak_arrival_proc(arrival_procs, target_thru):
         else:
             return None
 
-    return probe_throughputs(eval_fn, arrival_procs)
+    outputs = {}
+    for thru in target_thrus: 
+        peak_thru = probe_throughputs(lambda middle : eval_fn(middle, thru), arrival_procs)
+        outputs[thru] = peak_thru
 
-def find_mean_arrival_proc(arrival_procs, target_thru):
+    return outputs
+
+def find_mean_arrival_proc(arrival_procs, target_thrus):
     
-    def eval_fn(middle):
+    def eval_fn(middle, target_thru):
         key = arrival_procs.keys()[middle]
         mean_thru = calculate_mean_throughput(arrival_procs[key])
         if mean_thru <= target_thru:
@@ -81,22 +86,9 @@ def find_mean_arrival_proc(arrival_procs, target_thru):
         else:
             return None
 
-    return probe_throughputs(eval_fn, arrival_procs)
+    outputs = {}
+    for thru in target_thrus: 
+        peak_thru = probe_throughputs(lambda middle : eval_fn(middle, thru), arrival_procs)
+        outputs[thru] = peak_thru
 
-if __name__ == "__main__":
-    path = sys.argv[1]
-    cv = float(sys.argv[2])
-    num_replicas = int(sys.argv[3])
-
-    arrival_procs = load_arrival_procs(cv)
-    mean_thruput = get_mean_throughput(path)
-    target_thruput = num_replicas * mean_thruput
-
-    # IMPORTANT: DECAY THROUGHPUT BY THE SPECIFIED DECAY FACTOR
-    target_thruput = target_thruput * THROUGHPUT_UTILIZATION_DECAY_FACTOR
-
-    peak_delta = find_peak_arrival_proc(arrival_procs, target_thruput)
-    print(peak_delta)
-
-    mean_delta = find_mean_arrival_proc(arrival_procs, target_thruput)
-    print(mean_delta)
+    return outputs
