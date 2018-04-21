@@ -9,7 +9,7 @@ setup(
 	maintainer_email='czumar@berkeley.edu',
 	url='http://clipper.ai',
 	packages=[
-		"single_proc_utils", "single_proc_utils.model", "single_proc_utils.driver_utils"
+		"single_proc_utils", "single_proc_utils.model", "single_proc_utils.driver_utils", "single_proc_utils.spd_grpc_utils"]
 	],
 	install_requires=[
 		'numpy',

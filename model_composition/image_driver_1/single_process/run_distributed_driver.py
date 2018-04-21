@@ -40,7 +40,7 @@ def launch_processes(config):
         resnet_gpu, inception_gpu = gpu_affinity.split(" ")
 
         process_cmd = "(export CUDA_VISIBLE_DEVICES=\"{res_gpu},{incep_gpu}\";" \
-                      " numactl -C {cd_cpu_aff} python driver.py -b {bs} -c {cpu_aff}" \
+                      " numactl -C {cd_cpu_aff} python driver_sim.py -b {bs} -c {cpu_aff}" \
                       " -t {trials} -tl {length} -n {rep_num} -p {proc_file} -s {slo})".format(
                               res_gpu=resnet_gpu,
                               incep_gpu=inception_gpu,
