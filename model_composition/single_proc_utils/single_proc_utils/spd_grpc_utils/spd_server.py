@@ -1,9 +1,15 @@
+import grpc
+
+import numpy as np
+
 import spd_frontend_pb2
 import spd_frontend_pb2_grpc
 
+from concurrent.futures import ThreadPoolExecutor
+
 class SpdFrontend(spd_frontend_pb2_grpc.PredictServicer):
     
-    def predict(self.inputs, msg_ids):
+    def predict(self, inputs, msg_ids):
         pass
 
     def PredictFloats(self, request, context):
@@ -15,8 +21,29 @@ class SpdFrontend(spd_frontend_pb2_grpc.PredictServicer):
         
         return response
 
+class SpdServer:
 
+    def __init__(self, spd_frontend, host, port):
+        self.spd_frontend = spd_frontend
+        self.host = host
+        self.port = port
 
+        self.server = None
 
+    def start(self):
+        # Create a threadpool consisting of a single worker
+        # for synchronous predictions
+        self.server = grpc.server(ThreadPoolExecutor(max_workers=1)) 
 
+        spd_frontend_pb2_grpc.add_PredictServicer_to_server(self.spd_frontend, server)
+
+        address = "{host}:{port}".format(host=self.host, port=self.port)
+        server.add_insecure_port(address)
+        
+        # Start server
+        self.server.start()
+
+    def stop(self):
+        if self.server:
+            self.server.stop()
 

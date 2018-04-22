@@ -9,7 +9,9 @@ from Queue import Queue
 from threading import Thread, Lock
 from datetime import datetime
 
-REQUEST_QUEUE_POLLING_DELAY_SECONDS = .005
+import spd_frontend_pb2
+import spd_frontend_pb2_grpc
+
 REQUEST_TIME_OUT_SECONDS = 30
 
 class ReplicaAddress:
@@ -38,16 +40,18 @@ class GRPCClient:
             the client should communicate with
         """
 
-        self.replica_addrs = replica_addrs
-        self.clients = [self._create_client(address) for address in replica_addrs]
-        self.request_queue = Queue()
-
-        # TODO(czumar): Make sure this synchronization var works
         self.active = False
+        self.replica_addrs = replica_addrs
 
-        self.threads = [Thread(target=self._run, args=(i,)) for i in range(len(self.clients))]
+        self.threads = []
+        self.replicas = {}
+        for i in range(len(replica_addrs)):
+            address = replica_addrs[i]
+            queue = Queue()
+            self.replicas[i] = (address, self._create_client(address), Queue())
+            self.threads.append(Thread(target=self._run, args=(i,)))
 
-    def predict(self, input_item, callback):
+    def predict(self, replica_num, inputs, msg_ids, callback):
         """ 
         Parameters
         -------------
@@ -59,8 +63,9 @@ class GRPCClient:
             The function to execute when a response
             is received
         """
-
-        self.request_queue.put((input_item, callback))
+        
+        _, _, queue = self.replicas[replica_num]
+        queue.put(inputs, msg_ids, callback)
 
     def start(self):
         self.active = True
@@ -72,9 +77,6 @@ class GRPCClient:
         for thread in self.threads:
             thread.join()
 
-    def get_queue_size(self):
-        return self.request_queue.qsize()
-
     def _create_client(self, address):
         """
         Parameters
@@ -82,13 +84,18 @@ class GRPCClient:
         address : ReplicaAddress
         """
 
-        return prediction_service_pb2.beta_create_PredictionService_stub(address.get_channel())
+        return spd_frontend_pb2_grpc.PredictStub(address.get_channel())
 
     def _run(self, replica_num):
+        _, client, request_queue = self.replicas[replica_num]
         while self.active:
-            input_item, callback = self.request_queue.get(block=True)
-            response = self.clients[replica_num].Predict(input_item, REQUEST_TIME_OUT_SECONDS)
-            callback(response)
+            inputs, msg_ids, callback = self.request_queue.get(block=True)
+           
+            grpc_inputs = [spd_frontend_pb2.FloatsInput(input=inp) for inp in inputs]
+            predict_request = spd_frontend_pb2.PredictRequest(inputs=grpc_inputs, msg_ids=msg_ids)
+
+            response = client.PredictFloats(input_item, REQUEST_TIME_OUT_SECONDS)
+            callback(replica_num, list(response.msg_ids))
 
     def __str__(self):
         return ",".join(self.replica_addrs)
