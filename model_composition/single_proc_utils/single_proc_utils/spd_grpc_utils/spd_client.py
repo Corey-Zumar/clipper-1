@@ -2,8 +2,7 @@ import sys
 import os
 import time
 import logging
-
-from grpc.beta import implementations
+import grpc
 
 from Queue import Queue
 from threading import Thread, Lock
@@ -21,7 +20,8 @@ class ReplicaAddress:
         self.port = port
 
     def get_channel(self):
-        return implementations.insecure_channel(self.host_name, int(self.port))
+        address = "{}:{}".format(self.host_name, self.port)
+        return grpc.insecure_channel(address)
 
     def __str__(self):
         return "{}:{}".format(self.host_name, self.port)
@@ -42,16 +42,16 @@ class SPDClient:
 
         self.active = False
         self.replica_addrs = replica_addrs
-
+        
+        queue = Queue()
         self.threads = []
         self.replicas = {}
         for i in range(len(replica_addrs)):
             address = replica_addrs[i]
-            queue = Queue()
             self.replicas[i] = (address, self._create_client(address), Queue())
             self.threads.append(Thread(target=self._run, args=(i,)))
 
-    def predict(self, replica_num, inputs, msg_ids, callback):
+    def predict(self, inputs, msg_ids, callback):
         """ 
         Parameters
         -------------

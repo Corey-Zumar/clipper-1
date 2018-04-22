@@ -35,10 +35,10 @@ class SpdServer:
         # for synchronous predictions
         self.server = grpc.server(ThreadPoolExecutor(max_workers=1)) 
 
-        spd_frontend_pb2_grpc.add_PredictServicer_to_server(self.spd_frontend, server)
+        spd_frontend_pb2_grpc.add_PredictServicer_to_server(self.spd_frontend, self.server)
 
         address = "{host}:{port}".format(host=self.host, port=self.port)
-        server.add_insecure_port(address)
+        self.server.add_insecure_port(address)
         
         # Start server
         self.server.start()

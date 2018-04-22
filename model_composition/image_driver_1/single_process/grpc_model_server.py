@@ -79,7 +79,7 @@ def _get_inception_input():
 
 class ID1Frontend(SpdFrontend):
 
-    def __init__(self, models_dict):
+    def __init__(self, models_dict, warmup=True):
         self.task_execution_thread_pool = ThreadPoolExecutor(max_workers=2) 
         self.models_dict = models_dict
 
@@ -89,11 +89,13 @@ class ID1Frontend(SpdFrontend):
         self.inception_model = models_dict[INCEPTION_FEATS_MODEL_NAME]
         self.log_reg_model = models_dict[TF_LOG_REG_MODEL_NAME]
 
-        logger.info("Warming up...")
-        self.warmup_lock = Lock()
-        self.warming_up = True
-        warmup_thread = Thread(target=self._warm_up)
-        warmup_thread.start()
+        self.warming_up = False
+        if warmup:
+            logger.info("Warming up...")
+            self.warmup_lock = Lock()
+            self.warming_up = True
+            warmup_thread = Thread(target=self._warm_up)
+            warmup_thread.start()
 
     def predict(self, inputs, msg_ids):
         """
@@ -116,7 +118,7 @@ class ID1Frontend(SpdFrontend):
 
     def _predict(self, inputs, msg_ids):
         resnet_inputs = self._transform_inputs_resnet(inputs)
-        inception_inputs = self._transform_inputs_inceptioninputs)
+        inception_inputs = self._transform_inputs_inception(inputs)
 
         self._predict_parallel(resnet_inputs, inception_inputs)
 
@@ -190,12 +192,14 @@ if __name__ == "__main__":
     parser.add_argument('-r',  '--resnet_gpu', type=int, default=0, help="The GPU on which to run the ResNet 152 featurization model")
     parser.add_argument('-i',  '--inception_gpu', type=int, default=1, help="The GPU on which to run the inception featurization model")
     parser.add_argument('-p',  '--port', type=int, help="The port on which to run the grpc server")
+    parser.add_argument('-nw', '--no_warmup', action="store_true", help="If true, disables warmup")
 
     args = parser.parse_args()
 
     models_dict = load_models(args.resnet_gpu, args.inception_gpu)
 
-    frontend = ID1Frontend(models_dict)
+    warmup = not args.no_warmup
+    frontend = ID1Frontend(models_dict, warmup)
     server = SpdServer(frontend, SERVER_HOST_IP, args.port)
     server.start()
     

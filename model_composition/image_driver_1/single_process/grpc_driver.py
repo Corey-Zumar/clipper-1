@@ -7,6 +7,9 @@ import Queue
 import time
 import json
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Thread, Lock
+
 from machine_config_tagger import TAGGED_CONFIG_KEY_MACHINE_ADDRESS, TAGGED_CONFIG_KEY_CONFIG_PATH
 from single_proc_utils import HeavyNodeConfig, save_results
 from single_proc_utils.spd_grpc_utils.spd_client import ReplicaAddress, SPDClient  
@@ -168,19 +171,19 @@ class StatsManager(object):
 
         self.start_timestamp = datetime.now()
 
-    def update_stats(self, completed_requests, end_timestamp):
+    def update_stats(self, completed_requests, end_time):
         try:
             batch_size = len(completed_requests)
             self.batch_sizes.append(batch_size)
             for msg_id, send_time in completed_requests:
-                e2e_latency = end_timestamp - send_time
+                e2e_latency = (end_time - send_time).total_seconds()
                 self.latencies.append(e2e_latency)
                 self.stats["per_message_lats"][msg_id] = e2e_latency
 
             self.trial_num_complete += batch_size
 
             if self.trial_num_complete >= self.trial_length:
-                self._print_stats(end_timestamp)
+                self._print_stats()
                 self._init_stats()
         except Exception as e:
             print(e)
@@ -193,9 +196,10 @@ class StatsManager(object):
         self.cur_req_id = 0
         self.start_time = datetime.now()
 
-    def _print_stats(self, end_timestamp):
-        thru = float(self.trial_num_complete) / (end_timestamp - self.start_timestamp)
-        self.start_timestamp = end_timestamp
+    def _print_stats(self):
+        end_time = datetime.now()
+        thru = float(self.trial_num_complete) / (end_time - self.start_time).total_seconds()
+        self.start_time = end_time
 
         lats = np.array(self.latencies)
         batch_predict_lats = np.array(self.batch_predict_latencies)
@@ -208,14 +212,15 @@ class StatsManager(object):
         self.stats["p99_lats"].append(p99)
         self.stats["mean_lats"].append(mean)
         self.stats["mean_batch_sizes"].append(mean_batch_size)
-        logger.info("p99_lat: {p99}, mean_lat: {mean}, thruput: {thru}, 
-                     mean_batch: {mb}".format(p99=p99,
+        logger.info("p99_lat: {p99}, mean_lat: {mean}, thruput: {thru}, " 
+                    "mean_batch: {mb}".format(p99=p99,
                                               mean=mean,
                                               thru=thru, 
                                               mb=mean_batch_size))
 
 class DriverBenchmarker:
     def __init__(self, experiment_config):
+        self.experiment_config = experiment_config
         self.spd_client = self._create_client(experiment_config.machine_addrs)
     
     def run_config(self):
@@ -224,26 +229,46 @@ class DriverBenchmarker:
     def run_fixed_batch(self, batch_size):
         num_trials = 30
         trial_length = batch_size * 5
-        # For profiling, we will only send requests to the first
-        # replica and work under the assumption
-        # that throughput will scale linearly with the
-        # number of available SPD replicas
-        fixed_replica_num = 0
        
         logger.info("Generating inputs...")
-        inputs = self.generate_inputs()
+        inputs = generate_inputs()
 
         stats_manager = StatsManager(trial_length)
 
-        def call_predict(replica_num, output_msg_ids):
-             
+        inflight_ids_lock = Lock()
+        inflight_ids = {}
+
+        def callback(replica_num, msg_ids):
+            end_time = datetime.now()
+            inflight_ids_lock.acquire()
+            completed_msgs = []
+            for msg_id in msg_ids:
+                send_time = inflight_ids[msg_id]
+                completed_msgs.append((msg_id, send_time))
+                del inflight_ids[msg_id]
+            inflight_ids_lock.release()
+
+            stats_manager.update_stats(completed_msgs, end_time)
 
 
+        while True:
             batch_idxs = np.random.randint(0, len(inputs), batch_size)
             batch_inputs = inputs[batch_idxs]
             batch_msg_ids = range(len(batch_size))
 
-            self.spd_client.predict(replica_num, batch_inputs, batch_msg_ids)
+            inflight_ids_lock.acquire()
+            send_time = datetime.now()
+            for msg_id in msg_ids:
+                inflight_ids[msg_id] = send_time
+            inflight_ids_lock.release()
+
+            self.spd_client.predict(batch_inputs, batch_msg_ids, callback)
+
+            if len(stats_manager.stats["thrus"]) > num_trials:
+                save_results(self.configs, 
+                             [stats_manager.stats], 
+                             "single_proc_bs_{}_bench".format(batch_size), 
+                             slo_millis) 
 
 
     def _create_client(self, machine_addrs):
@@ -253,7 +278,7 @@ class DriverBenchmarker:
             replica_addr = ReplicaAddress(host_name, port)
             replica_addrs.append(replica_addr)
         
-         return SPDClient(replica_addrs)
+        return SPDClient(replica_addrs)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Single Process Image Driver 1')
