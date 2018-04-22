@@ -32,8 +32,6 @@ TF_KERNEL_SVM_MODEL_NAME = "kernel_svm"
 TF_LOG_REG_MODEL_NAME = "tf_log_reg"
 TF_RESNET_MODEL_NAME = "tf_resnet_feats"
 
-RESULTS_DIR = "/results"
-
 INCEPTION_MODEL_PATH = os.path.join(MODELS_DIR, "inception_model_data", "inception_feats_graph_def.pb")
 RESNET_MODEL_PATH = os.path.join(MODELS_DIR, "tf_resnet_model_data")
 

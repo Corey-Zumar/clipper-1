@@ -17,7 +17,6 @@ HIERARCHY_KEY_MEAN_PATHS = "mean"
 HIERARCHY_KEY_PEAK_PATHS = "peak"
 
 CONFIG_NUM_TRIALS = 30
-CONFIG_FILE_TAG_WORDS = ["FIRST", "SECOND", "THIRD", "FOURTH"]
 
 def get_arrival_process_path(procs_dir_path, cv, lambda_val, tagged_num_replicas=None):
     if tagged_num_replicas:
@@ -206,7 +205,7 @@ def create_configs(arrival_procs_path,
 
             mean_config_subpath = "{lv}_{nr}_rep_config_{tag}.json".format(lv=mean_lambda,
                                                                            nr=num_replicas,
-                                                                           tag=CONFIG_FILE_TAG_WORDS[j])
+                                                                           tag="m{}".format(j))
 
             mean_config_path = os.path.join(hierarchy_mean_path, mean_config_subpath) 
 
@@ -224,7 +223,7 @@ def create_configs(arrival_procs_path,
 
             peak_config_subpath = "{lv}_{nr}_rep_config_{tag}.json".format(lv=peak_lambda,
                                                                            nr=num_replicas,
-                                                                           tag=CONFIG_FILE_TAG_WORDS[j])
+                                                                           tag="m{}".format(j))
 
             peak_config_path = os.path.join(hierarchy_peak_path, peak_config_subpath)
             
