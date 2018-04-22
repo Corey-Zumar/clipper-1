@@ -7,6 +7,7 @@ import Queue
 import time
 import json
 
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from threading import Thread, Lock
 
@@ -250,15 +251,16 @@ class DriverBenchmarker:
 
             stats_manager.update_stats(completed_msgs, end_time)
 
+        logger.info("Starting predictions...")
 
         while True:
             batch_idxs = np.random.randint(0, len(inputs), batch_size)
             batch_inputs = inputs[batch_idxs]
-            batch_msg_ids = range(len(batch_size))
+            batch_msg_ids = range(batch_size)
 
             inflight_ids_lock.acquire()
             send_time = datetime.now()
-            for msg_id in msg_ids:
+            for msg_id in batch_msg_ids:
                 inflight_ids[msg_id] = send_time
             inflight_ids_lock.release()
 

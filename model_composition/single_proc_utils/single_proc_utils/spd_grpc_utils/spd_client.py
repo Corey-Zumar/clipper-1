@@ -43,12 +43,12 @@ class SPDClient:
         self.active = False
         self.replica_addrs = replica_addrs
         
-        queue = Queue()
+        self.request_queue = Queue()
         self.threads = []
         self.replicas = {}
         for i in range(len(replica_addrs)):
             address = replica_addrs[i]
-            self.replicas[i] = (address, self._create_client(address), Queue())
+            self.replicas[i] = (address, self._create_client(address))
             self.threads.append(Thread(target=self._run, args=(i,)))
 
     def predict(self, inputs, msg_ids, callback):
@@ -63,9 +63,7 @@ class SPDClient:
             The function to execute when a response
             is received
         """
-        
-        _, _, queue = self.replicas[replica_num]
-        queue.put(inputs, msg_ids, callback)
+        self.request_queue.put(inputs, msg_ids, callback)
 
     def start(self):
         self.active = True
@@ -87,7 +85,7 @@ class SPDClient:
         return spd_frontend_pb2_grpc.PredictStub(address.get_channel())
 
     def _run(self, replica_num):
-        _, client, request_queue = self.replicas[replica_num]
+        _, client = self.replicas[replica_num]
         while self.active:
             inputs, msg_ids, callback = self.request_queue.get(block=True)
            
