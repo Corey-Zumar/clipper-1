@@ -5,10 +5,18 @@ import numpy as np
 import logging
 import Queue
 import time
+import json
 
+from machine_config_tagger import TAGGED_CONFIG_KEY_MACHINE_ADDRESS, TAGGED_CONFIG_KEY_CONFIG_PATH
 from single_proc_utils import HeavyNodeConfig, save_results
+from single_proc_utils.spd_grpc_utils.spd_client import ReplicaAddress, SPDClient  
 
 from e2e_utils import load_tagged_arrival_deltas, load_arrival_deltas, calculate_mean_throughput
+
+INCEPTION_FEATS_MODEL_NAME = "inception_feats"
+TF_KERNEL_SVM_MODEL_NAME = "kernel_svm"
+TF_LOG_REG_MODEL_NAME = "tf_log_reg"
+TF_RESNET_MODEL_NAME = "tf_resnet_feats"
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -30,19 +38,19 @@ CONFIG_KEY_SLO_MILLIS = "slo_millis"
 
 ########## Setup ##########
 
-def get_heavy_node_configs(num_replicas, batch_size, allocated_cpus, resnet_gpus=[], inception_gpus=[]):
+def get_heavy_node_configs(num_replicas, batch_size, allocated_cpus, allocated_gpus):
     resnet_config = HeavyNodeConfig(model_name=TF_RESNET_MODEL_NAME,
                                     input_type="floats",
                                     num_replicas=num_replicas,
                                     allocated_cpus=allocated_cpus,
-                                    gpus=resnet_gpus,
+                                    gpus=allocated_gpus,
                                     batch_size=batch_size)
 
     inception_config = HeavyNodeConfig(model_name=INCEPTION_FEATS_MODEL_NAME,
                                        input_type="floats",
                                        num_replicas=num_replicas,
                                        allocated_cpus=allocated_cpus,
-                                       gpus=inception_gpus,
+                                       gpus=allocated_gpus,
                                        batch_size=batch_size)
 
     kernel_svm_config = HeavyNodeConfig(model_name=TF_KERNEL_SVM_MODEL_NAME,
@@ -61,28 +69,204 @@ def get_heavy_node_configs(num_replicas, batch_size, allocated_cpus, resnet_gpus
 
     return [resnet_config, inception_config, kernel_svm_config, log_reg_config]
 
-def parse_configs(configs_path):
-    config_files = [os.path.join(configs_path, fname) for fname in os.listdir(configs_path) if "config" in fname]
-    for config_file in config_files:
-        
+class ExperimentConfig:
 
+    def __init__(self, machine_addrs, batch_size, process_path, trial_length, num_trials, slo_millis):
+        self.machine_addrs = machine_addrs
+        self.batch_size = batch_size
+        self.process_path = process_path
+        self.trial_length = trial_length
+        self.num_trials = num_trials
+        self.slo_millis = slo_millis
+
+def parse_configs(tagged_config_path):
+    with open(tagged_config_path, "r") as f:
+        tagged_config_json = json.load(f)
+
+    config_files = [item[TAGGED_CONFIG_KEY_CONFIG_PATH] for item in tagged_config_json]
+    machine_addrs = [item[TAGGED_CONFIG_KEY_MACHINE_ADDRESS] for item in tagged_config_json]
+
+    all_replica_nums = []
+    all_cpu_affinities = []
+    all_gpu_affinities = []
+
+    machine_num = 0
+    for config_file in config_files:
+        with open(config_file, "r") as f:
+            config = json.load(f)
+
+        batch_size = config[CONFIG_KEY_BATCH_SIZE]
+        process_path = config[CONFIG_KEY_PROCESS_PATH]
+        trial_length = config[CONFIG_KEY_TRIAL_LENGTH]
+        num_trials = config[CONFIG_KEY_NUM_TRIALS]
+        slo_millis = config[CONFIG_KEY_SLO_MILLIS]
+        replica_nums = config[CONFIG_KEY_REPLICA_NUMS]
+        cpu_affinities = config[CONFIG_KEY_CPU_AFFINITIES]
+        gpu_affinities = config[CONFIG_KEY_GPU_AFFINITIES]
+
+        tagged_cpu_affinities = []
+        for affinities_item in cpu_affinities:
+            tagged_item = " ".join(["m{mn}:{itm}".format(mn=machine_num, itm=item) for item in affinities_item.split(" ")])
+            tagged_cpu_affinities.append(tagged_item)
+
+        tagged_gpu_affinities = []
+        for affinities_item in gpu_affinities:
+            tagged_item = " ".join(["m{mn}:{itm}".format(mn=machine_num, itm=item) for item in affinities_item.split(" ")])
+            tagged_gpu_affinities.append(tagged_item)
+
+        all_replica_nums += replica_nums
+        all_cpu_affinities += tagged_cpu_affinities
+        all_gpu_affinities += tagged_gpu_affinities
+
+        machine_num += 1
+
+    experiment_config = ExperimentConfig(machine_addrs, 
+                                         batch_size, 
+                                         process_path, 
+                                         trial_length, 
+                                         num_trials, 
+                                         slo_millis)
+
+    node_configs = get_heavy_node_configs(num_replicas=len(all_replica_nums), 
+                                     batch_size=batch_size, 
+                                     allocated_cpus=all_cpu_affinities, 
+                                     allocated_gpus=all_gpu_affinities)
+
+    return experiment_config, node_configs
+
+########## Input Generation ##########
+
+def generate_inputs():
+    inception_inputs = [_get_inception_input() for _ in range(1000)]
+    inception_inputs = [i for _ in range(40) for i in inception_inputs]
+
+    return np.array(inception_inputs)
+
+def _get_inception_input():
+    inception_input = np.array(np.random.rand(299, 299, 3) * 255, dtype=np.float32)
+    return inception_input.flatten()
+
+########## Benchmarking ##########
+
+class StatsManager(object):
+
+    def __init__(self, trial_length):
+        self.stats_thread_pool = ThreadPoolExecutor(max_workers=2)
+
+        self._init_stats()
+        self.stats = {
+            "thrus": [],
+            "p99_lats": [],
+            "mean_lats": [],
+            "all_lats": [],
+            "p99_queue_lats": [],
+            "mean_batch_sizes": [],
+            "per_message_lats": {}
+        }
+        self.total_num_complete = 0
+        self.trial_length = trial_length
+
+        self.start_timestamp = datetime.now()
+
+    def update_stats(self, completed_requests, end_timestamp):
+        try:
+            batch_size = len(completed_requests)
+            self.batch_sizes.append(batch_size)
+            for msg_id, send_time in completed_requests:
+                e2e_latency = end_timestamp - send_time
+                self.latencies.append(e2e_latency)
+                self.stats["per_message_lats"][msg_id] = e2e_latency
+
+            self.trial_num_complete += batch_size
+
+            if self.trial_num_complete >= self.trial_length:
+                self._print_stats(end_timestamp)
+                self._init_stats()
+        except Exception as e:
+            print(e)
+
+    def _init_stats(self):
+        self.latencies = []
+        self.batch_predict_latencies = []
+        self.batch_sizes = []
+        self.trial_num_complete = 0
+        self.cur_req_id = 0
+        self.start_time = datetime.now()
+
+    def _print_stats(self, end_timestamp):
+        thru = float(self.trial_num_complete) / (end_timestamp - self.start_timestamp)
+        self.start_timestamp = end_timestamp
+
+        lats = np.array(self.latencies)
+        batch_predict_lats = np.array(self.batch_predict_latencies)
+        p99 = np.percentile(lats, 99)
+        p99_batch_predict = np.percentile(batch_predict_lats, 99)
+        mean_batch_size = np.mean(self.batch_sizes)
+        mean = np.mean(lats)
+        self.stats["thrus"].append(thru)
+        self.stats["all_lats"].append(self.latencies)
+        self.stats["p99_lats"].append(p99)
+        self.stats["mean_lats"].append(mean)
+        self.stats["mean_batch_sizes"].append(mean_batch_size)
+        logger.info("p99_lat: {p99}, mean_lat: {mean}, thruput: {thru}, 
+                     mean_batch: {mb}".format(p99=p99,
+                                              mean=mean,
+                                              thru=thru, 
+                                              mb=mean_batch_size))
+
+class DriverBenchmarker:
+    def __init__(self, experiment_config):
+        self.spd_client = self._create_client(experiment_config.machine_addrs)
+    
+    def run_config(self):
+        pass
+    
+    def run_fixed_batch(self, batch_size):
+        num_trials = 30
+        trial_length = batch_size * 5
+        # For profiling, we will only send requests to the first
+        # replica and work under the assumption
+        # that throughput will scale linearly with the
+        # number of available SPD replicas
+        fixed_replica_num = 0
+       
+        logger.info("Generating inputs...")
+        inputs = self.generate_inputs()
+
+        stats_manager = StatsManager(trial_length)
+
+        def call_predict(replica_num, output_msg_ids):
+             
+
+
+            batch_idxs = np.random.randint(0, len(inputs), batch_size)
+            batch_inputs = inputs[batch_idxs]
+            batch_msg_ids = range(len(batch_size))
+
+            self.spd_client.predict(replica_num, batch_inputs, batch_msg_ids)
+
+
+    def _create_client(self, machine_addrs):
+        replica_addrs = []
+        for machine_addr in machine_addrs:
+            host_name, port = machine_addr.split(":")
+            replica_addr = ReplicaAddress(host_name, port)
+            replica_addrs.append(replica_addr)
+        
+         return SPDClient(replica_addrs)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Single Process Image Driver 1')
-    parser.add_argument('-c',  '--configs_dir_path', type=str, help="Path to the benchmark config")
+    parser.add_argument('-tc',  '--tagged_config_path', type=str, help="Path to the machine-tagged benchmark config")
+    parser.add_argument('-b',   '--fixed_batch_size', type=int, help="(Optional) The fixed batch size to use for profiling, instead of the specified arrival process")
 
-    # parser.add_argument('-n',  '--num_replicas', type=int, help="The number of SPD replicas to benchmark")
-    # parser.add_argument('-b',  '--batch_size', type=int, help="The batch size to benchmark")
-    # parser.add_argument('-c',  '--cpus', type=int, nargs='+', help="The set of machine-tagged VIRTUAL cpu cores on which to run SPD replicas")
-    # parser.add_argument('-g',  '--gpus', type=int, nargs='+', help="The set of machine-tagged GPUs on which to run SPD replicas")
-    # parser.add_argument('-t',  '--num_trials', type=int, default=15, help="The number of trials to run")
-    # parser.add_argument('-tl', '--trial_length', type=int, default=200, help="The length of each trial, in requests")
-    # parser.add_argument('-p',  '--process_file', type=str, help="Path to a TAGGED arrival process file")
-    # parser.add_argument('-rd', '--request_delay', type=float, help="The request delay")
-    # parser.add_argument('-s',  '--slo_millis', type=int, help="The latency SLO, in milliseconds")
-    
     args = parser.parse_args()
 
 
+    experiment_config, node_configs = parse_configs(args.tagged_config_path)
+    benchmarker = DriverBenchmarker(experiment_config)
 
-
+    if args.fixed_batch_size:
+        benchmarker.run_fixed_batch(args.fixed_batch_size)
+    else:
+        benchmarker.run_config()

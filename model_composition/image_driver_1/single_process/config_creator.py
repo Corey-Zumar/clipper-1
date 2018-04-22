@@ -16,6 +16,9 @@ from run_distributed_driver import CONFIG_KEY_NUM_TRIALS, CONFIG_KEY_SLO_MILLIS
 HIERARCHY_KEY_MEAN_PATHS = "mean"
 HIERARCHY_KEY_PEAK_PATHS = "peak"
 
+HIERARCHY_SUBDIR_MEAN_PROVISION = "mean_provision"
+HIERARCHY_SUBDIR_PEAK_PROVISION = "peak_provision"
+
 CONFIG_NUM_TRIALS = 30
 
 def get_arrival_process_path(procs_dir_path, cv, lambda_val, tagged_num_replicas=None):
@@ -37,8 +40,8 @@ def create_configs_hierarchy(configs_base_dir_path, max_num_replicas, cv):
     cv_subpath = "cv_{cv_val}".format(cv_val=cv)
     cv_path = os.path.join(configs_base_dir_path, cv_subpath)
 
-    mean_path = os.path.join(cv_path, "mean_provision")
-    peak_path = os.path.join(cv_path, "peak_provision")
+    mean_path = os.path.join(cv_path, HIERARCHY_SUBDIR_MEAN_PROVISION)
+    peak_path = os.path.join(cv_path, HIERARCHY_SUBDIR_PEAK_PROVISION)
 
     try:
         os.makedirs(mean_path)

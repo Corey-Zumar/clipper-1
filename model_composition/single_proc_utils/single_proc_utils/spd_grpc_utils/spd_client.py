@@ -29,7 +29,7 @@ class ReplicaAddress:
     def __repr__(self):
         return "{}:{}".format(self.host_name, self.port)
 
-class GRPCClient:
+class SPDClient:
 
     def __init__(self, replica_addrs):
         """
