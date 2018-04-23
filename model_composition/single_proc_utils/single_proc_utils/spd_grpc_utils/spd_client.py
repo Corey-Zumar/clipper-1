@@ -4,15 +4,18 @@ import time
 import logging
 import grpc
 
+# import spd_frontend_pb2
+# import spd_frontend_pb2_grpc
+
 from Queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 from threading import Thread, Lock
 from datetime import datetime
+from flatbuffers import builder
 
-from spd_grpc_consts import GRPC_OPTIONS 
+from spd_grpc_consts import GRPC_OPTIONS, INCEPTION_IMAGE_SIZE
+from flatbufs import spd_frontend_grpc_fb, PredictRequest, PredictResponse, FloatsInput
 
-import spd_frontend_pb2
-import spd_frontend_pb2_grpc
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -93,7 +96,7 @@ class SPDClient:
         """
 
         logger.info("Creating client with address: {}".format(address))
-        return spd_frontend_pb2_grpc.PredictStub(address.get_channel())
+        return spd_frontend_grpc_fb.PredictStub(address.get_channel())
 
     def _run(self, replica_num):
         try:
@@ -101,6 +104,7 @@ class SPDClient:
             _, client = self.replicas[replica_num]
             while self.active:
                 inputs, msg_ids, callback = self.request_queue.get(block=True)
+
                
                 grpc_inputs = [spd_frontend_pb2.FloatsInput(input=inp) for inp in inputs]
                 predict_request = spd_frontend_pb2.PredictRequest(inputs=grpc_inputs, msg_ids=msg_ids)
@@ -112,6 +116,43 @@ class SPDClient:
                 callback_threadpool.submit(callback, replica_num, list(predict_response.msg_ids))
         except Exception as e:
             print(e)
+
+    def _create_predict_request(inputs, msg_ids):
+        batch_size = len(inputs)
+        builder_size = (batch_size + 5) * INCEPTION_IMAGE_SIZE
+        builder = flatbuffers.Builder(builder_size)
+        floats_input_idxs = []
+        for inp in inputs:
+            inp_bytes = memoryview(inp.view(np.uint8))
+            inp_bytes_len = len(inp_bytes)
+            FloatsInput.FloatsInputStartDataVector(builder, inp_bytes_len) 
+            builder.Bytes[builder.head : (builder.head + inp_bytes_len)] = inp_bytes
+            data = builder.EndVector(inp_bytes_len)
+            FloatsInput.FloatsInputStart(builder)
+            FloatsInput.FloatsInputAddData(builder, data)
+            floats_input_idx = FloatsInput.FloatsInputEnd(builder)
+            floats_input_idxs.append(floats_input_idx)
+
+        msg_ids_bytes = memoryview(msg_ids.view(np.uint8))
+        msg_ids_len = len(msg_ids_bytes)
+        PredictRequest.PredictRequestStartMsgIdsVector(builder, msg_ids_len)
+        builder.Bytes[builder.head : (builder.head + msg_ids_len)] = msg_ids_bytes 
+        msg_ids_idx = builder.EndVector(msg_ids_len)
+
+        PredictRequest.PredictRequestStartInputsVector(builder, len(floats_input_idxs))
+        for float_input_idx in floats_input_idx:
+            curr_offset = builder.PrependUOffsetTRelative(float_input_idx)
+        inputs_vector_idx = builder.EndVector(curr_offset)
+        
+
+        PredictRequest.PredictRequestStart(builder)
+        PredictRequest.PredictRequestAddInputs(builder, inputs_vector_idx)
+        PredictRequest.PredictRequestAddMsgIds(builder, msg_ids_idx)
+        request_idx = PredictRequest.PredictRequestEnd(builder)
+        builder.Finish(request_idx)
+        request = builder.Output()
+
+        return request
 
     def __str__(self):
         return ",".join(self.replica_addrs)

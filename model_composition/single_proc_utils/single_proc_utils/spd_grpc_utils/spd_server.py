@@ -2,28 +2,42 @@ import grpc
 
 import numpy as np
 
-import spd_frontend_pb2
-import spd_frontend_pb2_grpc
-
+# import spd_frontend_pb2
+# import spd_frontend_pb2_grpc
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from flatbuffers import builder
 
 from spd_grpc_consts import GRPC_OPTIONS
+from flatbufs import spd_frontend_grpc_fb, PredictRequest, PredictResponse, FloatsInput
 
-from concurrent.futures import ThreadPoolExecutor
 
-class SpdFrontend(spd_frontend_pb2_grpc.PredictServicer):
+# class SpdFrontend(spd_frontend_pb2_grpc.PredictServicer):
+class SpdFrontend(spd_frontend_grpc_fb.PredictServicer):
     
     def predict(self, inputs, msg_ids):
         pass
 
     def PredictFloats(self, request, context):
         t1 = datetime.now()
-        inputs = np.array([np.array(inp.input, dtype=np.float32) for inp in request.inputs])
-        msg_ids = np.array(request.msg_ids, dtype=np.int32)
+        msg_ids = request.MsgIdsAsNumpy()
+        inputs = [request.Inputs(j).DataAsNumpy() for j in range(request.InputsLength())]
         t2 = datetime.now()
 
         output_ids = self.predict(inputs, msg_ids)
-        response = spd_frontend_pb2.PredictResponse(msg_ids=output_ids)
+
+        output_ids_bytes = memoryview(output_ids.view(np.uint8))
+        builder = flatbuffers.Builder(len(output_ids_bytes) * 2)
+        PredictResponse.PredictResponseStartMsgIdsVector(builder, len(output_ids_bytes))
+        builder.Bytes[builder.head : (builder.head + len(output_ids_bytes))] = output_ids_bytes 
+        data = builder.EndVector(len(output_ids_bytes))
+        PredictResponse.PredictResponseStart(builder)
+        PredictResponse.PredictResponseAddMsgIds(builder, data)
+        out_idx = PredictResponse.PredictResponseEnd(builder)
+        builder.Finish(out_idx)
+        response = builder.Output()
+
+        # response = spd_frontend_pb2.PredictResponse(msg_ids=output_ids)
 
         after = datetime.now()
         print((after - t2).total_seconds(), (t2 - t1).total_seconds())
