@@ -11,6 +11,11 @@ import numpy as np
 
 from e2e_driver import CONFIG_KEY_CLIENT_CONFIG_PATHS, CONFIG_KEY_CLIENT_CONFIG_ITEM_PATH, CONFIG_KEY_CLIENT_CONFIG_HOST
 from e2e_driver import CONFIG_KEY_NUM_TRIALS, CONFIG_KEY_TRIAL_LENGTH, CONFIG_KEY_NUM_CLIENTS, CONFIG_KEY_SLO_MILLIS, CONFIG_KEY_PROCESS_PATH
+from e2e_driver import CONFIG_KEY_SLO_MILLIS
+
+from e2e_driver import CONFIG_KEY_MODEL_NAME, CONFIG_KEY_BATCH_SIZE, CONFIG_KEY_NUM_REPLICAS
+from e2e_driver import CONFIG_KEY_CPUS_PER_REPLICA, CONFIG_KEY_ALLOCATED_GPUS
+from e2e_driver import CONFIG_KEY_ALLOCATED_GPUS, CONFIG_KEY_PORTS
 
 HIERARCHY_KEY_MEAN_PATHS = "mean"
 HIERARCHY_KEY_PEAK_PATHS = "peak"
@@ -19,6 +24,11 @@ HIERARCHY_SUBDIR_MEAN_PROVISION = "mean_provision"
 HIERARCHY_SUBDIR_PEAK_PROVISION = "peak_provision"
 
 CONFIG_NUM_TRIALS = 30
+
+RESNET_PORT_RANGE = range(9500,9508)
+INCEPTION_PORT_RANGE = range(9508, 9516)
+KSVM_PORT_RANGE = range(9516, 9524)
+LOG_REG_PORT_RANGE = range(9524, 9532)
 
 def get_arrival_process_path(procs_dir_path, cv, lambda_val, tagged_num_replicas=None):
     if tagged_num_replicas:
@@ -91,19 +101,16 @@ def create_config_json(process_path,
     replica_num : [int]
         The ZERO-INDEXED replica numbers for which to create a json config
     """
-
+    
     trial_length = max(30, lambda_val * 5)
     num_trials = CONFIG_NUM_TRIALS
 
     config_json = {
-        CONFIG_KEY_BATCH_SIZE : batch_size,
         CONFIG_KEY_PROCESS_PATH : process_path,
         CONFIG_KEY_REPLICA_NUMS : replica_nums,
         CONFIG_KEY_TRIAL_LENGTH : trial_length,
         CONFIG_KEY_NUM_TRIALS : CONFIG_NUM_TRIALS,
         CONFIG_KEY_SLO_MILLIS : slo_millis,
-        CONFIG_KEY_GPU_AFFINITIES : [],
-        CONFIG_KEY_CPU_AFFINITIES : []
     }
 
     for replica_num in replica_nums:
