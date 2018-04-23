@@ -16,7 +16,7 @@ service Predict {
 
 // Message containing a float vector
 message FloatsInput {
-    repeated float input = 1;
+    repeated float input = 1 [packed=true];
 }
 
 // A prediction request message

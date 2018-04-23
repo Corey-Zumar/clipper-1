@@ -89,10 +89,10 @@ class ID1Frontend(SpdFrontend):
         self.inception_model = models_dict[INCEPTION_FEATS_MODEL_NAME]
         self.log_reg_model = models_dict[TF_LOG_REG_MODEL_NAME]
 
+        self.warmup_lock = Lock()
         self.warming_up = False
         if warmup:
             logger.info("Warming up...")
-            self.warmup_lock = Lock()
             self.warming_up = True
             warmup_thread = Thread(target=self._warm_up)
             warmup_thread.start()
@@ -110,11 +110,12 @@ class ID1Frontend(SpdFrontend):
             A list of output msg ids
         """
         self.warmup_lock.acquire()
-        if self.warming_up:
-            self.warmup_lock.release()
+        warming_up = self.warming_up
+        self.warmup_lock.release()
+        if warming_up:
             return WARMING_UP_DEFAULT_RESPONSE
 
-        self._predict(inputs, msg_ids)
+        return self._predict(inputs, msg_ids)
 
     def _predict(self, inputs, msg_ids):
         resnet_inputs = self._transform_inputs_resnet(inputs)
@@ -207,4 +208,4 @@ if __name__ == "__main__":
         while True:
             time.sleep(ONE_DAY_IN_SECONDS)
     except KeyboardInterrupt:
-        server.stop(0)
+        server.stop()

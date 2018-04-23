@@ -191,7 +191,6 @@ class StatsManager(object):
 
     def _init_stats(self):
         self.latencies = []
-        self.batch_predict_latencies = []
         self.batch_sizes = []
         self.trial_num_complete = 0
         self.cur_req_id = 0
@@ -203,9 +202,7 @@ class StatsManager(object):
         self.start_time = end_time
 
         lats = np.array(self.latencies)
-        batch_predict_lats = np.array(self.batch_predict_latencies)
         p99 = np.percentile(lats, 99)
-        p99_batch_predict = np.percentile(batch_predict_lats, 99)
         mean_batch_size = np.mean(self.batch_sizes)
         mean = np.mean(lats)
         self.stats["thrus"].append(thru)
@@ -228,6 +225,8 @@ class DriverBenchmarker:
         pass
     
     def run_fixed_batch(self, batch_size):
+        self.spd_client.start()
+        
         num_trials = 30
         trial_length = batch_size * 5
        
@@ -240,16 +239,21 @@ class DriverBenchmarker:
         inflight_ids = {}
 
         def callback(replica_num, msg_ids):
-            end_time = datetime.now()
-            inflight_ids_lock.acquire()
-            completed_msgs = []
-            for msg_id in msg_ids:
-                send_time = inflight_ids[msg_id]
-                completed_msgs.append((msg_id, send_time))
-                del inflight_ids[msg_id]
-            inflight_ids_lock.release()
+            try:
+                end_time = datetime.now()
+                inflight_ids_lock.acquire()
+                completed_msgs = []
+                for msg_id in msg_ids:
+                    send_time = inflight_ids[msg_id]
+                    completed_msgs.append((msg_id, send_time))
+                    del inflight_ids[msg_id]
+                inflight_ids_lock.release()
 
-            stats_manager.update_stats(completed_msgs, end_time)
+                stats_manager.update_stats(completed_msgs, end_time)
+            except Exception as e:
+                print(e)
+
+        time.sleep(20)
 
         logger.info("Starting predictions...")
 
@@ -271,6 +275,10 @@ class DriverBenchmarker:
                              [stats_manager.stats], 
                              "single_proc_bs_{}_bench".format(batch_size), 
                              slo_millis) 
+
+                self.spd_client.stop()
+
+            time.sleep(10)
 
 
     def _create_client(self, machine_addrs):
