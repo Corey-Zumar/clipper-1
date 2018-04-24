@@ -319,8 +319,8 @@ class DriverBenchmarker:
 
         last_msg_id = 0
         while True:
-            idx_begin = np.random.randint(len(inputs) - self.experiment_config.batch_size)
-            batch_inputs = inputs[idx_begin : idx_begin + self.experiment_config.batch_size] 
+            idx_begin = np.random.randint(len(inputs) - batch_size)
+            batch_inputs = inputs[idx_begin : idx_begin + batch_size] 
             # batch_idxs = np.random.randint(0, len(inputs), batch_size)
             # batch_inputs = inputs[batch_idxs]
             batch_msg_ids = np.array(range(last_msg_id, last_msg_id + batch_size), dtype=np.uint32)
@@ -342,8 +342,6 @@ class DriverBenchmarker:
 
                 self.spd_client.stop()
                 break
-
-            # time.sleep(1.5)
 
 
     def _create_client(self, machine_addrs):
