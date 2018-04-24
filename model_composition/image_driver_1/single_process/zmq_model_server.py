@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Thread, Lock
 from PIL import Image
 
-from single_proc_utils.spd_grpc_utils.spd_server import SpdFrontend, SpdServer
+from single_proc_utils.spd_zmq_utils.spd_server import SpdFrontend, SpdServer
 from models import tf_resnet_model, inception_feats_model, tf_kernel_svm_model, tf_log_reg_model
 
 logging.basicConfig(

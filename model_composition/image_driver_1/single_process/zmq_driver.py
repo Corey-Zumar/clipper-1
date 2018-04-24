@@ -13,7 +13,7 @@ from threading import Thread, Lock
 
 from machine_config_tagger import TAGGED_CONFIG_KEY_MACHINE_ADDRESS, TAGGED_CONFIG_KEY_CONFIG_PATH
 from single_proc_utils import HeavyNodeConfig, save_results
-from single_proc_utils.spd_grpc_utils.spd_client import ReplicaAddress, SPDClient  
+from single_proc_utils.spd_zmq_utils.spd_client import ReplicaAddress, SPDClient  
 
 from e2e_utils import load_tagged_arrival_deltas, load_arrival_deltas, calculate_mean_throughput
 
