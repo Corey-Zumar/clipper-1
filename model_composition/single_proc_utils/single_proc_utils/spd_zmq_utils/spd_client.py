@@ -142,6 +142,7 @@ class SPDClient:
 
                 callback_threadpool.submit(callback, replica_num, parsed_output_msg_ids)
         except Exception as e:
+            print("ERROR")
             print(e)
 
     def __str__(self):

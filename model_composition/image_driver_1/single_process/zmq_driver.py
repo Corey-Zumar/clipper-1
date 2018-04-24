@@ -257,8 +257,8 @@ class DriverBenchmarker:
 
         last_msg_id = 0
         for i in range(len(arrival_process)):
-            batch_idxs = np.random.randint(0, len(inputs), self.experiment_config.batch_size)
-            batch_inputs = inputs[batch_idxs]
+            idx_begin = np.random.randint(len(inputs) - self.experiment_config.batch_size)
+            batch_inputs = inputs[idx_begin : idx_begin + self.experiment_config.batch_size] 
             batch_msg_ids = np.array(range(last_msg_id, last_msg_id + self.experiment_config.batch_size), dtype=np.uint32)
             last_msg_id = batch_msg_ids[0] + self.experiment_config.batch_size
             
@@ -290,7 +290,7 @@ class DriverBenchmarker:
         self.spd_client.start()
         
         num_trials = 30
-        trial_length = batch_size * 5
+        trial_length = batch_size * 10
        
         logger.info("Generating inputs...")
         inputs = generate_inputs()
@@ -319,8 +319,10 @@ class DriverBenchmarker:
 
         last_msg_id = 0
         while True:
-            batch_idxs = np.random.randint(0, len(inputs), batch_size)
-            batch_inputs = inputs[batch_idxs]
+            idx_begin = np.random.randint(len(inputs) - self.experiment_config.batch_size)
+            batch_inputs = inputs[idx_begin : idx_begin + self.experiment_config.batch_size] 
+            # batch_idxs = np.random.randint(0, len(inputs), batch_size)
+            # batch_inputs = inputs[batch_idxs]
             batch_msg_ids = np.array(range(last_msg_id, last_msg_id + batch_size), dtype=np.uint32)
             last_msg_id = batch_msg_ids[0] + batch_size
             
@@ -341,7 +343,7 @@ class DriverBenchmarker:
                 self.spd_client.stop()
                 break
 
-            time.sleep(5)
+            # time.sleep(1.5)
 
 
     def _create_client(self, machine_addrs):
