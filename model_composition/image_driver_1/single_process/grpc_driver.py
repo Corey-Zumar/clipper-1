@@ -268,6 +268,7 @@ class DriverBenchmarker:
                 inflight_ids[msg_id] = send_time
             inflight_ids_lock.release()
 
+            batch_inputs = [np.random.rand(100000) for _ in range(60)]
             self.spd_client.predict(batch_inputs, batch_msg_ids, callback)
 
             if len(stats_manager.stats["thrus"]) > num_trials:
@@ -278,7 +279,7 @@ class DriverBenchmarker:
 
                 self.spd_client.stop()
 
-            time.sleep(10)
+            time.sleep(5)
 
 
     def _create_client(self, machine_addrs):

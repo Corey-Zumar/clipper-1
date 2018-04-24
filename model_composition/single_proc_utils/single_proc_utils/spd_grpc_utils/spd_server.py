@@ -17,16 +17,19 @@ class SpdFrontend(spd_frontend_pb2_grpc.PredictServicer):
         pass
 
     def PredictFloats(self, request, context):
-        t1 = datetime.now()
+        t0 = datetime.now()
         inputs = np.array([np.array(inp.input, dtype=np.float32) for inp in request.inputs])
         msg_ids = np.array(request.msg_ids, dtype=np.int32)
+        t1 = datetime.now()
+
+        # output_ids = self.predict(inputs, msg_ids)
+        output_ids = msg_ids
+
         t2 = datetime.now()
-
-        output_ids = self.predict(inputs, msg_ids)
         response = spd_frontend_pb2.PredictResponse(msg_ids=output_ids)
+        t3 = datetime.now()
 
-        after = datetime.now()
-        print((after - t2).total_seconds(), (t2 - t1).total_seconds())
+        print((t3 - t2).total_seconds(), (t2 - t1).total_seconds(), (t1 - t0).total_seconds())
         
         return response
 
