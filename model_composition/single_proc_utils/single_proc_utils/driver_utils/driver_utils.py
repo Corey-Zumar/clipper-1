@@ -1,3 +1,4 @@
+import sys
 import os
 import json
 import logging
@@ -69,7 +70,6 @@ def save_results(configs, client_metrics, results_dir, slo, process_num=None, ar
     else:
         results_file = os.path.join(results_dir,
                                     (results_path_base + "-{:%y%m%d_%H%M%S}.json").format(datetime.datetime.now()))
-
 
     with open(results_file, "w") as f:
         json.dump(results_obj, f, indent=4)

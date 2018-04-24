@@ -29,9 +29,14 @@ def populate_tagged_configs_directory(machine_addrs, untagged_dir_path, tagged_d
         subdir_path = os.path.join(untagged_dir_path, subdir)
 
         # Sort config paths based on machine number, m<i> for i = 1, 2, ...
-        config_paths = sorted([os.path.join(subdir_path, item) for item in os.listdir(subdir_path) if "config" in item])
+        config_subpaths = sorted([item for item in os.listdir(subdir_path) if "config" in item])
+        copied_config_paths = []
+        for config_subpath in config_subpaths:
+            shutil.copy2(os.path.join(subdir_path, config_subpath), output_subdir_path)
+            copied_config_path = os.path.join(output_subdir_path, config_subpath)
+            copied_config_paths.append(copied_config_path)
 
-        tagged_configs = create_tagged_config(machine_addrs, config_paths) 
+        tagged_configs = create_tagged_config(machine_addrs, copied_config_paths) 
         tagged_config_subpath = "{nr}_tagged_config.json".format(nr=subdir)
         tagged_config_path = os.path.join(output_subdir_path, tagged_config_subpath)
         with open(tagged_config_path, "w") as f:

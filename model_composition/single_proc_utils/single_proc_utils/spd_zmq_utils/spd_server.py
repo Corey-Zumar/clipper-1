@@ -116,7 +116,7 @@ class SpdServer:
 
                     t3 = datetime.now()
 
-                    print((t3 - t2).total_seconds(), (t2 - t1).total_seconds(), (t1 - t0).total_seconds())
+                    # print((t3 - t2).total_seconds(), (t2 - t1).total_seconds(), (t1 - t0).total_seconds())
 
         except KeyboardInterrupt:
-            os._exit()
+            os._exit(0)

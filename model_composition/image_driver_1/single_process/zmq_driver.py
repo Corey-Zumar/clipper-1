@@ -75,7 +75,8 @@ def get_heavy_node_configs(num_replicas, batch_size, allocated_cpus, allocated_g
 
 class ExperimentConfig:
 
-    def __init__(self, machine_addrs, batch_size, process_path, trial_length, num_trials, slo_millis):
+    def __init__(self, config_path, machine_addrs, batch_size, process_path, trial_length, num_trials, slo_millis):
+        self.config_path = config_path
         self.machine_addrs = machine_addrs
         self.batch_size = batch_size
         self.process_path = process_path
@@ -124,7 +125,8 @@ def parse_configs(tagged_config_path):
 
         machine_num += 1
 
-    experiment_config = ExperimentConfig(machine_addrs, 
+    experiment_config = ExperimentConfig(tagged_config_path,
+                                         machine_addrs, 
                                          batch_size, 
                                          process_path, 
                                          trial_length, 
@@ -179,7 +181,7 @@ class StatsManager(object):
             for msg_id, send_time in completed_requests:
                 e2e_latency = (end_time - send_time).total_seconds()
                 self.latencies.append(e2e_latency)
-                self.stats["per_message_lats"][msg_id] = e2e_latency
+                self.stats["per_message_lats"][str(msg_id)] = e2e_latency
 
             self.trial_num_complete += batch_size
 
@@ -217,12 +219,72 @@ class StatsManager(object):
                                               mb=mean_batch_size))
 
 class DriverBenchmarker:
-    def __init__(self, experiment_config):
+    def __init__(self, node_configs, experiment_config):
+        self.node_configs = node_configs
         self.experiment_config = experiment_config
         self.spd_client = self._create_client(experiment_config.machine_addrs)
     
     def run_config(self):
-        pass
+        self.spd_client.start()
+        
+        logger.info("Generating inputs...")
+        inputs = generate_inputs()
+
+        logger.info("Loading arrival process...")
+        arrival_process = load_arrival_deltas(self.experiment_config.process_path)
+
+        stats_manager = StatsManager(self.experiment_config.trial_length)
+
+        inflight_ids_lock = Lock()
+        inflight_ids = {}
+
+        def callback(replica_num, msg_ids):
+            try:
+                end_time = datetime.now()
+                inflight_ids_lock.acquire()
+                completed_msgs = []
+                for msg_id in msg_ids:
+                    send_time = inflight_ids[msg_id]
+                    completed_msgs.append((msg_id, send_time))
+                    del inflight_ids[msg_id]
+                inflight_ids_lock.release()
+
+                stats_manager.update_stats(completed_msgs, end_time)
+            except Exception as e:
+                print(e)
+
+        logger.info("Starting predictions...")
+
+        last_msg_id = 0
+        for i in range(len(arrival_process)):
+            batch_idxs = np.random.randint(0, len(inputs), self.experiment_config.batch_size)
+            batch_inputs = inputs[batch_idxs]
+            batch_msg_ids = np.array(range(last_msg_id, last_msg_id + self.experiment_config.batch_size), dtype=np.uint32)
+            last_msg_id = batch_msg_ids[0] + self.experiment_config.batch_size
+            
+            inflight_ids_lock.acquire()
+            send_time = datetime.now()
+            for msg_id in batch_msg_ids:
+                inflight_ids[msg_id] = send_time
+            inflight_ids_lock.release()
+
+            self.spd_client.predict(batch_inputs, batch_msg_ids, callback)
+
+            request_delay_millis = arrival_process[i]
+            request_delay_seconds = request_delay_millis * .001
+            time.sleep(request_delay_seconds)
+
+            if len(stats_manager.stats["thrus"]) >= self.experiment_config.num_trials:
+                results_base_path = "/".join(experiment_config.config_path.split("/")[:-1])
+                print(results_base_path)
+                save_results(self.node_configs, 
+                             [stats_manager.stats],
+                             results_base_path,
+                             experiment_config.slo_millis,
+                             arrival_process=experiment_config.process_path)
+
+                self.spd_client.stop()
+                break
     
     def run_fixed_batch(self, batch_size):
         self.spd_client.start()
@@ -270,13 +332,14 @@ class DriverBenchmarker:
 
             self.spd_client.predict(batch_inputs, batch_msg_ids, callback)
 
-            if len(stats_manager.stats["thrus"]) > num_trials:
-                save_results(self.configs, 
+            if len(stats_manager.stats["thrus"]) >= num_trials:
+                save_results(self.node_configs, 
                              [stats_manager.stats], 
-                             "single_proc_bs_{}_bench".format(batch_size), 
-                             slo_millis) 
+                             "sm_profile_bs_{}_slo_{}".format(batch_size, self.experiment_config.slo_millis), 
+                             self.experiment_config.slo_millis) 
 
                 self.spd_client.stop()
+                break
 
             time.sleep(5)
 
@@ -291,7 +354,7 @@ class DriverBenchmarker:
         return SPDClient(replica_addrs)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Set up and benchmark models for Single Process Image Driver 1')
+    parser = argparse.ArgumentParser(description='Benchmark SPD configurations')
     parser.add_argument('-tc',  '--tagged_config_path', type=str, help="Path to the machine-tagged benchmark config")
     parser.add_argument('-b',   '--fixed_batch_size', type=int, help="(Optional) The fixed batch size to use for profiling, instead of the specified arrival process")
 
@@ -299,7 +362,7 @@ if __name__ == "__main__":
 
 
     experiment_config, node_configs = parse_configs(args.tagged_config_path)
-    benchmarker = DriverBenchmarker(experiment_config)
+    benchmarker = DriverBenchmarker(node_configs, experiment_config)
 
     if args.fixed_batch_size:
         benchmarker.run_fixed_batch(args.fixed_batch_size)
