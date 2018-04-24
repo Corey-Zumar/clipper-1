@@ -19,41 +19,10 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='spd_frontend.proto',
   package='clipper.grpc',
   syntax='proto3',
-  serialized_pb=_b('\n\x12spd_frontend.proto\x12\x0c\x63lipper.grpc\" \n\x0b\x46loatsInput\x12\x11\n\x05input\x18\x01 \x03(\x02\x42\x02\x10\x01\"L\n\x0ePredictRequest\x12)\n\x06inputs\x18\x01 \x03(\x0b\x32\x19.clipper.grpc.FloatsInput\x12\x0f\n\x07msg_ids\x18\x02 \x03(\x05\"\"\n\x0fPredictResponse\x12\x0f\n\x07msg_ids\x18\x01 \x03(\x05\x32Y\n\x07Predict\x12N\n\rPredictFloats\x12\x1c.clipper.grpc.PredictRequest\x1a\x1d.clipper.grpc.PredictResponse\"\x00\x62\x06proto3')
+  serialized_pb=_b('\n\x12spd_frontend.proto\x12\x0c\x63lipper.grpc\"1\n\x0ePredictRequest\x12\x0e\n\x06inputs\x18\x01 \x03(\x0c\x12\x0f\n\x07msg_ids\x18\x02 \x03(\x05\"\"\n\x0fPredictResponse\x12\x0f\n\x07msg_ids\x18\x01 \x03(\x05\x32Y\n\x07Predict\x12N\n\rPredictFloats\x12\x1c.clipper.grpc.PredictRequest\x1a\x1d.clipper.grpc.PredictResponse\"\x00\x62\x06proto3')
 )
 
 
-
-
-_FLOATSINPUT = _descriptor.Descriptor(
-  name='FloatsInput',
-  full_name='clipper.grpc.FloatsInput',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='input', full_name='clipper.grpc.FloatsInput.input', index=0,
-      number=1, type=2, cpp_type=6, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=_descriptor._ParseOptions(descriptor_pb2.FieldOptions(), _b('\020\001')), file=DESCRIPTOR),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=36,
-  serialized_end=68,
-)
 
 
 _PREDICTREQUEST = _descriptor.Descriptor(
@@ -65,7 +34,7 @@ _PREDICTREQUEST = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='inputs', full_name='clipper.grpc.PredictRequest.inputs', index=0,
-      number=1, type=11, cpp_type=10, label=3,
+      number=1, type=12, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -89,8 +58,8 @@ _PREDICTREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=70,
-  serialized_end=146,
+  serialized_start=36,
+  serialized_end=85,
 )
 
 
@@ -120,22 +89,13 @@ _PREDICTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=148,
-  serialized_end=182,
+  serialized_start=87,
+  serialized_end=121,
 )
 
-_PREDICTREQUEST.fields_by_name['inputs'].message_type = _FLOATSINPUT
-DESCRIPTOR.message_types_by_name['FloatsInput'] = _FLOATSINPUT
 DESCRIPTOR.message_types_by_name['PredictRequest'] = _PREDICTREQUEST
 DESCRIPTOR.message_types_by_name['PredictResponse'] = _PREDICTRESPONSE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
-
-FloatsInput = _reflection.GeneratedProtocolMessageType('FloatsInput', (_message.Message,), dict(
-  DESCRIPTOR = _FLOATSINPUT,
-  __module__ = 'spd_frontend_pb2'
-  # @@protoc_insertion_point(class_scope:clipper.grpc.FloatsInput)
-  ))
-_sym_db.RegisterMessage(FloatsInput)
 
 PredictRequest = _reflection.GeneratedProtocolMessageType('PredictRequest', (_message.Message,), dict(
   DESCRIPTOR = _PREDICTREQUEST,
@@ -152,8 +112,6 @@ PredictResponse = _reflection.GeneratedProtocolMessageType('PredictResponse', (_
 _sym_db.RegisterMessage(PredictResponse)
 
 
-_FLOATSINPUT.fields_by_name['input'].has_options = True
-_FLOATSINPUT.fields_by_name['input']._options = _descriptor._ParseOptions(descriptor_pb2.FieldOptions(), _b('\020\001'))
 
 _PREDICT = _descriptor.ServiceDescriptor(
   name='Predict',
@@ -161,8 +119,8 @@ _PREDICT = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   options=None,
-  serialized_start=184,
-  serialized_end=273,
+  serialized_start=123,
+  serialized_end=212,
   methods=[
   _descriptor.MethodDescriptor(
     name='PredictFloats',

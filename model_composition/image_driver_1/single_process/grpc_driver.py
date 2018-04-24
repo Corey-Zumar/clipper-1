@@ -144,7 +144,7 @@ def generate_inputs():
     inception_inputs = [_get_inception_input() for _ in range(1000)]
     inception_inputs = [i for _ in range(40) for i in inception_inputs]
 
-    return np.array(inception_inputs)
+    return np.array(inception_inputs, dtype=np.float32)
 
 def _get_inception_input():
     inception_input = np.array(np.random.rand(299, 299, 3) * 255, dtype=np.float32)
@@ -253,22 +253,23 @@ class DriverBenchmarker:
             except Exception as e:
                 print(e)
 
-        time.sleep(20)
-
         logger.info("Starting predictions...")
 
+        last_msg_id = 0
         while True:
             batch_idxs = np.random.randint(0, len(inputs), batch_size)
             batch_inputs = inputs[batch_idxs]
-            batch_msg_ids = range(batch_size)
-
+            batch_msg_ids = range(last_msg_id, last_msg_id + batch_size)
+            last_msg_id = batch_msg_ids[0] + batch_size
+            
             inflight_ids_lock.acquire()
             send_time = datetime.now()
             for msg_id in batch_msg_ids:
                 inflight_ids[msg_id] = send_time
             inflight_ids_lock.release()
 
-            batch_inputs = [np.random.rand(100000) for _ in range(60)]
+            batch_inputs = [np.array(np.random.rand(299 * 299 * 3 * 60), dtype=np.float32)]
+
             self.spd_client.predict(batch_inputs, batch_msg_ids, callback)
 
             if len(stats_manager.stats["thrus"]) > num_trials:

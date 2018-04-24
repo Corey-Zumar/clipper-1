@@ -18,18 +18,26 @@ class SpdFrontend(spd_frontend_pb2_grpc.PredictServicer):
 
     def PredictFloats(self, request, context):
         t0 = datetime.now()
-        inputs = np.array([np.array(inp.input, dtype=np.float32) for inp in request.inputs])
+        
         msg_ids = np.array(request.msg_ids, dtype=np.int32)
+        batch_size = len(msg_ids) 
+        
+        t05 = datetime.now()
+        
+        inp_item = np.frombuffer(request.inputs[0], dtype=np.float32)
+        inputs = np.reshape(inp_item, (batch_size, -1))
+        
         t1 = datetime.now()
 
-        # output_ids = self.predict(inputs, msg_ids)
-        output_ids = msg_ids
+        output_ids = self.predict(inputs, msg_ids)
 
         t2 = datetime.now()
+        
         response = spd_frontend_pb2.PredictResponse(msg_ids=output_ids)
+        
         t3 = datetime.now()
 
-        print((t3 - t2).total_seconds(), (t2 - t1).total_seconds(), (t1 - t0).total_seconds())
+        print((t3 - t2).total_seconds(), (t2 - t1).total_seconds(), (t1 - t05).total_seconds(), (t05 - t0).total_seconds())
         
         return response
 

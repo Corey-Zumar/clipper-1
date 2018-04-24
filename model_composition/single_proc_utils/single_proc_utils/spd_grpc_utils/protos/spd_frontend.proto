@@ -14,14 +14,9 @@ service Predict {
     rpc PredictFloats(PredictRequest) returns (PredictResponse) {}
 }
 
-// Message containing a float vector
-message FloatsInput {
-    repeated float input = 1 [packed=true];
-}
-
 // A prediction request message
 message PredictRequest {
-    repeated FloatsInput inputs = 1;
+    repeated bytes inputs = 1;
     repeated int32 msg_ids = 2;
 }
 

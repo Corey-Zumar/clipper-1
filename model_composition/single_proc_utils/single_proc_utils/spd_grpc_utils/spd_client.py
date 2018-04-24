@@ -101,8 +101,9 @@ class SPDClient:
             _, client = self.replicas[replica_num]
             while self.active:
                 inputs, msg_ids, callback = self.request_queue.get(block=True)
-               
-                grpc_inputs = [spd_frontend_pb2.FloatsInput(input=inp) for inp in inputs]
+        
+                grpc_inputs = [inp.tobytes() for inp in inputs]
+                # grpc_inputs = [spd_frontend_pb2.FloatsInput(input=inp) for inp in inputs]
                 predict_request = spd_frontend_pb2.PredictRequest(inputs=grpc_inputs, msg_ids=msg_ids)
 
                 before = datetime.now()
