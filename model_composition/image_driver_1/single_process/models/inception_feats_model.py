@@ -38,10 +38,12 @@ class InceptionFeaturizationModel(ModelBase):
         list
             A list of featurized images, each represented as a numpy array
         """
-        
-        reshaped_inputs = [input_item.reshape(299,299,3) for input_item in inputs]
-        all_img_features = self._get_image_features(reshaped_inputs)
-        return [np.array(item.flatten(), dtype=np.float32) for item in all_img_features]
+        try:
+            reshaped_inputs = [input_item.reshape(299,299,3) for input_item in inputs]
+            all_img_features = self._get_image_features(reshaped_inputs)
+            return [np.array(item.flatten(), dtype=np.float32) for item in all_img_features]
+        except Exception as e:
+            print(e)
 
     def _load_inception_model(self, inception_model_path):
         inception_file = open(inception_model_path, mode='rb')
