@@ -259,7 +259,7 @@ class DriverBenchmarker:
         while True:
             batch_idxs = np.random.randint(0, len(inputs), batch_size)
             batch_inputs = inputs[batch_idxs]
-            batch_msg_ids = range(last_msg_id, last_msg_id + batch_size)
+            batch_msg_ids = np.array(range(last_msg_id, last_msg_id + batch_size), dtype=np.uint32)
             last_msg_id = batch_msg_ids[0] + batch_size
             
             inflight_ids_lock.acquire()
@@ -267,8 +267,6 @@ class DriverBenchmarker:
             for msg_id in batch_msg_ids:
                 inflight_ids[msg_id] = send_time
             inflight_ids_lock.release()
-
-            batch_inputs = [np.array(np.random.rand(299 * 299 * 3 * 60), dtype=np.float32)]
 
             self.spd_client.predict(batch_inputs, batch_msg_ids, callback)
 

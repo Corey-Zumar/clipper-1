@@ -1,18 +1,17 @@
 import sys
 import os
+import zmq
 import time
 import logging
-import grpc
+import struct
+import numpy as np
 
 from Queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 from threading import Thread, Lock
 from datetime import datetime
 
-from spd_grpc_consts import GRPC_OPTIONS 
-
-import spd_frontend_pb2
-import spd_frontend_pb2_grpc
+from spd_server import INPUT_DTYPE
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -22,22 +21,25 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 REQUEST_TIME_OUT_SECONDS = 30
+HOST_NAME_LOCALHOST_READABLE = "localhost"
+HOST_NAME_LOCALHOST_NUMERIC = "127.0.0.1"
+
+UINT32_SIZE_BYTES = 4
+INITIAL_INPUT_HEADER_BUFFER_SIZE = 200 * UINT32_SIZE_BYTES 
 
 class ReplicaAddress:
 
     def __init__(self, host_name, port):
+        if host_name == HOST_NAME_LOCALHOST_READABLE:
+            host_name = HOST_NAME_LOCALHOST_NUMERIC
         self.host_name = host_name
         self.port = port
 
-    def get_channel(self):
-        address = "{}:{}".format(self.host_name, self.port)
-        return grpc.insecure_channel(address, options=GRPC_OPTIONS)
-
     def __str__(self):
-        return "{}:{}".format(self.host_name, self.port)
+        return "tcp://{}:{}".format(self.host_name, self.port)
 
     def __repr__(self):
-        return "{}:{}".format(self.host_name, self.port)
+        return "REPLICA ADDRESS OBJ - tcp://{}:{}".format(self.host_name, self.port)
 
 class SPDClient:
 
@@ -58,7 +60,7 @@ class SPDClient:
         self.replicas = {}
         for i in range(len(replica_addrs)):
             address = replica_addrs[i]
-            self.replicas[i] = (address, self._create_client(address))
+            self.replicas[i] = address
             self.threads.append(Thread(target=self._run, args=(i,)))
 
     def predict(self, inputs, msg_ids, callback):
@@ -85,32 +87,60 @@ class SPDClient:
         for thread in self.threads:
             thread.join()
 
-    def _create_client(self, address):
-        """
-        Parameters
-        -------------
-        address : ReplicaAddress
-        """
-
-        logger.info("Creating client with address: {}".format(address))
-        return spd_frontend_pb2_grpc.PredictStub(address.get_channel())
-
     def _run(self, replica_num):
         try:
             callback_threadpool = ThreadPoolExecutor(max_workers=1)
-            _, client = self.replicas[replica_num]
+            address = str(self.replicas[replica_num])
+            context = zmq.Context()
+            socket = context.socket(zmq.DEALER) 
+            socket.connect(address)
+            poller = zmq.Poller()
+            poller.register(socket, zmq.POLLIN)
+            logger.info("Client connected to model server at address: {}".format(address))
+
+            input_header_buffer = bytearray(INITIAL_INPUT_HEADER_BUFFER_SIZE)
             while self.active:
                 inputs, msg_ids, callback = self.request_queue.get(block=True)
-        
-                grpc_inputs = [inp.tobytes() for inp in inputs]
-                # grpc_inputs = [spd_frontend_pb2.FloatsInput(input=inp) for inp in inputs]
-                predict_request = spd_frontend_pb2.PredictRequest(inputs=grpc_inputs, msg_ids=msg_ids)
 
-                before = datetime.now()
-                predict_response = client.PredictFloats(predict_request, REQUEST_TIME_OUT_SECONDS)
-                end = datetime.now()
-                print((end - before).total_seconds())
-                callback_threadpool.submit(callback, replica_num, list(predict_response.msg_ids))
+                input_header_size = (1 + len(inputs)) * UINT32_SIZE_BYTES
+                if len(input_header_buffer) < input_header_size:
+                    input_header_buffer = bytearray(input_header_size * 2)
+
+                buffer_idx = 0 
+                struct.pack_into("<I", input_header_buffer, buffer_idx, len(inputs))
+                buffer_idx += UINT32_SIZE_BYTES
+                for inp in inputs:
+                    struct.pack_into("<I", input_header_buffer, buffer_idx, len(inp) * INPUT_DTYPE.itemsize)
+                    buffer_idx += UINT32_SIZE_BYTES
+
+                input_header = memoryview(input_header_buffer)[:input_header_size]
+
+                # input_header = np.array([len(inputs)] + [(len(inp) * INPUT_DTYPE.itemsize) for inp in inputs], dtype=np.uint32)
+                
+                # Send the empty delimeter required at the start of a new message
+
+                socket.send("", zmq.SNDMORE)
+                
+                socket.send(memoryview(msg_ids.view(np.uint8)), zmq.SNDMORE)
+                socket.send(input_header, zmq.SNDMORE)
+                for i in range(len(inputs)):
+                    if i < len(inputs) - 1:
+                        socket.send(memoryview(inputs[i].view(np.uint8)), copy=False, flags=zmq.SNDMORE)
+                    else:
+                        socket.send(memoryview(inputs[i].view(np.uint8)), copy=False, flags=0)
+
+                receivable_sockets = dict(poller.poll(timeout=None))
+                if socket in receivable_sockets and receivable_sockets[socket] == zmq.POLLIN:
+                    # Receive delimiter between routing identity and content
+                    socket.recv()
+                    output_msg_ids = socket.recv()
+                    parsed_output_msg_ids = np.frombuffer(output_msg_ids, dtype=np.uint32)
+
+                else:
+                    logger.info("Undefined receive behavior")
+                    raise
+
+                callback_threadpool.submit(callback, replica_num, parsed_output_msg_ids)
         except Exception as e:
             print(e)
 
