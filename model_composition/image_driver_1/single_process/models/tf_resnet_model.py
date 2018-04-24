@@ -35,10 +35,12 @@ class TfResNetModel(ModelBase):
             A list of 3-channel, 224 x 224 images, each represented
             as a numpy array
         """
-
-        reshaped_inputs = [input_item.reshape(224,224,3) for input_item in inputs]
-        all_img_features = self._get_image_features(reshaped_inputs)
-        return [np.array(item, dtype=np.float32) for item in all_img_features]
+        try:
+            reshaped_inputs = [input_item.reshape(224,224,3) for input_item in inputs]
+            all_img_features = self._get_image_features(reshaped_inputs)
+            return [np.array(item, dtype=np.float32) for item in all_img_features]
+        except Exception as e:
+            print(e)
 
     def _get_image_features(self, images):
         feed_dict = { self.t_images : images }

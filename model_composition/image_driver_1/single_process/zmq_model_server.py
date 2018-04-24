@@ -123,17 +123,19 @@ class ID1Frontend(SpdFrontend):
 
         self._predict_parallel(resnet_inputs, inception_inputs)
 
+        after2 = datetime.now()
+
         return msg_ids
 
     def _predict_parallel(self, resnet_inputs, inception_inputs):
-        resnet_svm_future = self.task_execution_thread_pool.submit(
-            lambda inputs : self.kernel_svm_model.predict(self.resnet_model.predict(inputs)), resnet_inputs)
-        
-        inception_log_reg_future = self.task_execution_thread_pool.submit(
-            lambda inputs : self.log_reg_model.predict(self.inception_model.predict(inputs)), inception_inputs)
+            resnet_svm_future = self.task_execution_thread_pool.submit(
+                lambda inputs : self.kernel_svm_model.predict(self.resnet_model.predict(inputs)), resnet_inputs)
+            
+            inception_log_reg_future = self.task_execution_thread_pool.submit(
+                lambda inputs : self.log_reg_model.predict(self.inception_model.predict(inputs)), inception_inputs)
 
-        resnet_svm_classes = resnet_svm_future.result()
-        inception_log_reg_classes = inception_log_reg_future.result()
+            resnet_svm_classes = resnet_svm_future.result()
+            inception_log_reg_classes = inception_log_reg_future.result()
 
 
     def _warm_up(self):
@@ -145,7 +147,8 @@ class ID1Frontend(SpdFrontend):
             warmup_lats = []
             warmup_batch_sizes = []
             for i in range(1000):
-                bs = max(1, int(batch_size * (1 + np.random.normal(0, .2))))
+                bs = 1
+                # bs = max(1, int(batch_size * (1 + np.random.normal(0, .2))))
                 batch_idxs = np.random.randint(0, len(warmup_inputs), bs)
                 curr_inputs = warmup_inputs[batch_idxs]
                 msg_ids = range(bs)
@@ -186,7 +189,7 @@ class ID1Frontend(SpdFrontend):
         assert len(inputs.shape) == 2
         assert inputs.shape[1] == inception_image_size
 
-        return inputs
+        return inputs.reshape((-1, 299, 299, 3))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Single Process Image Driver 1')
