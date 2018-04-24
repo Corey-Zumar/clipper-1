@@ -147,8 +147,7 @@ class ID1Frontend(SpdFrontend):
             warmup_lats = []
             warmup_batch_sizes = []
             for i in range(1000):
-                bs = 1
-                # bs = max(1, int(batch_size * (1 + np.random.normal(0, .2))))
+                bs = max(1, int(batch_size * (1 + np.random.normal(0, .2))))
                 batch_idxs = np.random.randint(0, len(warmup_inputs), bs)
                 curr_inputs = warmup_inputs[batch_idxs]
                 msg_ids = range(bs)
