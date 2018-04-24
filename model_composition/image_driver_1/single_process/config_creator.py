@@ -244,7 +244,7 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--max_num_replicas', type=int, help="The maximum number of replicas for which to generate configs. Configs will be generated in the range (1, max]")
     parser.add_argument('-u', '--utilization_factor', type=float, help="The utilization (decay) factor used to scale target thruputs when selecting lambda values") 
     parser.add_argument('-c', '--configs_base_dir', type=str, help="The output base directory to which to write configurations")
-    parser.add_argument('-r', '--replicas_per_machine', type=int, default=2, help="The number of replicas of the driver that can be launched per machine")
+    parser.add_argument('-r', '--replicas_per_machine', type=int, default=1, help="The number of replicas of the driver that can be launched per machine")
     parser.add_argument('-b', '--batch_size', type=int, help="The batch size that will be used when running experiments")
     parser.add_argument('-sm', '--slo_millis', type=int, help="The latency SLO, in milliseconds, that will be recorded when running experiments")
     parser.add_argument('-gr', '--gpus_per_replica', type=int, default=2, help="The number of GPUs required to run a single replica of SPD")

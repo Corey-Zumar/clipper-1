@@ -1,0 +1,19 @@
+{
+    "num_trials": 30, 
+    "process_path": "CONFIGS/untagged/1000ms/cv_0.1/mean_provision/3_rep/349_0.1.deltas", 
+    "cpu_affinities": [
+        "0 1 2 3 16 17 18 19", 
+        "4 5 6 7 20 21 22 23"
+    ], 
+    "trial_length": 1745, 
+    "replica_nums": [
+        0, 
+        1
+    ], 
+    "gpu_affinities": [
+        "0 1", 
+        "2 3"
+    ], 
+    "batch_size": 175, 
+    "slo_millis": 1000
+}
