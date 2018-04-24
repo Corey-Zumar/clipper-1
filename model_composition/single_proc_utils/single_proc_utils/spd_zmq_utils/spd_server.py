@@ -52,7 +52,7 @@ class SpdServer:
 
     def start(self):
         try:
-            address = "tcp://127.0.0.1:{port}".format(port=self.port)
+            address = "tcp://0.0.0.0:{port}".format(port=self.port)
             context = zmq.Context()
             socket = context.socket(zmq.DEALER)
             socket.bind(address)
