@@ -1,0 +1,18 @@
+[
+    {
+        "machine_address": "172.33.18.238:9500", 
+        "config_path": "CONFIGS/tagged/500ms_cv0.1/mean_provision/4_rep/423_4_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.33.18.238:9501", 
+        "config_path": "CONFIGS/tagged/500ms_cv0.1/mean_provision/4_rep/423_4_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.33.21.238:9500", 
+        "config_path": "CONFIGS/tagged/500ms_cv0.1/mean_provision/4_rep/423_4_rep_config_m1.json"
+    }, 
+    {
+        "machine_address": "172.33.21.238:9501", 
+        "config_path": "CONFIGS/tagged/500ms_cv0.1/mean_provision/4_rep/423_4_rep_config_m1.json"
+    }
+]
