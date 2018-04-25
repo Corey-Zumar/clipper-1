@@ -1,6 +1,6 @@
 [
     {
-        "machine_address": "172.33.18.238:9500", 
+        "machine_address": "172.33.16.134:9500", 
         "config_path": "CONFIGS/tagged/min_lat_cv0.1/peak_provision/1_rep/3_1_rep_config_m0.json"
     }
 ]
