@@ -1,0 +1,10 @@
+[
+    {
+        "machine_address": "172.33.21.186:9500", 
+        "config_path": "CONFIGS/tagged/1000ms_cv4.0/mean_provision/2_rep/233_2_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.33.21.186:9501", 
+        "config_path": "CONFIGS/tagged/1000ms_cv4.0/mean_provision/2_rep/233_2_rep_config_m0.json"
+    }
+]
