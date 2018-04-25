@@ -6,6 +6,7 @@ import logging
 import Queue
 import time
 import json
+import copy
 
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
@@ -279,7 +280,7 @@ class DriverBenchmarker:
                 results_base_path = "/".join(experiment_config.config_path.split("/")[:-1])
                 print(results_base_path)
                 save_results(self.node_configs, 
-                             [dict(stats_manager.stats)],
+                             [copy.deepcopy(stats_manager.stats)],
                              results_base_path,
                              experiment_config.slo_millis,
                              arrival_process=experiment_config.process_path)
@@ -337,7 +338,7 @@ class DriverBenchmarker:
 
             if len(stats_manager.stats["thrus"]) >= num_trials:
                 save_results(self.node_configs, 
-                             [stats_manager.stats], 
+                             [copy.deepcopy(stats_manager.stats)], 
                              "sm_profile_bs_{}_slo_{}".format(batch_size, self.experiment_config.slo_millis), 
                              self.experiment_config.slo_millis) 
 
