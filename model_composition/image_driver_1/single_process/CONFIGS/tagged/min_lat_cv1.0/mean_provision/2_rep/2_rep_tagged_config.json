@@ -1,0 +1,18 @@
+[
+    {
+<<<<<<< HEAD
+        "machine_address": "172.33.28.121:9500", 
+        "config_path": "CONFIGS/tagged/min_lat_cv1.0/mean_provision/2_rep/14_2_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.33.28.121:9501", 
+=======
+        "machine_address": "172.33.23.193:9500", 
+        "config_path": "CONFIGS/tagged/min_lat_cv1.0/mean_provision/2_rep/14_2_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.33.23.193:9501", 
+>>>>>>> 8e89c5e474a4d284f728fba2d1f7a96dcbd469d9
+        "config_path": "CONFIGS/tagged/min_lat_cv1.0/mean_provision/2_rep/14_2_rep_config_m0.json"
+    }
+]

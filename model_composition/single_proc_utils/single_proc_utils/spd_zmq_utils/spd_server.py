@@ -78,7 +78,7 @@ class SpdServer:
                   
                     input_content_size = sum(input_sizes_bytes) 
                     if len(input_content_buffer) < input_content_size:
-                        input_content_buffer = bytearray(len(input_content_buffer) * 2)
+                        input_content_buffer = bytearray(input_content_size * 2)
                     input_content_view = memoryview(input_content_buffer)[:input_content_size]
 
                     # We assume a fixed input datatype of np.float32
