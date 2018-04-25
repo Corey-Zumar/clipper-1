@@ -1,6 +1,6 @@
 {
     "num_trials": 30, 
-    "process_path": "TEST_SLO_3/cv_0.1/mean_provision/1_rep/105_0.1.deltas", 
+    "process_path": "CONFIGS/untagged/350ms/cv_0.1/mean_provision/1_rep/105_0.1.deltas", 
     "cpu_affinities": [
         "0 1 2 3 16 17 18 19"
     ], 
