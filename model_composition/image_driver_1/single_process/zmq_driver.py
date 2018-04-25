@@ -225,7 +225,7 @@ class DriverBenchmarker:
         self.spd_client = self._create_client(experiment_config.machine_addrs)
     
     def run_config(self):
-        self.spd_client.start()
+        self.spd_client.start(self.experiment_config.batch_size)
         
         logger.info("Generating inputs...")
         inputs = generate_inputs()
@@ -251,17 +251,18 @@ class DriverBenchmarker:
 
                 stats_manager.update_stats(completed_msgs, end_time)
             except Exception as e:
-                print(e)
+                print("ERROR IN CALLBACK: {}".format(e))
 
         logger.info("Starting predictions...")
 
         last_msg_id = 0
         for i in range(len(arrival_process)):
-            idx_begin = np.random.randint(len(inputs) - self.experiment_config.batch_size)
-            batch_inputs = inputs[idx_begin : idx_begin + self.experiment_config.batch_size] 
-            batch_msg_ids = np.array(range(last_msg_id, last_msg_id + self.experiment_config.batch_size), dtype=np.uint32)
-            last_msg_id = batch_msg_ids[0] + self.experiment_config.batch_size
-            
+            idx = np.random.randint(len(inputs))
+            input_item = inputs[idx]
+            batch_inputs = [input_item]
+            batch_msg_ids = [last_msg_id]
+            last_msg_id += 1
+
             inflight_ids_lock.acquire()
             send_time = datetime.now()
             for msg_id in batch_msg_ids:
@@ -287,7 +288,7 @@ class DriverBenchmarker:
                 break
     
     def run_fixed_batch(self, batch_size):
-        self.spd_client.start()
+        self.spd_client.start(batch_size)
         
         num_trials = 30
         trial_length = batch_size * 10

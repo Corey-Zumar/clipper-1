@@ -56,8 +56,12 @@ def probe_throughputs(eval_fn, arrival_process):
             # that peak throughput does not always monotonically
             # increase with lambda
             curr_max = min(curr_max - 1, (middle + 16) - 1)
-    return highest_successful_config
-        
+
+    if highest_successful_config:
+        return highest_successful_config
+    else:
+        key = arrival_process.keys()[0]
+        return (key, arrival_process[key])
 
 def find_peak_arrival_proc(arrival_procs, target_thrus, slo_window_millis=350):
     

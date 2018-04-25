@@ -22,10 +22,16 @@ HIERARCHY_SUBDIR_PEAK_PROVISION = "peak_provision"
 CONFIG_NUM_TRIALS = 30
 
 def get_arrival_process_path(procs_dir_path, cv, lambda_val, tagged_num_replicas=None):
-    if tagged_num_replicas:
-        fname = "{lv}_{cv}_tagged_{nr}.deltas".format(lv=lambda_val, cv=cv, nr=tagged_num_replicas) 
+    if cv == 1:
+        if tagged_num_replicas:
+            fname = "{lv}_tagged_{nr}.deltas".format(lv=lambda_val, nr=tagged_num_replicas) 
+        else:
+            fname = "{lv}.deltas".format(lv=lambda_val)
     else:
-        fname = "{lv}_{cv}.deltas".format(lv=lambda_val, cv=cv)
+        if tagged_num_replicas:
+            fname = "{lv}_{cv}_tagged_{nr}.deltas".format(lv=lambda_val, cv=cv, nr=tagged_num_replicas) 
+        else:
+            fname = "{lv}_{cv}.deltas".format(lv=lambda_val, cv=cv)
 
     return os.path.join(procs_dir_path, fname)
 

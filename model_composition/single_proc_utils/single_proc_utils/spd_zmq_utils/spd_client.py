@@ -5,8 +5,8 @@ import time
 import logging
 import struct
 import numpy as np
+import Queue
 
-from Queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 from threading import Thread, Lock
 from datetime import datetime
@@ -55,7 +55,7 @@ class SPDClient:
         self.active = False
         self.replica_addrs = replica_addrs
         
-        self.request_queue = Queue()
+        self.request_queue = Queue.Queue()
         self.threads = []
         self.replicas = {}
         for i in range(len(replica_addrs)):
@@ -77,7 +77,8 @@ class SPDClient:
         """
         self.request_queue.put((inputs, msg_ids, callback))
 
-    def start(self):
+    def start(self, batch_size):
+        self.batch_size = batch_size
         self.active = True
         for thread in self.threads:
             thread.start()
@@ -101,6 +102,15 @@ class SPDClient:
             input_header_buffer = bytearray(INITIAL_INPUT_HEADER_BUFFER_SIZE)
             while self.active:
                 inputs, msg_ids, callback = self.request_queue.get(block=True)
+                while len(inputs) < self.batch_size and self.request_queue.qsize() > 0:
+                    try:
+                        more_inputs, more_msg_ids, _ = self.request_queue.get()
+                        inputs += more_inputs
+                        msg_ids += more_msg_ids
+                    except Queue.Empty:
+                        break
+
+                msg_ids = np.array(msg_ids, dtype=np.uint32)
 
                 input_header_size = (1 + len(inputs)) * UINT32_SIZE_BYTES
                 if len(input_header_buffer) < input_header_size:
@@ -139,6 +149,8 @@ class SPDClient:
                 else:
                     logger.info("Undefined receive behavior")
                     raise
+
+                print(parsed_output_msg_ids)
 
                 callback_threadpool.submit(callback, replica_num, parsed_output_msg_ids)
         except Exception as e:
