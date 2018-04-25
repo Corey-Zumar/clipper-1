@@ -150,8 +150,6 @@ class SPDClient:
                     logger.info("Undefined receive behavior")
                     raise
 
-                print(parsed_output_msg_ids)
-
                 callback_threadpool.submit(callback, replica_num, parsed_output_msg_ids)
         except Exception as e:
             print("ERROR")
