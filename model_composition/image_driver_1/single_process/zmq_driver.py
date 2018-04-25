@@ -175,6 +175,12 @@ class StatsManager(object):
         self.stats_lock = Lock()
         self.start_timestamp = datetime.now()
 
+    def get_stats(self):
+        self.stats_lock.acquire()
+        result = copy.deepcopy(self.stats)
+        self.stats_lock.release()
+        return result
+
     def update_stats(self, completed_requests, end_time):
         try:
             self.stats_lock.acquire()
@@ -283,7 +289,7 @@ class DriverBenchmarker:
                 results_base_path = "/".join(experiment_config.config_path.split("/")[:-1])
                 print(results_base_path)
                 save_results(self.node_configs, 
-                             [copy.deepcopy(stats_manager.stats)],
+                             [stats_manager.get_stats()],
                              results_base_path,
                              experiment_config.slo_millis,
                              arrival_process=experiment_config.process_path)
