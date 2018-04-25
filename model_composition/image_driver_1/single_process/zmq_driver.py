@@ -6,6 +6,7 @@ import logging
 import Queue
 import time
 import json
+import copy
 
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
@@ -171,11 +172,18 @@ class StatsManager(object):
         }
         self.total_num_complete = 0
         self.trial_length = trial_length
-
+        self.stats_lock = Lock()
         self.start_timestamp = datetime.now()
+
+    def get_stats(self):
+        self.stats_lock.acquire()
+        result = copy.deepcopy(self.stats)
+        self.stats_lock.release()
+        return result
 
     def update_stats(self, completed_requests, end_time):
         try:
+            self.stats_lock.acquire()
             batch_size = len(completed_requests)
             self.batch_sizes.append(batch_size)
             for msg_id, send_time in completed_requests:
@@ -188,8 +196,10 @@ class StatsManager(object):
             if self.trial_num_complete >= self.trial_length:
                 self._print_stats()
                 self._init_stats()
+
+            self.stats_lock.release()
         except Exception as e:
-            print(e)
+            print("ERROR UPDATING STATS: {}".format(e))
 
     def _init_stats(self):
         self.latencies = []
@@ -275,17 +285,14 @@ class DriverBenchmarker:
             request_delay_seconds = request_delay_millis * .001
             time.sleep(request_delay_seconds)
 
-            if len(stats_manager.stats["thrus"]) >= self.experiment_config.num_trials:
-                results_base_path = "/".join(experiment_config.config_path.split("/")[:-1])
-                print(results_base_path)
-                save_results(self.node_configs, 
-                             [stats_manager.stats],
-                             results_base_path,
-                             experiment_config.slo_millis,
-                             arrival_process=experiment_config.process_path)
+        results_base_path = "/".join(experiment_config.config_path.split("/")[:-1])
+        save_results(self.node_configs, 
+                     [stats_manager.get_stats()],
+                     results_base_path,
+                     experiment_config.slo_millis,
+                     arrival_process=experiment_config.process_path)
 
-                self.spd_client.stop()
-                break
+        self.spd_client.stop()
     
     def run_fixed_batch(self, batch_size):
         self.spd_client.start(batch_size)
@@ -337,7 +344,7 @@ class DriverBenchmarker:
 
             if len(stats_manager.stats["thrus"]) >= num_trials:
                 save_results(self.node_configs, 
-                             [stats_manager.stats], 
+                             [copy.deepcopy(stats_manager.stats)], 
                              "sm_profile_bs_{}_slo_{}".format(batch_size, self.experiment_config.slo_millis), 
                              self.experiment_config.slo_millis) 
 
