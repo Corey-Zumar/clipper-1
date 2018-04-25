@@ -172,11 +172,12 @@ class StatsManager(object):
         }
         self.total_num_complete = 0
         self.trial_length = trial_length
-
+        self.stats_lock = Lock()
         self.start_timestamp = datetime.now()
 
     def update_stats(self, completed_requests, end_time):
         try:
+            self.stats_lock.acquire()
             batch_size = len(completed_requests)
             self.batch_sizes.append(batch_size)
             for msg_id, send_time in completed_requests:
@@ -189,8 +190,10 @@ class StatsManager(object):
             if self.trial_num_complete >= self.trial_length:
                 self._print_stats()
                 self._init_stats()
+
+            self.stats_lock.release()
         except Exception as e:
-            print(e)
+            print("ERROR UPDATING STATS: {}".format(e))
 
     def _init_stats(self):
         self.latencies = []
