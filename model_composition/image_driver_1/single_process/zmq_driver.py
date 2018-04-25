@@ -285,17 +285,14 @@ class DriverBenchmarker:
             request_delay_seconds = request_delay_millis * .001
             time.sleep(request_delay_seconds)
 
-            if len(stats_manager.stats["thrus"]) >= self.experiment_config.num_trials:
-                results_base_path = "/".join(experiment_config.config_path.split("/")[:-1])
-                print(results_base_path)
-                save_results(self.node_configs, 
-                             [stats_manager.get_stats()],
-                             results_base_path,
-                             experiment_config.slo_millis,
-                             arrival_process=experiment_config.process_path)
+        results_base_path = "/".join(experiment_config.config_path.split("/")[:-1])
+        save_results(self.node_configs, 
+                     [stats_manager.get_stats()],
+                     results_base_path,
+                     experiment_config.slo_millis,
+                     arrival_process=experiment_config.process_path)
 
-                self.spd_client.stop()
-                break
+        self.spd_client.stop()
     
     def run_fixed_batch(self, batch_size):
         self.spd_client.start(batch_size)
