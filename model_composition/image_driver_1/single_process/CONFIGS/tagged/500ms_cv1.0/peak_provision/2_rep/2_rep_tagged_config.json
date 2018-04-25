@@ -1,0 +1,10 @@
+[
+    {
+        "machine_address": "172.33.23.193:9500", 
+        "config_path": "CONFIGS/tagged/500ms_cv1.0/peak_provision/2_rep/145_2_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.33.23.193:9501", 
+        "config_path": "CONFIGS/tagged/500ms_cv1.0/peak_provision/2_rep/145_2_rep_config_m0.json"
+    }
+]
