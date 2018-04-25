@@ -279,7 +279,7 @@ class DriverBenchmarker:
                 results_base_path = "/".join(experiment_config.config_path.split("/")[:-1])
                 print(results_base_path)
                 save_results(self.node_configs, 
-                             [stats_manager.stats],
+                             [dict(stats_manager.stats)],
                              results_base_path,
                              experiment_config.slo_millis,
                              arrival_process=experiment_config.process_path)
