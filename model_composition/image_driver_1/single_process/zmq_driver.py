@@ -14,9 +14,13 @@ from threading import Thread, Lock
 
 from machine_config_tagger import TAGGED_CONFIG_KEY_MACHINE_ADDRESS, TAGGED_CONFIG_KEY_CONFIG_PATH
 from single_proc_utils import HeavyNodeConfig, save_results
-from single_proc_utils.spd_zmq_utils.spd_client import ReplicaAddress, SPDClient  
+from single_proc_utils.spd_zmq_utils.spd_client import ReplicaAddress, SPDClient, QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS 
 
 from e2e_utils import load_tagged_arrival_deltas, load_arrival_deltas, calculate_mean_throughput
+
+from config_creator import CONFIG_KEY_BATCH_SIZE, CONFIG_KEY_CPU_AFFINITIES, CONFIG_KEY_GPU_AFFINITIES
+from config_creator import CONFIG_KEY_PROCESS_PATH, CONFIG_KEY_REPLICA_NUMS, CONFIG_KEY_TRIAL_LENGTH
+from config_creator import CONFIG_KEY_NUM_TRIALS, CONFIG_KEY_SLO_MILLIS, CONFIG_KEY_LAMBDA, CONFIG_KEY_CV
 
 INCEPTION_FEATS_MODEL_NAME = "inception_feats"
 TF_KERNEL_SVM_MODEL_NAME = "kernel_svm"
@@ -32,14 +36,8 @@ logger = logging.getLogger(__name__)
 
 CURR_DIR = os.path.dirname(os.path.realpath(__file__))
 
-CONFIG_KEY_BATCH_SIZE = "batch_size"
-CONFIG_KEY_CPU_AFFINITIES = "cpu_affinities"
-CONFIG_KEY_GPU_AFFINITIES = "gpu_affinities"
-CONFIG_KEY_PROCESS_PATH = "process_path"
-CONFIG_KEY_REPLICA_NUMS = "replica_nums"
-CONFIG_KEY_TRIAL_LENGTH = "trial_length"
-CONFIG_KEY_NUM_TRIALS = "num_trials"
-CONFIG_KEY_SLO_MILLIS = "slo_millis"
+EXPIRED_REQUEST_LATENCY = sys.maxint
+SERVICE_INGEST_RATIO_DIVERGENCE_THRESHOLD = .95
 
 ########## Setup ##########
 
@@ -76,7 +74,7 @@ def get_heavy_node_configs(num_replicas, batch_size, allocated_cpus, allocated_g
 
 class ExperimentConfig:
 
-    def __init__(self, config_path, machine_addrs, batch_size, process_path, trial_length, num_trials, slo_millis):
+    def __init__(self, config_path, machine_addrs, batch_size, process_path, trial_length, num_trials, slo_millis, lambda_val, cv):
         self.config_path = config_path
         self.machine_addrs = machine_addrs
         self.batch_size = batch_size
@@ -84,12 +82,14 @@ class ExperimentConfig:
         self.trial_length = trial_length
         self.num_trials = num_trials
         self.slo_millis = slo_millis
+        self.lambda_val = lambda_val
+        self.cv = cv
 
 def parse_configs(tagged_config_path):
     with open(tagged_config_path, "r") as f:
         tagged_config_json = json.load(f)
 
-    config_files = [item[TAGGED_CONFIG_KEY_CONFIG_PATH] for item in tagged_config_json]
+    config_files = set([item[TAGGED_CONFIG_KEY_CONFIG_PATH] for item in tagged_config_json])
     machine_addrs = [item[TAGGED_CONFIG_KEY_MACHINE_ADDRESS] for item in tagged_config_json]
 
     all_replica_nums = []
@@ -109,6 +109,8 @@ def parse_configs(tagged_config_path):
         replica_nums = config[CONFIG_KEY_REPLICA_NUMS]
         cpu_affinities = config[CONFIG_KEY_CPU_AFFINITIES]
         gpu_affinities = config[CONFIG_KEY_GPU_AFFINITIES]
+        cv = config[CONFIG_KEY_CV]
+        lambda_val = config[CONFIG_KEY_LAMBDA]
 
         tagged_cpu_affinities = []
         for affinities_item in cpu_affinities:
@@ -132,12 +134,14 @@ def parse_configs(tagged_config_path):
                                          process_path, 
                                          trial_length, 
                                          num_trials, 
-                                         slo_millis)
+                                         slo_millis,
+                                         lambda_val,
+                                         cv)
 
     node_configs = get_heavy_node_configs(num_replicas=len(all_replica_nums), 
-                                     batch_size=batch_size, 
-                                     allocated_cpus=all_cpu_affinities, 
-                                     allocated_gpus=all_gpu_affinities)
+                                          batch_size=batch_size, 
+                                          allocated_cpus=all_cpu_affinities, 
+                                          allocated_gpus=all_gpu_affinities)
 
     return experiment_config, node_configs
 
@@ -201,6 +205,15 @@ class StatsManager(object):
         except Exception as e:
             print("ERROR UPDATING STATS: {}".format(e))
 
+    def expire_requests(self, msg_ids):
+        try:
+            self.stats_lock.acquire()
+            for msg_id in msg_ids:
+                self.stats["per_message_lats"][str(msg_id)] = EXPIRED_REQUEST_LATENCY
+            self.stats_lock.release()
+        except Exception as e:
+            print("ERROR EXPIRING REQUESTS {}".format(e))
+
     def _init_stats(self):
         self.latencies = []
         self.batch_sizes = []
@@ -235,7 +248,21 @@ class DriverBenchmarker:
         self.spd_client = self._create_client(experiment_config.machine_addrs)
     
     def run_config(self):
-        self.spd_client.start(self.experiment_config.batch_size)
+        def expiration_callback(msg_ids):
+            try:
+                inflight_ids_lock.acquire()
+                for msg_id in msg_ids:
+                    del inflight_ids[msg_id]
+                inflight_ids_lock.release()
+
+                stats_manager.expire_requests(msg_ids)
+            
+            except Exception as e:
+                print("ERROR IN EXPIRATION CALLBACK: {}".format(e))
+
+        self.spd_client.start(self.experiment_config.batch_size, 
+                              self.experiment_config.slo_millis,
+                              expiration_callback)
         
         logger.info("Generating inputs...")
         inputs = generate_inputs()
@@ -248,7 +275,7 @@ class DriverBenchmarker:
         inflight_ids_lock = Lock()
         inflight_ids = {}
 
-        def callback(replica_num, msg_ids):
+        def stats_update_callback(replica_num, msg_ids):
             try:
                 end_time = datetime.now()
                 inflight_ids_lock.acquire()
@@ -261,7 +288,7 @@ class DriverBenchmarker:
 
                 stats_manager.update_stats(completed_msgs, end_time)
             except Exception as e:
-                print("ERROR IN CALLBACK: {}".format(e))
+                print("ERROR IN STATS UPDATE CALLBACK: {}".format(e))
 
         logger.info("Starting predictions...")
 
@@ -279,14 +306,32 @@ class DriverBenchmarker:
                 inflight_ids[msg_id] = send_time
             inflight_ids_lock.release()
 
-            self.spd_client.predict(batch_inputs, batch_msg_ids, callback)
+            self.spd_client.predict(batch_inputs, batch_msg_ids, stats_update_callback)
+
+            if i > self.experiment_config.lambda_val * 20:
+                total_enqueued += 1
+                enqueue_trial_length = (send_time - enqueue_trial_begin).total_seconds()
+                if enqueue_trial_length > QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS:
+                    enqueue_rate = float(total_enqueued) / enqueue_trial_length
+                    service_ingest_ratio = self.spd_client.get_dequeue_rate() / enqueue_rate
+                    if service_ingest_ratio <= SERVICE_INGEST_RATIO_DIVERGENCE_THRESHOLD: 
+                        print(enqueue_rate, self.spd_client.get_dequeue_rate())
+                        logger.info("Request queue is diverging! Stopping experiment...")
+                        break
+
+                    total_enqueued = 0
+                    enqueue_trial_begin = send_time
+            else:
+                enqueue_trial_begin = send_time
+                total_enqueued = 0
 
             request_delay_millis = arrival_process[i]
             request_delay_seconds = request_delay_millis * .001
             time.sleep(request_delay_seconds)
 
         results_base_path = "/".join(experiment_config.config_path.split("/")[:-1])
-        save_results(self.node_configs, 
+        save_results(self.experiment_config,
+                     self.node_configs, 
                      [stats_manager.get_stats()],
                      results_base_path,
                      experiment_config.slo_millis,
@@ -295,7 +340,9 @@ class DriverBenchmarker:
         self.spd_client.stop()
     
     def run_fixed_batch(self, batch_size):
-        self.spd_client.start(batch_size)
+        profiling_slo_millis = sys.maxint 
+
+        self.spd_client.start(batch_size, profiling_slo_millis, lambda msg_ids : None)
         
         num_trials = 30
         trial_length = batch_size * 10
@@ -329,8 +376,6 @@ class DriverBenchmarker:
         while True:
             idx_begin = np.random.randint(len(inputs) - batch_size)
             batch_inputs = inputs[idx_begin : idx_begin + batch_size] 
-            # batch_idxs = np.random.randint(0, len(inputs), batch_size)
-            # batch_inputs = inputs[batch_idxs]
             batch_msg_ids = np.array(range(last_msg_id, last_msg_id + batch_size), dtype=np.uint32)
             last_msg_id = batch_msg_ids[0] + batch_size
             
@@ -343,7 +388,8 @@ class DriverBenchmarker:
             self.spd_client.predict(batch_inputs, batch_msg_ids, callback)
 
             if len(stats_manager.stats["thrus"]) >= num_trials:
-                save_results(self.node_configs, 
+                save_results(self.experiment_config,
+                             self.node_configs, 
                              [copy.deepcopy(stats_manager.stats)], 
                              "sm_profile_bs_{}_slo_{}".format(batch_size, self.experiment_config.slo_millis), 
                              self.experiment_config.slo_millis) 

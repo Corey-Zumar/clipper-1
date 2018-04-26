@@ -9,9 +9,16 @@ import e2e_utils
 
 import numpy as np
 
-from run_distributed_driver import CONFIG_KEY_BATCH_SIZE, CONFIG_KEY_CPU_AFFINITIES, CONFIG_KEY_GPU_AFFINITIES
-from run_distributed_driver import CONFIG_KEY_PROCESS_PATH, CONFIG_KEY_REPLICA_NUMS, CONFIG_KEY_TRIAL_LENGTH
-from run_distributed_driver import CONFIG_KEY_NUM_TRIALS, CONFIG_KEY_SLO_MILLIS
+CONFIG_KEY_BATCH_SIZE = "batch_size"
+CONFIG_KEY_CPU_AFFINITIES = "cpu_affinities"
+CONFIG_KEY_GPU_AFFINITIES = "gpu_affinities"
+CONFIG_KEY_PROCESS_PATH = "process_path"
+CONFIG_KEY_REPLICA_NUMS = "replica_nums"
+CONFIG_KEY_TRIAL_LENGTH = "trial_length"
+CONFIG_KEY_NUM_TRIALS = "num_trials"
+CONFIG_KEY_SLO_MILLIS = "slo_millis"
+CONFIG_KEY_LAMBDA = "lambda"
+CONFIG_KEY_CV = "cv"
 
 HIERARCHY_KEY_MEAN_PATHS = "mean"
 HIERARCHY_KEY_PEAK_PATHS = "peak"
@@ -91,7 +98,8 @@ def create_config_json(process_path,
                        pcpus_per_replica,
                        replica_nums,
                        batch_size,
-                       lambda_val, 
+                       lambda_val,
+                       cv,
                        slo_millis):
 
     """
@@ -110,7 +118,9 @@ def create_config_json(process_path,
         CONFIG_KEY_NUM_TRIALS : CONFIG_NUM_TRIALS,
         CONFIG_KEY_SLO_MILLIS : slo_millis,
         CONFIG_KEY_GPU_AFFINITIES : [],
-        CONFIG_KEY_CPU_AFFINITIES : []
+        CONFIG_KEY_CPU_AFFINITIES : [],
+        CONFIG_KEY_LAMBDA : lambda_val,
+        CONFIG_KEY_CV : cv
     }
 
     for replica_num in replica_nums:
@@ -210,6 +220,7 @@ def create_configs(arrival_procs_path,
                                                   replica_nums, 
                                                   batch_size,
                                                   mean_lambda,
+                                                  cv,
                                                   slo_millis)
 
             mean_config_subpath = "{lv}_{nr}_rep_config_{tag}.json".format(lv=mean_lambda,
@@ -228,6 +239,7 @@ def create_configs(arrival_procs_path,
                                                   replica_nums, 
                                                   batch_size,
                                                   peak_lambda,
+                                                  cv,
                                                   slo_millis)
 
             peak_config_subpath = "{lv}_{nr}_rep_config_{tag}.json".format(lv=peak_lambda,
@@ -250,7 +262,7 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--max_num_replicas', type=int, help="The maximum number of replicas for which to generate configs. Configs will be generated in the range (1, max]")
     parser.add_argument('-u', '--utilization_factor', type=float, help="The utilization (decay) factor used to scale target thruputs when selecting lambda values") 
     parser.add_argument('-c', '--configs_base_dir', type=str, help="The output base directory to which to write configurations")
-    parser.add_argument('-r', '--replicas_per_machine', type=int, default=1, help="The number of replicas of the driver that can be launched per machine")
+    parser.add_argument('-r', '--replicas_per_machine', type=int, default=1, help="The number of replicas of SPD that can be launched per machine")
     parser.add_argument('-b', '--batch_size', type=int, help="The batch size that will be used when running experiments")
     parser.add_argument('-sm', '--slo_millis', type=int, help="The latency SLO, in milliseconds, that will be recorded when running experiments")
     parser.add_argument('-gr', '--gpus_per_replica', type=int, default=2, help="The number of GPUs required to run a single replica of SPD")
