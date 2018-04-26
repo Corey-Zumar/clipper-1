@@ -23,9 +23,14 @@ def run_exps(tagged_dirs):
             cmd = "python zmq_driver.py -tc {tc}".format(tc=config_path)
             cmds.append(cmd)
 
-        for cmd in reversed(cmds):
-            print(cmd)
-            sp.check_output(cmd, shell=True)
+        idx = len(cmds) - 1
+        while idx >= 0:
+            curr_cmd = cmds[idx]
+            try:
+                sp.check_output(curr_cmd, shell=True)
+                idx -= 1
+            except Exception as e:
+                continue
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Manage experiments')

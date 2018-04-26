@@ -205,6 +205,7 @@ class StatsManager(object):
             self.stats_lock.release()
         except Exception as e:
             print("ERROR UPDATING STATS: {}".format(e))
+            os._exit(1)
 
     def expire_requests(self, msg_ids):
         try:
@@ -214,6 +215,7 @@ class StatsManager(object):
             self.stats_lock.release()
         except Exception as e:
             print("ERROR EXPIRING REQUESTS {}".format(e))
+            os._exit(1)
 
     def _init_stats(self):
         self.latencies = []
@@ -263,6 +265,7 @@ class DriverBenchmarker:
                 stats_manager.update_stats(completed_msgs, end_time)
             except Exception as e:
                 print("ERROR IN STATS UPDATE CALLBACK: {}".format(e))
+                os._exit(1)
 
         def expiration_callback(msg_ids):
             try:
@@ -275,6 +278,7 @@ class DriverBenchmarker:
             
             except Exception as e:
                 print("ERROR IN EXPIRATION CALLBACK: {}".format(e))
+                os._exit(1)
 
         logger.info("Loading arrival process...")
         arrival_process = load_arrival_deltas(self.experiment_config.process_path)

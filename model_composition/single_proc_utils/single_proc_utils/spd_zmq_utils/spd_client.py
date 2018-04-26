@@ -92,7 +92,7 @@ class SPDClient:
         self.expiration_callback = expiration_callback
         self.inflight_msgs = inflight_msgs
         self.inflight_msgs_lock = inflight_msgs_lock
-        self.arrival_process_seconds = [.001 for _ in xrange(50000)]
+        self.arrival_process_seconds = [item * .001 for item in arrival_process_millis] 
         self.active = True
 
         self.request_queue = deque()
@@ -275,6 +275,7 @@ class SPDClient:
                 callback_threadpool.submit(self.stats_callback, replica_num, parsed_output_msg_ids)
         except Exception as e:
             print("ERROR IN CLIENT: {}".format(e))
+            os._exit(1)
 
     def __str__(self):
         return ",".join(self.replica_addrs)
