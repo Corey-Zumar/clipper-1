@@ -307,7 +307,7 @@ class DriverBenchmarker:
 
             print(enqueue_rate, dequeue_rate)
 
-            if dequeue_rate == 0 and enqueue rate > 0:
+            if dequeue_rate == 0 and enqueue_rate > 0:
                 logger.info("ERROR: Dequeue rate is zero, yet enqueue rate is: {}".format(enqueue_rate))
 
             elif enqueue_rate > 0 and dequeue_rate > 0 (dequeue_rate / enqueue_rate) <= SERVICE_INGEST_RATIO_DIVERGENCE_THRESHOLD:
