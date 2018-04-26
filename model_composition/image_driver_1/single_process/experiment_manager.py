@@ -27,9 +27,11 @@ def run_exps(tagged_dirs):
         while idx >= 0:
             curr_cmd = cmds[idx]
             try:
+                print(curr_cmd)
                 sp.check_output(curr_cmd, shell=True)
                 idx -= 1
             except Exception as e:
+                print(e)
                 continue
 
 if __name__ == "__main__":
