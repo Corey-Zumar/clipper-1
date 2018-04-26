@@ -29,7 +29,7 @@ def run_exps(tagged_dirs):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Manage experiments')
-    parser.add_argument('-p',  '--paths', type=str, help="Paths to the directories containing experiments to run")
+    parser.add_argument('-p',  '--paths', type=str, nargs='+', help="Paths to the directories containing experiments to run")
 
     args = parser.parse_args()
 
