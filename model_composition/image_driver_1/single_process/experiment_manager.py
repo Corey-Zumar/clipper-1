@@ -6,7 +6,7 @@ import subprocess as sp
 from config_creator import HIERARCHY_SUBDIR_MEAN_PROVISION, HIERARCHY_SUBDIR_PEAK_PROVISION
 
 def run_exps(tagged_dirs):
-    for tagged_dir in tagged_dirs
+    for tagged_dir in tagged_dirs:
         mean_path = os.path.join(tagged_dir, HIERARCHY_SUBDIR_MEAN_PROVISION)
         peak_path = os.path.join(tagged_dir, HIERARCHY_SUBDIR_PEAK_PROVISION)
 

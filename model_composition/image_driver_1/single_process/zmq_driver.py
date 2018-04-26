@@ -9,6 +9,7 @@ import json
 import copy
 
 from datetime import datetime
+from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor
 from threading import Thread, Lock
 
@@ -248,33 +249,6 @@ class DriverBenchmarker:
         self.spd_client = self._create_client(experiment_config.machine_addrs)
     
     def run_config(self):
-        def expiration_callback(msg_ids):
-            try:
-                inflight_ids_lock.acquire()
-                for msg_id in msg_ids:
-                    del inflight_ids[msg_id]
-                inflight_ids_lock.release()
-
-                stats_manager.expire_requests(msg_ids)
-            
-            except Exception as e:
-                print("ERROR IN EXPIRATION CALLBACK: {}".format(e))
-
-        self.spd_client.start(self.experiment_config.batch_size, 
-                              self.experiment_config.slo_millis,
-                              expiration_callback)
-        
-        logger.info("Generating inputs...")
-        inputs = generate_inputs()
-
-        logger.info("Loading arrival process...")
-        arrival_process = load_arrival_deltas(self.experiment_config.process_path)
-
-        stats_manager = StatsManager(self.experiment_config.trial_length)
-
-        inflight_ids_lock = Lock()
-        inflight_ids = {}
-
         def stats_update_callback(replica_num, msg_ids):
             try:
                 end_time = datetime.now()
@@ -290,47 +264,52 @@ class DriverBenchmarker:
             except Exception as e:
                 print("ERROR IN STATS UPDATE CALLBACK: {}".format(e))
 
+        def expiration_callback(msg_ids):
+            try:
+                inflight_ids_lock.acquire()
+                for msg_id in msg_ids:
+                    del inflight_ids[msg_id]
+                inflight_ids_lock.release()
+
+                stats_manager.expire_requests(msg_ids)
+            
+            except Exception as e:
+                print("ERROR IN EXPIRATION CALLBACK: {}".format(e))
+
+        logger.info("Loading arrival process...")
+        arrival_process = load_arrival_deltas(self.experiment_config.process_path)
+
+        stats_manager = StatsManager(self.experiment_config.trial_length)
+
+        inflight_ids = {}
+        inflight_ids_lock = Lock()
+
         logger.info("Starting predictions...")
 
-        diverged = False
+        self.spd_client.start(self.experiment_config.batch_size, 
+                              self.experiment_config.slo_millis,
+                              stats_update_callback,
+                              expiration_callback,
+                              inflight_ids,
+                              inflight_ids_lock,
+                              arrival_process)
 
-        last_msg_id = 0
-        for i in range(len(arrival_process)):
-            idx = np.random.randint(len(inputs))
-            input_item = inputs[idx]
-            batch_inputs = [input_item]
-            batch_msg_ids = [last_msg_id]
-            last_msg_id += 1
+        while True:
+            if len(stats_manager.stats["per_message_lats"]) < .98 * len(arrival_process):
+                time.sleep(2 * QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS)
 
-            inflight_ids_lock.acquire()
-            send_time = datetime.now()
-            for msg_id in batch_msg_ids:
-                inflight_ids[msg_id] = send_time
-            inflight_ids_lock.release()
+            enqueue_rate = self.spd_client.get_enqueue_rate()
+            dequeue_rate = self.spd_client.get_dequeue_rate()
 
-            self.spd_client.predict(batch_inputs, batch_msg_ids, stats_update_callback)
+            print(enqueue_rate, dequeue_rate)
 
-            if i > self.experiment_config.lambda_val * 20:
-                total_enqueued += 1
-                enqueue_trial_length = (send_time - enqueue_trial_begin).total_seconds()
-                if enqueue_trial_length > QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS:
-                    enqueue_rate = float(total_enqueued) / enqueue_trial_length
-                    service_ingest_ratio = self.spd_client.get_dequeue_rate() / enqueue_rate
-                    if service_ingest_ratio <= SERVICE_INGEST_RATIO_DIVERGENCE_THRESHOLD: 
-                        print(enqueue_rate, self.spd_client.get_dequeue_rate())
-                        diverged = True
-                        logger.info("Request queue is diverging! Stopping experiment...")
-                        break
+            if (dequeue_rate / enqueue_rate) <= SERVICE_INGEST_RATIO_DIVERGENCE_THRESHOLD:
+                diverged = True
+                logger.info("Request queue is diverging! Stopping experiment...")
+                logger.info("Enqueue rate: {}, Dequeue rate: {}".format(enqueue_rate, dequeue_rate))
+                break
 
-                    total_enqueued = 0
-                    enqueue_trial_begin = send_time
-            else:
-                enqueue_trial_begin = send_time
-                total_enqueued = 0
-
-            request_delay_millis = arrival_process[i]
-            request_delay_seconds = request_delay_millis * .001
-            time.sleep(request_delay_seconds)
+        time.sleep(20)
 
         results_base_path = "/".join(experiment_config.config_path.split("/")[:-1])
         save_results(self.experiment_config,

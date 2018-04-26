@@ -7,9 +7,11 @@ import struct
 import numpy as np
 import Queue
 
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from threading import Thread, Lock
+from threading import Thread, RLock
 from datetime import datetime
+from datetime import timedelta
 
 from spd_server import INPUT_DTYPE
 
@@ -54,10 +56,20 @@ class SPDClient:
             the client should communicate with
         """
 
+        logger.info("Generating inputs")
+        self.inputs = generate_inputs() 
+
         self.active = False
         self.replica_addrs = replica_addrs
+       
+        self.total_dequeued = 0
+        self.dequeue_rate = 0
+        self.dequeue_trial_begin = datetime.now()
         
-        self.request_queue = Queue.Queue()
+        self.total_enqueued = 0
+        self.enqueue_rate = 0
+        self.enqueue_trial_begin = datetime.now()
+
         self.threads = []
         self.replicas = {}
         for i in range(len(replica_addrs)):
@@ -65,30 +77,29 @@ class SPDClient:
             self.replicas[i] = address
             self.threads.append(Thread(target=self._run, args=(i,)))
 
-    def predict(self, inputs, msg_ids, callback):
-        """ 
-        Parameters
-        -------------
-        input_item : Proto
-            An input proto
-            TODO(czumar): Make this more specific
+    def start(self, 
+              batch_size, 
+              slo_millis, 
+              stats_callback, 
+              expiration_callback,
+              inflight_msgs,
+              inflight_msgs_lock,
+              arrival_process_millis):
 
-        callback : function
-            The function to execute when a response
-            is received
-        """
-        send_time = datetime.now()
-        self.request_queue.put((inputs, msg_ids, send_time, callback))
-
-    def start(self, batch_size, slo_millis, expiration_callback):
         self.batch_size = batch_size
         self.slo_millis = slo_millis
+        self.stats_callback = stats_callback
         self.expiration_callback = expiration_callback
+        self.inflight_msgs = inflight_msgs
+        self.inflight_msgs_lock = inflight_msgs_lock
+        self.arrival_process_seconds = [.001 for _ in xrange(50000)]
         self.active = True
-        self.total_dequeued = 0
-        self.dequeue_rate = None
-        self.dequeue_trial_begin = datetime.now()
-        self.dequeue_rate_lock = Lock() 
+
+        self.request_queue = deque()
+        self.last_dequeued_time = None
+        self.queue_lock = RLock()
+        self.process_idx = 0
+
         for thread in self.threads:
             thread.start()
 
@@ -97,21 +108,40 @@ class SPDClient:
         for thread in self.threads:
             thread.join()
 
-    def update_dequeue_rate(self, num_dequeued):
-        self.dequeue_rate_lock.acquire()
+    def update_enqueue_rate(self, num_enqueued):
+        # Assumes that "queue_lock" is held
         curr_time = datetime.now()
+        self.total_enqueued += num_enqueued
+        enqueue_trial_length = (curr_time - self.enqueue_trial_begin).total_seconds()
+        if enqueue_trial_length > QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS:
+            self.enqueue_rate = float(self.total_enqueued) / enqueue_trial_length
+            self.enqueue_trial_begin = curr_time
+            self.total_enqueued = 0
+
+    def get_enqueue_rate(self):
+        self.queue_lock.acquire()
+        enqueue_rate = float(self.enqueue_rate)
+        self.queue_lock.release()
+        return enqueue_rate
+
+    def update_dequeue_rate(self, num_dequeued):
+        # Assumes that "queue_lock" is held
+        curr_time = datetime.now()
+        window_elapsed = False
         self.total_dequeued += num_dequeued
         dequeue_trial_length = (curr_time - self.dequeue_trial_begin).total_seconds()
         if dequeue_trial_length > QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS:
             self.dequeue_rate = float(self.total_dequeued) / dequeue_trial_length
             self.dequeue_trial_begin = curr_time
             self.total_dequeued = 0
-        self.dequeue_rate_lock.release()
+            window_elapsed = True
+
+        return window_elapsed 
 
     def get_dequeue_rate(self):
-        self.dequeue_rate_lock.acquire()
+        self.queue_lock.acquire()
         dequeue_rate = float(self.dequeue_rate)
-        self.dequeue_rate_lock.release()
+        self.queue_lock.release()
         return dequeue_rate
 
     def _run(self, replica_num):
@@ -129,38 +159,86 @@ class SPDClient:
             input_header_buffer = bytearray(INITIAL_INPUT_HEADER_BUFFER_SIZE)
             dequeue_trial_begin = datetime.now()
             while self.active:
-                iter_dequeued = 0
-                expiration_ids = []
-                inputs, msg_ids, send_time, callback = self.request_queue.get(block=True)
-                iter_dequeued += len(msg_ids)
-                dequeue_time = datetime.now()
-                if (dequeue_time - send_time).total_seconds() * 1000 > self.slo_millis:
-                    inputs = []
-                    msg_ids = []
-                    expiration_ids = msg_ids
+                self.queue_lock.acquire()
+                self.inflight_msgs_lock.acquire()
 
-                while len(inputs) < self.batch_size and self.request_queue.qsize() > 0:
-                    try:
-                        more_inputs, more_msg_ids, send_time, _ = self.request_queue.get()
-                        iter_dequeued += len(more_msg_ids)
-                        dequeue_time = datetime.now()
-                        if (dequeue_time - send_time).total_seconds() * 1000 > self.slo_millis:
-                            expiration_ids += more_msg_ids 
-                        else:
-                            inputs += more_inputs
-                            msg_ids += more_msg_ids
-                    
-                    except Queue.Empty:
-                        break
+                before = datetime.now()
                 
-                self.update_dequeue_rate(iter_dequeued) 
+                if self.last_dequeued_time:
+                    curr_time = datetime.now()
+                    time_since_dequeue = (curr_time - self.last_dequeued_time).total_seconds()
+                    accounted_delay = 0
+                    while self.process_idx < len(self.arrival_process_seconds):
+                        request_delay_seconds = self.arrival_process_seconds[self.process_idx]
+                        if accounted_delay + request_delay_seconds < time_since_dequeue:
+                            accounted_delay += request_delay_seconds
+                            send_time = curr_time + timedelta(seconds=accounted_delay)
+                            
+                            input_idx = np.random.randint(0, len(self.inputs))
+                            new_input = self.inputs[input_idx]
+                            msg_id = self.process_idx
+
+                            self.inflight_msgs[msg_id] = send_time
+
+                            self.request_queue.append((new_input, msg_id, send_time))
+                            self.process_idx += 1
+                            self.update_enqueue_rate(1)
+                        else:
+                            time_cut = time_since_dequeue - accounted_delay
+                            self.arrival_process_seconds[self.process_idx] -= time_cut
+                            break
+
+                else:
+                    assert self.process_idx == 0
+                    time.sleep(self.arrival_process_seconds[self.process_idx])
+                    send_time = datetime.now()
+                    
+                    input_idx = np.random.randint(0, len(self.inputs))
+                    new_input = self.inputs[input_idx]
+                    msg_id = self.process_idx
+                    self.inflight_msgs[msg_id] = send_time
+
+                    self.request_queue.append((new_input, msg_id, send_time))
+                    self.process_idx += 1
+                    self.update_enqueue_rate(1)
+
+                    start_time = datetime.now()
+
+
+                after = datetime.now()
+                print((after - before).total_seconds())
+
+                inputs = []
+                msg_ids = []
+                expiration_ids = []
+
+                dequeue_time = datetime.now()
+                num_dequeued = 0
+                while len(inputs) < self.batch_size and len(self.request_queue) > 0:
+                    inp_item, msg_id, send_time = self.request_queue.popleft()
+                    if (dequeue_time - send_time).total_seconds() * 1000 > self.slo_millis:
+                        expiration_ids.append(msg_id)
+                    else:
+                        msg_ids.append(msg_id)
+                        inputs.append(inp_item)
+                        # Only count a query as "dequeued"
+                        # if it has not expired
+                        num_dequeued += 1
+
+                self.update_dequeue_rate(num_dequeued)
+
+                self.last_dequeued_time = datetime.now()
+
+
+                self.inflight_msgs_lock.release()
+                self.queue_lock.release()
+
+                expiration_threadpool.submit(self.expiration_callback, expiration_ids)
 
                 if len(msg_ids) == 0:
                     # We filtered out all incoming requests because they expired. We should
                     # check the queue again
                     continue
-
-                expiration_threadpool.submit(self.expiration_callback, expiration_ids)
 
                 msg_ids = np.array(msg_ids, dtype=np.uint32)
 
@@ -202,13 +280,9 @@ class SPDClient:
                     logger.info("Undefined receive behavior")
                     raise
 
-                callback_threadpool.submit(callback, replica_num, parsed_output_msg_ids)
+                callback_threadpool.submit(self.stats_callback, replica_num, parsed_output_msg_ids)
         except Exception as e:
-            print("ERROR")
-            print(e)
-
-    def _expire_queries(self, expired_msg_ids):
-        pass
+            print("ERROR IN CLIENT: {}".format(e))
 
     def __str__(self):
         return ",".join(self.replica_addrs)
@@ -216,3 +290,12 @@ class SPDClient:
     def __repr__(self):
         return ",".join(self.replica_addrs)
 
+def generate_inputs():
+    inception_inputs = [_get_inception_input() for _ in range(1000)]
+    inception_inputs = [i for _ in range(40) for i in inception_inputs]
+
+    return np.array(inception_inputs, dtype=np.float32)
+
+def _get_inception_input():
+    inception_input = np.array(np.random.rand(299, 299, 3) * 255, dtype=np.float32)
+    return inception_input.flatten()
