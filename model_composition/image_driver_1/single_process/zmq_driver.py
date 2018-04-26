@@ -182,7 +182,7 @@ class StatsManager(object):
 
     def get_mean_thru_for_dequeue(self):
         self.stats_lock.acquire()
-        mean_thru = np.mean(self.stats["thrus"][1:-1])
+        mean_thru = np.mean(self.stats["thrus"][2:-1])
         self.stats_lock.release()
         return mean_thru
 
@@ -313,7 +313,7 @@ class DriverBenchmarker:
             else:
                 break
 
-            if len(stats_manager.stats["thrus"]) < 3:
+            if len(stats_manager.stats["thrus"]) < 4:
                 continue
             
             enqueue_rate = self.spd_client.get_enqueue_rate()
