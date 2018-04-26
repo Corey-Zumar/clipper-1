@@ -292,6 +292,8 @@ class DriverBenchmarker:
 
         logger.info("Starting predictions...")
 
+        diverged = False
+
         last_msg_id = 0
         for i in range(len(arrival_process)):
             idx = np.random.randint(len(inputs))
@@ -316,6 +318,7 @@ class DriverBenchmarker:
                     service_ingest_ratio = self.spd_client.get_dequeue_rate() / enqueue_rate
                     if service_ingest_ratio <= SERVICE_INGEST_RATIO_DIVERGENCE_THRESHOLD: 
                         print(enqueue_rate, self.spd_client.get_dequeue_rate())
+                        diverged = True
                         logger.info("Request queue is diverging! Stopping experiment...")
                         break
 
@@ -335,6 +338,7 @@ class DriverBenchmarker:
                      [stats_manager.get_stats()],
                      results_base_path,
                      experiment_config.slo_millis,
+                     diverged,
                      arrival_process=experiment_config.process_path)
 
         os._exit(0)
@@ -390,11 +394,13 @@ class DriverBenchmarker:
             self.spd_client.predict(batch_inputs, batch_msg_ids, callback)
 
             if len(stats_manager.stats["thrus"]) >= num_trials:
+                diverged = False
                 save_results(self.experiment_config,
                              self.node_configs, 
                              [copy.deepcopy(stats_manager.stats)], 
                              "sm_profile_bs_{}_slo_{}".format(batch_size, self.experiment_config.slo_millis), 
-                             self.experiment_config.slo_millis) 
+                             self.experiment_config.slo_millis,
+                             diverged)
 
                 self.spd_client.stop()
                 break

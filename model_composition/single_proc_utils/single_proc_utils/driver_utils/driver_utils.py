@@ -35,7 +35,7 @@ class HeavyNodeConfig(object):
     def to_json(self):
         return json.dumps(self.__dict__)
 
-def save_results(experiment_config, node_configs, client_metrics, results_dir, slo, process_num=None, arrival_process=None):
+def save_results(experiment_config, node_configs, client_metrics, results_dir, slo, diverged, process_num=None, arrival_process=None):
     """
     Parameters
     ----------
@@ -49,6 +49,7 @@ def save_results(experiment_config, node_configs, client_metrics, results_dir, s
         logger.info("Created experiments directory: %s" % results_dir)
 
     results_obj = {
+        "diverged": diverged,
         "experiment_config": experiment_config.__dict__,
         "node_configs": [c.__dict__ for c in node_configs],
         "client_metrics": client_metrics,
