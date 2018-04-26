@@ -313,7 +313,7 @@ class DriverBenchmarker:
             else:
                 break
 
-            if len(stats_manager.stats["thrus"]) < 4:
+            if len(stats_manager.stats["thrus"]) < 6:
                 continue
             
             enqueue_rate = self.spd_client.get_enqueue_rate()
