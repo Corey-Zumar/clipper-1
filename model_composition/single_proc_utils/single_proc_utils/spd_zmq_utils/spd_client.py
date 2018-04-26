@@ -205,7 +205,6 @@ class SPDClient:
                 expiration_ids = []
 
                 dequeue_time = datetime.now()
-                num_dequeued = 0
                 while len(inputs) < self.batch_size and len(self.request_queue) > 0:
                     inp_item, msg_id, send_time = self.request_queue.popleft()
                     if (dequeue_time - send_time).total_seconds() * 1000 > self.slo_millis:
@@ -215,10 +214,7 @@ class SPDClient:
                         inputs.append(inp_item)
                         # Only count a query as "dequeued"
                         # if it has not expired
-                        num_dequeued += 1
-
-                self.update_dequeue_rate(num_dequeued)
-                print("DEQUEUED ITEM")
+                        self.update_dequeue_rate(num_dequeued)
 
                 self.last_dequeued_time = datetime.now()
 

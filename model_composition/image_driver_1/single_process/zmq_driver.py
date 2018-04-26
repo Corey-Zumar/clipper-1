@@ -180,6 +180,12 @@ class StatsManager(object):
         self.stats_lock = Lock()
         self.start_timestamp = datetime.now()
 
+    def get_mean_thru(self):
+        self.stats_lock.acquire()
+        mean_thru = np.mean(self.stats["thrus"])
+        self.stats_lock.release()
+        return mean_thru
+
     def get_stats(self):
         self.stats_lock.acquire()
         result = copy.deepcopy(self.stats)
@@ -290,6 +296,8 @@ class DriverBenchmarker:
 
         logger.info("Starting predictions...")
 
+        diverged = False
+
         self.spd_client.start(self.experiment_config.batch_size, 
                               self.experiment_config.slo_millis,
                               stats_update_callback,
@@ -300,17 +308,20 @@ class DriverBenchmarker:
 
         while True:
             if len(stats_manager.stats["per_message_lats"]) < .98 * len(arrival_process):
-                time.sleep(2 * QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS)
+                # time.sleep(2 * QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS)
+                time.sleep(QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS + 2)
 
             enqueue_rate = self.spd_client.get_enqueue_rate()
-            dequeue_rate = self.spd_client.get_dequeue_rate()
+            dequeue_rate = stats_manager.get_mean_thru()
 
+            # dequeue_rate = self.spd_client.get_dequeue_rate()
+            #
             print(enqueue_rate, dequeue_rate)
 
             if dequeue_rate == 0 and enqueue_rate > 0:
                 logger.info("ERROR: Dequeue rate is zero, yet enqueue rate is: {}".format(enqueue_rate))
 
-            elif enqueue_rate > 0 and dequeue_rate > 0 and (dequeue_rate / enqueue_rate) <= SERVICE_INGEST_RATIO_DIVERGENCE_THRESHOLD:
+            elif (not diverged) and enqueue_rate > 0 and dequeue_rate > 0 and (dequeue_rate / enqueue_rate) <= SERVICE_INGEST_RATIO_DIVERGENCE_THRESHOLD:
                 diverged = True
                 logger.info("Request queue is diverging! Stopping experiment...")
                 logger.info("Enqueue rate: {}, Dequeue rate: {}".format(enqueue_rate, dequeue_rate))
