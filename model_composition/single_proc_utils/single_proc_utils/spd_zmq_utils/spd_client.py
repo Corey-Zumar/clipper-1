@@ -162,8 +162,6 @@ class SPDClient:
                 self.queue_lock.acquire()
                 self.inflight_msgs_lock.acquire()
 
-                before = datetime.now()
-                
                 if self.last_dequeued_time:
                     curr_time = datetime.now()
                     time_since_dequeue = (curr_time - self.last_dequeued_time).total_seconds()
@@ -201,12 +199,6 @@ class SPDClient:
                     self.request_queue.append((new_input, msg_id, send_time))
                     self.process_idx += 1
                     self.update_enqueue_rate(1)
-
-                    start_time = datetime.now()
-
-
-                after = datetime.now()
-                print((after - before).total_seconds())
 
                 inputs = []
                 msg_ids = []
