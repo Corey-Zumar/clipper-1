@@ -214,7 +214,7 @@ class SPDClient:
                         inputs.append(inp_item)
                         # Only count a query as "dequeued"
                         # if it has not expired
-                        self.update_dequeue_rate(num_dequeued)
+                        self.update_dequeue_rate(1)
 
                 self.last_dequeued_time = datetime.now()
 
