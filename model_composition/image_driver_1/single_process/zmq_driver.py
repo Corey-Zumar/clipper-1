@@ -337,6 +337,8 @@ class DriverBenchmarker:
                      experiment_config.slo_millis,
                      arrival_process=experiment_config.process_path)
 
+        os._exit(0)
+
         self.spd_client.stop()
     
     def run_fixed_batch(self, batch_size):
