@@ -218,6 +218,7 @@ class SPDClient:
                         num_dequeued += 1
 
                 self.update_dequeue_rate(num_dequeued)
+                print("DEQUEUED ITEM")
 
                 self.last_dequeued_time = datetime.now()
 
