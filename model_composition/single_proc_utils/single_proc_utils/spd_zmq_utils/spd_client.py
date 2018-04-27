@@ -170,7 +170,7 @@ class SPDClient:
                         request_delay_seconds = self.arrival_process_seconds[self.process_idx]
                         if accounted_delay + request_delay_seconds < time_since_dequeue:
                             accounted_delay += request_delay_seconds
-                            send_time = curr_time + timedelta(seconds=accounted_delay)
+                            send_time = self.last_dequeued_time + timedelta(seconds=accounted_delay)
                             
                             input_idx = np.random.randint(0, len(self.inputs))
                             new_input = self.inputs[input_idx]
@@ -217,8 +217,7 @@ class SPDClient:
                         self.update_dequeue_rate(1)
 
                 self.last_dequeued_time = datetime.now()
-
-
+                
                 self.inflight_msgs_lock.release()
                 self.queue_lock.release()
 
