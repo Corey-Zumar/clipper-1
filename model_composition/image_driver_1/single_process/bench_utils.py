@@ -18,6 +18,7 @@ def get_mean_throughput(config_path):
     return np.mean(thrus)
 
 def load_relevant_arrival_procs(procs_dir, cv):
+    fnames_dict = {}
     deltas_dict = {}
     if cv == 1:
         fnames = [os.path.join(procs_dir, fname) for fname in os.listdir(procs_dir) if ("deltas" in fname) and "_" not in fname]
@@ -32,8 +33,9 @@ def load_relevant_arrival_procs(procs_dir, cv):
             delta = int(deltas_subname.split(".")[0])
 
         deltas_dict[delta] = load_arrival_deltas(fname)
+        fnames_dict[delta] = fname
 
-    return OrderedDict(sorted(deltas_dict.items()))
+    return OrderedDict(sorted(deltas_dict.items())), fnames_dict
 
 def probe_throughputs(eval_fn, arrival_process):
     curr_min = 0

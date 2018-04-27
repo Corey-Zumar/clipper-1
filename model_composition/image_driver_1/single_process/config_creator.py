@@ -42,7 +42,7 @@ def get_arrival_process_path(procs_dir_path, cv, lambda_val, tagged_num_replicas
 
     return os.path.join(procs_dir_path, fname)
 
-def create_configs_hierarchy(configs_base_dir_path, max_num_replicas, cv):
+def create_configs_hierarchy_no_lambda(configs_base_dir_path, max_num_replicas, cv):
     if not os.path.exists(configs_base_dir_path):
         try: 
             os.makedirs(configs_base_dir_path)
@@ -91,7 +91,44 @@ def create_configs_hierarchy(configs_base_dir_path, max_num_replicas, cv):
         path_outputs[HIERARCHY_KEY_PEAK_PATHS][replica_num] = peak_replica_path
 
     return path_outputs
-            
+
+
+def create_configs_hierarchy_lambda_vals(configs_base_dir_path, lambda_vals, cv):
+    if not os.path.exists(configs_base_dir_path):
+        try: 
+            os.makedirs(configs_base_dir_path)
+        except OSError:
+            print("Failed to create outputs base directory with path: {}".format(configs_base_dir_path))
+            raise
+
+    cv_subpath = "cv_{cv_val}".format(cv_val=cv)
+    cv_path = os.path.join(configs_base_dir_path, cv_subpath)
+
+    mean_path = os.path.join(cv_path, HIERARCHY_SUBDIR_MEAN_PROVISION)
+    peak_path = os.path.join(cv_path, HIERARCHY_SUBDIR_PEAK_PROVISION)
+
+    try:
+        os.makedirs(mean_path)
+    except OSError:
+        print("Failed to create mean provision directory with path: {}".format(mean_path))
+        raise
+
+    try:
+        os.makedirs(peak_path)
+    except OSError:
+        print("Failed to create peak provision directory with path: {}".format(peak_path))
+        raise
+
+    path_outputs = { HIERARCHY_KEY_MEAN_PATHS : {}, HIERARCHY_KEY_PEAK_PATHS : {} }
+
+    for lambda_val in lambda_vals:
+        lambda_subpath = str(lambda_val)
+        mean_lambda_path = os.path.join(mean_path, lambda_subpath)
+        peak_lambda_path = os.path.join(peak_path, lambda_subpath)
+
+        path_outputs[HIERARCHY_KEY_MEAN_PATHS] = mean_lambda_path
+        path_outputs[HIERARCHY_KEY_PEAK_PATHS] = peak_lambda_path
+
 def create_config_json(process_path,
                        replicas_per_machine,
                        gpus_per_replica,
@@ -138,21 +175,21 @@ def create_config_json(process_path,
 
     return config_json
 
-def create_configs(arrival_procs_path, 
-                   profile_path, 
-                   max_num_replicas,
-                   replicas_per_machine,
-                   gpus_per_replica,
-                   pcpus_per_replica,
-                   batch_size,
-                   slo_millis,
-                   cv, 
-                   utilization_factor, 
-                   configs_base_dir,
-                   tag_procs):
+def create_configs_find_lambda(arrival_procs_path, 
+                               profile_path, 
+                               max_num_replicas,
+                               replicas_per_machine,
+                               gpus_per_replica,
+                               pcpus_per_replica,
+                               batch_size,
+                               slo_millis,
+                               cv, 
+                               utilization_factor, 
+                               configs_base_dir,
+                               tag_procs):
 
-    configs_hierarchy = create_configs_hierarchy(configs_base_dir, max_num_replicas, cv)
-    arrival_procs = bench_utils.load_relevant_arrival_procs(arrival_procs_path, cv)
+    configs_hierarchy = create_configs_hierarchy_no_lambda(configs_base_dir, max_num_replicas, cv)
+    arrival_procs, _ = bench_utils.load_relevant_arrival_procs(arrival_procs_path, cv)
 
     mean_profile_thruput = bench_utils.get_mean_throughput(profile_path)
     for num_replicas in xrange(1, max_num_replicas + 1):
@@ -254,9 +291,40 @@ def create_configs(arrival_procs_path,
             i += replicas_per_machine
             j += 1
 
+
+def create_configs_find_min_cost(arrival_procs_path, 
+                                 profile_path, 
+                                 max_num_replicas,
+                                 replicas_per_machine,
+                                 gpus_per_replica,
+                                 pcpus_per_replica,
+                                 batch_size,
+                                 slo_millis,
+                                 lambda_vals,
+                                 cv, 
+                                 utilization_factor, 
+                                 configs_base_dir,
+                                 tag_procs):
+
+    configs_hierarchy = create_configs_hierarchy_lambda_vals(configs_base_dir, lambda_vals, cv)
+
+    mean_profile_thruput = bench_utils.get_mean_throughput(profile_path)
+    target_thruput = num_replicas * mean_profile_thruput * utilization_factor
+
+    arrival_procs, fnames = bench_utils.load_relevant_arrival_procs(arrival_procs_path, cv)
+
+    for lambda_val in lambda_vals:
+        lambda_proc = arrival_procs[lambda_val]
+        lambda_fname = fnames[lambda_val]
+
+        mean_thru = bench_utils.calculate_mean_throughput(lambda_proc)
+        peak_thru = bench_utils.calculate_peak_throughput(lambda_proc)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Create configurations for SPD experiments')
     parser.add_argument('-cv',  '--cv', type=float, help="The CV for which to generate configurations")
+    parser.add_argument('-l', '--lambda_vals', type=int, help="If specified, generate configs by finding the minimum cost configuration to support workloads with mean throughputs specified by each lambda")
+    
     parser.add_argument('-p',  '--arrival_procs_path', type=str, help="The path to the arrival processes directory")
     parser.add_argument('-s',  '--slo_profile_path', type=str, help="The path to a JSON profile for a fixed batch size corresponding to some SLO")
     parser.add_argument('-m', '--max_num_replicas', type=int, help="The maximum number of replicas for which to generate configs. Configs will be generated in the range (1, max]")
@@ -271,7 +339,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    create_configs(arrival_procs_path=args.arrival_procs_path, 
+    if args.lambda_val:
+
+    else:
+        create_configs(arrival_procs_path=args.arrival_procs_path, 
                    profile_path=args.slo_profile_path, 
                    max_num_replicas=args.max_num_replicas,
                    replicas_per_machine=args.replicas_per_machine,
