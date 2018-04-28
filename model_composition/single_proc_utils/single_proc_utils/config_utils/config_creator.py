@@ -463,16 +463,16 @@ if __name__ == "__main__":
 
 
     else:
-        create_configs(arrival_procs_path=args.arrival_procs_path, 
-                       profile_path=args.slo_profile_path, 
-                       max_num_replicas=args.max_num_replicas,
-                       replicas_per_machine=args.replicas_per_machine,
-                       gpus_per_replica=args.gpus_per_replica,
-                       pcpus_per_replica=args.cpus_per_replica,
-                       batch_size=args.batch_size,
-                       slo_millis=args.slo_millis,
-                       cv=args.cv, 
-                       utilization_factor=args.utilization_factor,
-                       configs_base_dir=args.configs_base_dir,
-                       tag_procs=args.tag_procs)
+        create_configs_find_lambda(arrival_procs_path=args.arrival_procs_path, 
+                                   profile_path=args.slo_profile_path, 
+                                   max_num_replicas=args.max_num_replicas,
+                                   replicas_per_machine=args.replicas_per_machine,
+                                   gpus_per_replica=args.gpus_per_replica,
+                                   pcpus_per_replica=args.cpus_per_replica,
+                                   batch_size=args.batch_size,
+                                   slo_millis=args.slo_millis,
+                                   cv=args.cv, 
+                                   utilization_factor=args.utilization_factor,
+                                   configs_base_dir=args.configs_base_dir,
+                                   tag_procs=args.tag_procs)
 
