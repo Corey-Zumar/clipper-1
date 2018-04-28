@@ -1,0 +1,10 @@
+[
+    {
+        "machine_address": "172.33.18.238:9500", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv4.0/mean_provision/lambda_170/170_2_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.33.18.238:9501", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv4.0/mean_provision/lambda_170/170_2_rep_config_m0.json"
+    }
+]

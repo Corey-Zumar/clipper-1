@@ -1,0 +1,34 @@
+[
+    {
+        "machine_address": "172.33.18.238:9500", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv4.0/peak_provision/lambda_840/840_8_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.33.18.238:9501", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv4.0/peak_provision/lambda_840/840_8_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.33.21.238:9500", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv4.0/peak_provision/lambda_840/840_8_rep_config_m1.json"
+    }, 
+    {
+        "machine_address": "172.33.21.238:9501", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv4.0/peak_provision/lambda_840/840_8_rep_config_m1.json"
+    }, 
+    {
+        "machine_address": "172.33.26.33:9500", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv4.0/peak_provision/lambda_840/840_8_rep_config_m2.json"
+    }, 
+    {
+        "machine_address": "172.33.26.33:9501", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv4.0/peak_provision/lambda_840/840_8_rep_config_m2.json"
+    }, 
+    {
+        "machine_address": "172.33.28.121:9500", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv4.0/peak_provision/lambda_840/840_8_rep_config_m3.json"
+    }, 
+    {
+        "machine_address": "172.33.28.121:9501", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv4.0/peak_provision/lambda_840/840_8_rep_config_m3.json"
+    }
+]
