@@ -26,7 +26,7 @@ def load_relevant_arrival_procs(procs_dir, cv):
         fnames = [os.path.join(procs_dir, fname) for fname in os.listdir(procs_dir) if ("deltas" in fname) and str(cv) in fname]
     for fname in fnames:
         print(fname)
-        deltas_subname = fname.split("/")[1]
+        deltas_subname = fname.split("/")[-1]
         if "_" in deltas_subname:
             delta = int(deltas_subname.split("_")[0])
         else:

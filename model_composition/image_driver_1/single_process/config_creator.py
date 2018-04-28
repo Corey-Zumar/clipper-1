@@ -97,7 +97,7 @@ def create_configs_hierarchy_no_lambda(configs_base_dir_path, max_num_replicas, 
     return path_outputs
 
 
-def create_configs_hierarchy_lambda_vals(configs_base_dir_path, lambda_vals, cv):
+def create_configs_hierarchy_lambda_vals(configs_base_dir_path, lambda_vals, cv, slo_millis):
     if not os.path.exists(configs_base_dir_path):
         try: 
             os.makedirs(configs_base_dir_path)
@@ -105,10 +105,14 @@ def create_configs_hierarchy_lambda_vals(configs_base_dir_path, lambda_vals, cv)
             print("Failed to create outputs base directory with path: {}".format(configs_base_dir_path))
             raise
 
+    slo_subpath = "slo_{slo_val}".format(slo_val=slo_millis)
+    slo_path = os.path.join(configs_base_dir_path, slo_subpath)
+
     cv_subpath = "cv_{cv_val}".format(cv_val=cv)
-    cv_path = os.path.join(configs_base_dir_path, cv_subpath)
+    cv_path = os.path.join(slo_path, cv_subpath)
 
     mean_path = os.path.join(cv_path, HIERARCHY_SUBDIR_MEAN_PROVISION)
+    print("MEAN PATH", mean_path)
     peak_path = os.path.join(cv_path, HIERARCHY_SUBDIR_PEAK_PROVISION)
 
     try:
@@ -125,6 +129,7 @@ def create_configs_hierarchy_lambda_vals(configs_base_dir_path, lambda_vals, cv)
 
     path_outputs = { HIERARCHY_KEY_MEAN_PATHS : {}, HIERARCHY_KEY_PEAK_PATHS : {} }
 
+    print(lambda_vals)
     for lambda_val in lambda_vals:
         lambda_subpath = "lambda_{lv}".format(lv=lambda_val)
         mean_lambda_path = os.path.join(mean_path, lambda_subpath)
@@ -352,7 +357,7 @@ def create_configs_find_min_cost(arrival_procs_path,
                                  utilization_factor, 
                                  configs_base_dir):
 
-    configs_hierarchy = create_configs_hierarchy_lambda_vals(configs_base_dir, lambda_vals, cv)
+    configs_hierarchy = create_configs_hierarchy_lambda_vals(configs_base_dir, lambda_vals, cv, slo_millis)
 
     mean_profile_thruput = bench_utils.get_mean_throughput(profile_path)
     one_rep_thruput =  mean_profile_thruput * utilization_factor
@@ -420,6 +425,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Create configurations for SPD experiments')
     parser.add_argument('-cv',  '--cv', type=float, help="The CV for which to generate configurations")
     parser.add_argument('-l', '--lambda_vals', type=int, nargs="+", help="If specified, generate configs by finding the minimum cost configuration to support workloads with mean throughputs specified by each lambda")
+    parser.add_argument('-lp', '--lambdas_path', type=str, help="If specified, a path to an SLO-keyed json file containing lambda values")
     
     parser.add_argument('-p',  '--arrival_procs_path', type=str, help="The path to the arrival processes directory")
     parser.add_argument('-s',  '--slo_profile_path', type=str, help="The path to a JSON profile for a fixed batch size corresponding to some SLO")
@@ -435,7 +441,14 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.lambda_vals:
+    if args.lambda_vals or args.lambdas_path:
+        if args.lambdas_path:
+            slo_key_seconds = str(args.slo_millis * .001)
+            cv_key = str(args.cv)
+            with open(args.lambdas_path, "r") as f:
+                lambdas_json = json.load(f)
+                args.lambda_vals = lambdas_json[slo_key_seconds][cv_key]
+
         create_configs_find_min_cost(arrival_procs_path=args.arrival_procs_path, 
                                      profile_path=args.slo_profile_path,
                                      replicas_per_machine=args.replicas_per_machine,
