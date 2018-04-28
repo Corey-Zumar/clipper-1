@@ -13,15 +13,14 @@ from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor
 from threading import Thread, Lock
 
-from machine_config_tagger import TAGGED_CONFIG_KEY_MACHINE_ADDRESS, TAGGED_CONFIG_KEY_CONFIG_PATH
 from single_proc_utils import HeavyNodeConfig, save_results
-from single_proc_utils.spd_zmq_utils.spd_client import ReplicaAddress, SPDClient, QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS 
+from single_proc_utils.spd_zmq_utils import ReplicaAddress, SPDClient, QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS 
 
-from e2e_utils import load_tagged_arrival_deltas, load_arrival_deltas, calculate_mean_throughput
-
-from config_creator import CONFIG_KEY_BATCH_SIZE, CONFIG_KEY_CPU_AFFINITIES, CONFIG_KEY_GPU_AFFINITIES
-from config_creator import CONFIG_KEY_PROCESS_PATH, CONFIG_KEY_REPLICA_NUMS, CONFIG_KEY_TRIAL_LENGTH
-from config_creator import CONFIG_KEY_NUM_TRIALS, CONFIG_KEY_SLO_MILLIS, CONFIG_KEY_LAMBDA, CONFIG_KEY_CV
+from single_proc_utils.config_utils import load_tagged_arrival_deltas, load_arrival_deltas, calculate_mean_throughput
+from single_proc_utils.config_utils import TAGGED_CONFIG_KEY_MACHINE_ADDRESS, TAGGED_CONFIG_KEY_CONFIG_PATH
+from single_proc_utils.config_utils import CONFIG_KEY_BATCH_SIZE, CONFIG_KEY_CPU_AFFINITIES, CONFIG_KEY_GPU_AFFINITIES
+from single_proc_utils.config_utils import CONFIG_KEY_PROCESS_PATH, CONFIG_KEY_REPLICA_NUMS, CONFIG_KEY_TRIAL_LENGTH
+from single_proc_utils.config_utils import CONFIG_KEY_NUM_TRIALS, CONFIG_KEY_SLO_MILLIS, CONFIG_KEY_LAMBDA, CONFIG_KEY_CV
 
 INCEPTION_FEATS_MODEL_NAME = "inception_feats"
 TF_KERNEL_SVM_MODEL_NAME = "kernel_svm"
