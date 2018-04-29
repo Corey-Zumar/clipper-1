@@ -10,7 +10,8 @@ from threading import Thread, Lock
 from PIL import Image
 
 from single_proc_utils.spd_zmq_utils import SpdFrontend, SpdServer
-from models import res50_model, res152_model, alexnet_model
+from models import cascade_model
+from models.cascade_model import CASCADE_MODEL_ARCHITECTURE_RES50, CASCADE_MODEL_ARCHITECTURE_RES152, CASCADE_MODEL_ARCHITECTURE_ALEXNET
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -26,6 +27,13 @@ RES50_MODEL_NAME = "res50"
 RES152_MODEL_NAME = "res152"
 ALEXNET_MODEL_NAME = "alexnet"
 
+# AlexNet is the first model in the pipeline and is 
+# therefore always queried
+ALEXNET_QUERY_PROBABILITY = 1
+
+RES50_QUERY_PROBABILITY = 1 - (0.192)
+RES152_QUERY_PROBABILITY = 1 - (0.4633)
+
 RESULTS_DIR = "/results"
 
 ONE_DAY_IN_SECONDS = 60 * 60 * 24
@@ -35,18 +43,18 @@ WARMING_UP_DEFAULT_RESPONSE = [-1]
 
 ########## Setup ##########
 def create_res50_model(gpu_num):
-    pass
+    return cascade_model.CascadeModel(CASCADE_MODEL_ARCHITECTURE_RES50, gpu_num)
 
 def create_res152_model(gpu_num):
-    pass
+    return cascade_model.CascadeModel(CASCADE_MODEL_ARCHITECTURE_RES152, gpu_num)
 
 def create_alexnet_model(gpu_num):
-    pass
+    return cascade_model.CascadeModel(CASCADE_MODEL_ARCHITECTURE_ALEXNET, gpu_num)
 
 def load_models(res50_gpu, res152_gpu, alexnet_gpu):
     models_dict = {
-        RES50_MODEL_NAME : create_res50_model(res50_gpu)
-        RES152_MODEL_NAME : create_res152_model(res152_gpu)
+        RES50_MODEL_NAME : create_res50_model(res50_gpu),
+        RES152_MODEL_NAME : create_res152_model(res152_gpu),
         ALEXNET_MODEL_NAME : create_alexnet_model(alexnet_gpu)
     }
 
@@ -61,7 +69,9 @@ def generate_inputs():
     return np.array(cascade_inputs, dtype=np.float32)
 
 def _get_cascade_input():
-    cascade_input = np.array(np.random.rand(224, 224, 3) * 255, dtype=np.float32)
+    # These 299 x 299 x 3 ImageNet inputs will be downscaled
+    # to the appropriate size for AlexNet and ResNet50/152
+    cascade_input = np.array(np.random.rand(299, 299, 3) * 255, dtype=np.float32)
     return cascade_input.flatten()
 
 ########## Frontend Generation ##########
@@ -105,6 +115,13 @@ class CascadeFrontend(SpdFrontend):
         return self._predict(inputs, msg_ids)
 
     def _predict(self, inputs, msg_ids):
+        self.alexnet_model.predict(inputs)
+
+        if np.random.rand() < RES50_QUERY_PROBABILITY:
+            self.res50_model.predict(inputs)
+
+            if np.random.rand() < RES152_QUERY_PROBABILITY:
+                self.res152_model.predict(inputs)
 
         return msg_ids
 
