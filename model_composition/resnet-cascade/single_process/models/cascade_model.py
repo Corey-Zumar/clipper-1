@@ -37,15 +37,12 @@ class CascadeModel(ModelBase):
 
         if torch.cuda.is_available():
             # Place model on the GPU specified by 'gpu_num'
-            print(gpu_num)
-            self.model.cuda(1)
-            print("HERE1")
+            print("Initializing model with architecture: {arc} on GPU: {gn}".format(arc=model_architecture, gn=gpu_num))
+            self.model.cuda(gpu_num)
 
         self.model.eval()
         self.height = 299
         self.width = 299
-
-        print("HERE2")
 
         normalize = transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
