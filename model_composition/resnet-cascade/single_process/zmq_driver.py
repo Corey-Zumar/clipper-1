@@ -146,7 +146,9 @@ def generate_inputs():
     return np.array(cascade_inputs, dtype=np.float32)
 
 def _get_cascade_input():
-    cascade_input = np.array(np.random.rand(224, 224, 3) * 255, dtype=np.float32)
+    # These 299 x 299 x 3 ImageNet inputs will be downscaled
+    # to the appropriate size for AlexNet and ResNet50/152
+    cascade_input = np.array(np.random.rand(299, 299, 3) * 255, dtype=np.float32)
     return cascade_input.flatten()
 
 ########## Benchmarking ##########

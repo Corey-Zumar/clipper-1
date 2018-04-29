@@ -143,11 +143,12 @@ class ID1Frontend(SpdFrontend):
         warmup_inputs = generate_inputs()
 
         logger.info("Running warmup...")
-        for batch_size in [32, 70]:
+        for batch_size in [32, 70, 140]:
             warmup_lats = []
             warmup_batch_sizes = []
             for i in range(1000):
                 bs = max(1, int(batch_size * (1 + np.random.normal(0, .2))))
+                bs = min(bs, 175)
                 batch_idxs = np.random.randint(0, len(warmup_inputs), bs)
                 curr_inputs = warmup_inputs[batch_idxs]
                 msg_ids = range(bs)
