@@ -1,6 +1,7 @@
 import sys
 import os
 import logging
+import torch
 import numpy as np
 
 from torchvision import models, transforms
@@ -35,11 +36,16 @@ class CascadeModel(ModelBase):
             raise Exception("Invalid architecture specified for cascade model: {}".format(model_architecture))
 
         if torch.cuda.is_available():
-            self.model.cuda()
+            # Place model on the GPU specified by 'gpu_num'
+            print(gpu_num)
+            self.model.cuda(1)
+            print("HERE1")
 
         self.model.eval()
         self.height = 299
         self.width = 299
+
+        print("HERE2")
 
         normalize = transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
