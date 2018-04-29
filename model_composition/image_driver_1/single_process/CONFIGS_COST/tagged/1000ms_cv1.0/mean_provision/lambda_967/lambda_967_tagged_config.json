@@ -1,0 +1,26 @@
+[
+    {
+        "machine_address": "172.34.180.129:9500", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv1.0/mean_provision/lambda_967/967_6_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.34.180.129:9501", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv1.0/mean_provision/lambda_967/967_6_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.34.38.246:9500", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv1.0/mean_provision/lambda_967/967_6_rep_config_m1.json"
+    }, 
+    {
+        "machine_address": "172.34.38.246:9501", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv1.0/mean_provision/lambda_967/967_6_rep_config_m1.json"
+    }, 
+    {
+        "machine_address": "172.34.62.21:9500", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv1.0/mean_provision/lambda_967/967_6_rep_config_m2.json"
+    }, 
+    {
+        "machine_address": "172.34.62.21:9501", 
+        "config_path": "CONFIGS_COST/tagged/1000ms_cv1.0/mean_provision/lambda_967/967_6_rep_config_m2.json"
+    }
+]

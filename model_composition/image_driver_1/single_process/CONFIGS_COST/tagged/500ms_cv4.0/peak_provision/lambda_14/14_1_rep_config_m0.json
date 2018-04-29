@@ -1,0 +1,21 @@
+{
+    "process_path": "CONFIGS_COST/untagged/slo_500/cv_4.0/peak_provision/lambda_14/14_4.0.deltas", 
+    "batch_size": 80, 
+    "gpu_affinities": [
+        "0 1"
+    ], 
+    "num_trials": 30, 
+    "cpu_affinities": [
+        "0 1 2 3 16 17 18 19"
+    ], 
+    "trial_length": 70, 
+    "replica_nums": [
+        0
+    ], 
+    "slo_millis": 500, 
+    "cv": 4.0, 
+    "process_mean_thru": 13.946472144582167, 
+    "max_estimated_thru": 150.98971458731117, 
+    "process_peak_thru": 128.0, 
+    "lambda": 14
+}
