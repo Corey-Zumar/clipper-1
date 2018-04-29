@@ -164,7 +164,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Single Process Image Driver 1')
     parser.add_argument('-r50',  '--res50_gpu', type=int, default=0, help="The GPU on which to run the ResNet 50 featurization model")
     parser.add_argument('-r152', '--res152_gpu', type=int, default=1, help="The GPU on which to run the ResNet 152 classification model")
-    parser.add_argument('-a', '--alexnet_gpu', type=int, default=1, help="The GPU on which to run the alexnet classification model")
+    parser.add_argument('-a', '--alexnet_gpu', type=int, default=2, help="The GPU on which to run the alexnet classification model")
     parser.add_argument('-p',  '--port', type=int, help="The port on which to run the grpc server")
     parser.add_argument('-nw', '--no_warmup', action="store_true", help="If true, disables warmup")
 

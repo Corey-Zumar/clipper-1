@@ -26,6 +26,8 @@ class CascadeModel(ModelBase):
     def __init__(self, model_architecture, gpu_num):
         ModelBase.__init__(self)
 
+        self.gpu_num = gpu_num
+
         if model_architecture == CASCADE_MODEL_ARCHITECTURE_RES50:
             self.model = models.resnet50(pretrained=True)
         elif model_architecture == CASCADE_MODEL_ARCHITECTURE_RES152:
@@ -37,8 +39,8 @@ class CascadeModel(ModelBase):
 
         if torch.cuda.is_available():
             # Place model on the GPU specified by 'gpu_num'
-            print("Initializing model with architecture: {arc} on GPU: {gn}".format(arc=model_architecture, gn=gpu_num))
-            self.model.cuda(gpu_num)
+            print("Initializing model with architecture: {arc} on GPU: {gn}".format(arc=model_architecture, gn=self.gpu_num))
+            self.model.cuda(self.gpu_num)
 
         self.model.eval()
         self.height = 299
@@ -72,7 +74,7 @@ class CascadeModel(ModelBase):
             inputs.append(self.preprocess(img))
         input_batch = Variable(torch.stack(inputs, dim=0))
         if torch.cuda.is_available():
-            input_batch = input_batch.cuda()
+            input_batch = input_batch.cuda(self.gpu_num)
         logits = self.model(input_batch)
         maxes, arg_maxes = torch.max(logits, dim=1)
         pred_classes = arg_maxes.squeeze().data.cpu().numpy()
