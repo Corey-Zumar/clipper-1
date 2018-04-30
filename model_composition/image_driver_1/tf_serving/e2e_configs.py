@@ -11,12 +11,15 @@ import tensorflow as tf
 from tf_serving_utils import GRPCClient, ReplicaAddress
 from tf_serving_utils import tfs_utils
 
+from tf_serving_utils.config_utils import CONFIG_KEY_MODEL_NAME, CONFIG_KEY_BATCH_SIZE, CONFIG_KEY_NUM_REPLICAS, CONFIG_KEY_VCPUS_PER_REPLICA 
+from tf_serving_utils.config_utils import CONFIG_KEY_ALLOCATED_GPUS, CONFIG_KEY_ALLOCATED_VCPUS, CONFIG_KEY_ALLOCATED_GPUS, CONFIG_KEY_PORTS 
+
 # Models and applications for each heavy node
 # will share the same name
 INCEPTION_FEATS_MODEL_NAME = "inception"
 RESNET_152_MODEL_NAME = "resnet"
 LOG_REG_MODEL_NAME = "log_reg"
-KERNEL_SVM_MODEL_NAME = "kernel_svm"
+KERNEL_SVM_MODEL_NAME = "ksvm"
 
 CURR_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_BASE_DIR_PATH = os.path.join(CURR_DIR, "exported_tf_models")
@@ -26,22 +29,14 @@ RESNET_152_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "resnet_tfserve")
 LOG_REG_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "log_reg_tfserve")
 KERNEL_SVM_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "kernel_svm_tfserve")
 
-CONFIG_KEY_MODEL_NAME = "model_name"
-CONFIG_KEY_BATCH_SIZE = "batch_size"
-CONFIG_KEY_NUM_REPLICAS = "num_replicas"
-CONFIG_KEY_CPUS_PER_REPLICA = "vcpus_per_replica"
-CONFIG_KEY_ALLOCATED_CPUS = "allocated_vcpus"
-CONFIG_KEY_ALLOCATED_GPUS = "allocated_gpus"
-CONFIG_KEY_PORTS = "ports"
-
-def get_heavy_node_config(model_name, batch_size, num_replicas, ports, allocated_cpus, cpus_per_replica=2, allocated_gpus=[]):
+def get_heavy_node_config(model_name, batch_size, num_replicas, ports, allocated_vcpus, vcpus_per_replica=2, allocated_gpus=[]):
     if model_name == INCEPTION_FEATS_MODEL_NAME:
         return tfs_utils.TFSHeavyNodeConfig(name=INCEPTION_FEATS_MODEL_NAME,
                                             model_base_path=INCEPTION_FEATS_MODEL_BASE_PATH,
                                             ports=ports,
                                             input_type="floats",
-                                            allocated_cpus=allocated_cpus,
-                                            cpus_per_replica=cpus_per_replica,
+                                            allocated_cpus=allocated_vcpus,
+                                            cpus_per_replica=vcpus_per_replica,
                                             num_replicas=num_replicas,
                                             gpus=allocated_gpus,
                                             batch_size=batch_size)
@@ -51,8 +46,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, ports, allocated
                                             model_base_path=LOG_REG_MODEL_BASE_PATH,
                                             ports=ports,
                                             input_type="floats",
-                                            allocated_cpus=allocated_cpus,
-                                            cpus_per_replica=cpus_per_replica,
+                                            allocated_cpus=allocated_vcpus,
+                                            cpus_per_replica=vcpus_per_replica,
                                             num_replicas=num_replicas,
                                             gpus=allocated_gpus,
                                             batch_size=batch_size)
@@ -63,8 +58,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, ports, allocated
                                             model_base_path=RESNET_152_MODEL_BASE_PATH,
                                             ports=ports,
                                             input_type="floats",
-                                            allocated_cpus=allocated_cpus,
-                                            cpus_per_replica=cpus_per_replica,
+                                            allocated_cpus=allocated_vcpus,
+                                            cpus_per_replica=vcpus_per_replica,
                                             num_replicas=num_replicas,
                                             gpus=allocated_gpus,
                                             batch_size=batch_size)
@@ -74,8 +69,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, ports, allocated
                                             model_base_path=KERNEL_SVM_MODEL_BASE_PATH,
                                             ports=ports,
                                             input_type="floats",
-                                            allocated_cpus=allocated_cpus,
-                                            cpus_per_replica=cpus_per_replica,
+                                            allocated_cpus=allocated_vcpus,
+                                            cpus_per_replica=vcpus_per_replica,
                                             num_replicas=num_replicas,
                                             gpus=allocated_gpus,
                                             batch_size=batch_size)
@@ -90,8 +85,8 @@ def load_server_configs(configs_dir_path):
         model_name = config_params[CONFIG_KEY_MODEL_NAME]
         batch_size = config_params[CONFIG_KEY_BATCH_SIZE]
         num_replicas = config_params[CONFIG_KEY_NUM_REPLICAS]
-        cpus_per_replica = config_params[CONFIG_KEY_CPUS_PER_REPLICA]
-        allocated_cpus = config_params[CONFIG_KEY_ALLOCATED_CPUS]
+        vcpus_per_replica = config_params[CONFIG_KEY_VCPUS_PER_REPLICA]
+        allocated_vcpus = config_params[CONFIG_KEY_ALLOCATED_VCPUS]
         allocated_gpus = config_params[CONFIG_KEY_ALLOCATED_GPUS]
         ports = config_params[CONFIG_KEY_PORTS]
 
@@ -99,8 +94,8 @@ def load_server_configs(configs_dir_path):
                                        batch_size=batch_size,
                                        num_replicas=num_replicas,
                                        ports=ports,
-                                       cpus_per_replica=cpus_per_replica,
-                                       allocated_cpus=allocated_cpus,
+                                       vcpus_per_replica=vcpus_per_replica,
+                                       allocated_vcpus=allocated_vcpus,
                                        allocated_gpus=allocated_gpus)
 
         server_configs.append(config)

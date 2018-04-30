@@ -344,7 +344,6 @@ if __name__ == "__main__":
 
     experiment_config = load_experiment_config(args.experiment_config_path)
 
-
     if args.warmup:
         benchmarker = DriverBenchmarker(experiment_config.trial_length, 
                                         queue, 
@@ -378,7 +377,8 @@ if __name__ == "__main__":
         all_configs = model_configs.values()
 
         fname = "{clients}_clients".format(clients=experiment_config.num_clients)
-        tfs_utils.save_results(all_configs, 
+        tfs_utils.save_results(
+                               all_configs, 
                                all_stats, 
                                "tf_image_driver_1_exps", 
                                prefix=fname, 
