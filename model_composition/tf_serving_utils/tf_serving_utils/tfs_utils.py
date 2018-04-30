@@ -113,16 +113,14 @@ class TFSHeavyNodeConfig(object):
     def to_json(self):
         return json.dumps(self.__dict__)
 
-def save_results(configs, client_metrics, results_dir, prefix="results", slo_millis=250, arrival_process=None):
-    """
-    Parameters
-    ----------
-    configs : list(HeavyNodeConfig)
-       The configs for any models deployed
-    arrival_process : str (optional)
-        Path to an arrival process file used to generate experimental request
-        delays
-    """
+def save_results(node_configs, 
+                 client_metrics, 
+                 prefix, 
+                 results_dir, 
+                 slo_millis, 
+                 cv, 
+                 lambda_val, 
+                 arrival_process=None):
 
     results_dir = os.path.abspath(os.path.expanduser(results_dir))
     if not os.path.exists(results_dir):
@@ -130,7 +128,7 @@ def save_results(configs, client_metrics, results_dir, prefix="results", slo_mil
         logger.info("Created experiments directory: %s" % results_dir)
 
     results_obj = {
-        "node_configs": [c.__dict__ for c in configs],
+        "node_configs": [c.__dict__ for c in node_configs],
         "client_metrics": client_metrics,
     }
 
@@ -142,8 +140,9 @@ def save_results(configs, client_metrics, results_dir, prefix="results", slo_mil
 
         results_obj["arrival_process"] = {
             "filename" : arrival_process,
+            "hash" : process_hash,
             "mean_thru" : mean_throughput,
-            "peak_thru" : peak_throughput
+            "peak_thru" : peak_throughput,
         }
 
     results_file = os.path.join(results_dir, "{prefix}-{ts:%y%m%d_%H%M%S}.json".format(

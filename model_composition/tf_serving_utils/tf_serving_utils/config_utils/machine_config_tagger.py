@@ -6,6 +6,9 @@ import argparse
 
 from config_creator import HIERARCHY_SUBDIR_MEAN_PROVISION, HIERARCHY_SUBDIR_PEAK_PROVISION
 
+TAGGED_CONFIG_KEY_TAGGED_MACHINES = "tagged_machines"
+TAGGED_CONFIG_KEY_EXPERIMENT_CONFIG = "experiment_config"
+
 TAGGED_CONFIG_KEY_MACHINE_ADDRESS = "machine_address"
 TAGGED_CONFIG_KEY_CONFIG_PATH = "config_path"
 
@@ -55,10 +58,16 @@ def populate_tagged_configs_directory(machine_addrs, untagged_dir_path, tagged_d
 
         tagged_config = create_tagged_config(machine_addr_dir_mapping)
 
-        tagged_config_subpath = "machine_tagged_config.json"
-        tagged_config_path = os.path.join(output_lambda_subdir_path, tagged_config_subpath)
-        with open(tagged_config_path, "w") as f:
-            json.dump(tagged_config, f, indent=4)
+        experiment_config_path = os.path.join(lambda_subdir_path, [fname for fname in os.listdir(lambda_subdir_path) if "experiment" in fname][0])
+        with open(experiment_config_path, "r") as f:
+            experiment_config_json = json.load(f)
+
+        output_config = { TAGGED_CONFIG_KEY_TAGGED_MACHINES : tagged_config , TAGGED_CONFIG_KEY_EXPERIMENT_CONFIG : experiment_config_json } 
+
+        output_config_subpath = "machine_tagged_config.json"
+        output_config_path = os.path.join(output_lambda_subdir_path, output_config_subpath)
+        with open(output_config_path, "w") as f:
+            json.dump(output_config, f, indent=4)
 
 def tag_configs(machine_addrs, configs_dir, output_dir):
     assert configs_dir != output_dir

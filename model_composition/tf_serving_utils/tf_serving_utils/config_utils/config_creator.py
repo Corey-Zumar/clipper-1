@@ -27,7 +27,6 @@ CONFIG_KEY_SLO_MILLIS = "slo_millis"
 CONFIG_KEY_LAMBDA = "lambda"
 CONFIG_KEY_CV = "cv"
 CONFIG_KEY_PROCESS_PATH = "process_path"
-CONFIG_KEY_PROCESS_HASH = "process_hash"
 
 CONFIG_KEY_RESNET = "resnet"
 CONFIG_KEY_INCEPTION = "inception"
@@ -285,7 +284,6 @@ def populate_configs_directory(hierarchy_path,
         CONFIG_KEY_CV : cv,
         CONFIG_KEY_LAMBDA : lambda_val,
         CONFIG_KEY_PROCESS_PATH : process_path_output
-        # ADD PROCESS HASH CONFIG KEY!!!
     }
 
     for model_key in required_replica_config:

@@ -15,7 +15,18 @@ from multiprocessing import Process, Queue
 from tf_serving_utils import GRPCClient, ReplicaAddress
 from tf_serving_utils import tfs_utils
 
-from e2e_configs import load_client_configs  
+from tf_serving_utils.config_utils import CONFIG_KEY_NUM_TRIALS, CONFIG_KEY_TRIAL_LENGTH, CONFIG_KEY_NUM_CLIENTS, 
+from tf_serving_utils.config_utils import CONFIG_KEY_SLO_MILLIS, CONFIG_KEY_PROCESS_PATH, CONFIG_KEY_PROCESS_HASH
+from tf_serving_utils.config_utils import CONFIG_KEY_CV, CONFIG_KEY_LAMBDA
+
+from tf_serving_utils.config_utils import TAGGED_CONFIG_KEY_TAGGED_MACHINES, TAGGED_CONFIG_KEY_EXPERIMENT_CONFIG
+from tf_serving_utils.config_utils import TAGGED_CONFIG_KEY_MACHINE_ADDRESS, TAGGED_CONFIG_KEY_CONFIG_PATH 
+
+from e2e_configs import load_client_configs, load_server_configs
+
+CONFIG_KEY_CLIENT_CONFIG_PATHS = "client_config_paths"
+CONFIG_KEY_CLIENT_CONFIG_ITEM_PATH = "config_path"
+CONFIG_KEY_CLIENT_CONFIG_HOST = "host"
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -38,15 +49,6 @@ RESNET_FEATS_OUTPUT_KEY = "feats"
 KERNEL_SVM_OUTPUT_KEY = "outputs"
 LOG_REG_OUTPUT_KEY = "outputs"
 
-CONFIG_KEY_CLIENT_CONFIG_PATHS = "client_config_paths"
-CONFIG_KEY_CLIENT_CONFIG_ITEM_PATH = "config_path"
-CONFIG_KEY_CLIENT_CONFIG_HOST = "host"
-
-CONFIG_KEY_NUM_TRIALS = "num_trials"
-CONFIG_KEY_TRIAL_LENGTH = "trial_length"
-CONFIG_KEY_NUM_CLIENTS = "num_clients"
-CONFIG_KEY_SLO_MILLIS = "slo_millis"
-CONFIG_KEY_PROCESS_PATH = "process_path"
 
 ########## Client Setup ##########
 
@@ -59,50 +61,72 @@ class ClientConfig:
 
 class ExperimentConfig:
 
-    def __init__(self, num_trials, trial_length, num_clients, slo_millis, process_path, model_configs):
+    def __init__(self, 
+                 num_trials, 
+                 trial_length, 
+                 num_clients, 
+                 slo_millis,
+                 cv,
+                 lambda_val,
+                 process_path,
+                 node_configs,
+                 client_configs)
         self.num_trials = num_trials
         self.trial_length = trial_length
         self.num_clients = num_clients
         self.slo_millis = slo_millis
+        self.cv = cv
+        self.lambda_val = lambda_val
         self.process_path = process_path
-        self.model_configs = model_configs
+        self.node_configs = node_configs 
+        self.client_configs = client_configs
 
 def load_experiment_config(config_path):
     with open(config_path, "r") as f:
-        experiment_config_params = json.load(f)
+        experiment_config_json = json.load(f)
 
-    client_config_items = experiment_config_params[CONFIG_KEY_CLIENT_CONFIG_PATHS]
+    tagged_machines = experiment_config_json[TAGGED_CONFIG_KEY_TAGGED_MACHINES]
+    experiment_config_params = experiment_config_json[TAGGED_CONFIG_KEY_EXPERIMENT_CONFIG]
 
     num_trials = experiment_config_params[CONFIG_KEY_NUM_TRIALS]
     trial_length = experiment_config_params[CONFIG_KEY_TRIAL_LENGTH]
     num_clients = experiment_config_params[CONFIG_KEY_NUM_CLIENTS]
     slo_millis = experiment_config_params[CONFIG_KEY_SLO_MILLIS]
+    cv = experiment_config_params[CONFIG_KEY_CV]
+    lambda_val = experiment_config_params[CONFIG_KEY_LAMBDA]
     process_path = experiment_config_params[CONFIG_KEY_PROCESS_PATH]
 
-    model_configs = {}
-    for item in client_config_items:
-        config_path = item[CONFIG_KEY_CLIENT_CONFIG_ITEM_PATH]
-        host = item[CONFIG_KEY_CLIENT_CONFIG_HOST]
+    client_model_configs = {}
+    all_node_configs = []
+    for tagged_machine in client_config_items:
+        config_path = tagged_machine[CONFIG_KEY_CLIENT_CONFIG_ITEM_PATH]
+        host = tagged_machine[CONFIG_KEY_CLIENT_CONFIG_HOST]
 
         client_configs = load_client_configs(config_path)
         for config in client_configs:
             model_name, ports = config
             required_replicas = experiment_config_params[model_name]
             
-            if model_name not in model_configs:
-                model_configs[model_name] = []
+            if model_name not in client_model_configs:
+                client_model_configs[model_name] = []
 
-            while len(model_configs[model_name]) < required_replicas and len(ports) > 0:
+            while len(client_model_configs[model_name]) < required_replicas and len(ports) > 0:
                 port = ports.pop(0)
                 new_config = ClientConfig(model_name, host, port)
-                model_configs[model_name].append(new_config)
+                client_model_configs[model_name].append(new_config)
 
-    experiment_config = ExperimentConfig(num_trials, 
-                                         trial_length, 
-                                         num_clients, 
-                                         slo_millis, 
-                                         process_path, 
-                                         model_configs)
+        machine_node_configs = load_server_configs(config_path)
+        all_node_configs.append(machine_node_configs)
+
+    experiment_config = ExperimentConfig(num_trials=num_trials, 
+                                         trial_length=trial_length, 
+                                         num_clients=num_clients, 
+                                         slo_millis=slo_millis,
+                                         cv=cv,
+                                         lambda_val=lambda_val,
+                                         process_path=process_path,
+                                         node_configs=all_node_configs,
+                                         client_configs=client_model_configs)
 
     return experiment_config 
 
@@ -310,7 +334,8 @@ class DriverBenchmarker(object):
 
             time.sleep(request_delay)
 
-        self.queue.put(predictor.stats)
+        if self.queue:
+            self.queue.put(predictor.stats)
 
     def warm_up(self):
         request_delay = .1
@@ -345,9 +370,9 @@ if __name__ == "__main__":
     experiment_config = load_experiment_config(args.experiment_config_path)
 
     if args.warmup:
-        benchmarker = DriverBenchmarker(experiment_config.trial_length, 
-                                        queue, 
-                                        experiment_config.model_configs)
+        benchmarker = DriverBenchmarker(trial_length=experiment_config.trial_length, 
+                                        queue=None, 
+                                        configs=experiment_config.client_configs)
         benchmarker.warm_up()
 
     else:
@@ -361,9 +386,9 @@ if __name__ == "__main__":
             
         procs = []
         for i in range(experiment_config.num_clients):
-            benchmarker = DriverBenchmarker(experiment_config.trial_length, 
-                                            queue, 
-                                            experiment_config.model_configs)
+            benchmarker = DriverBenchmarker(trial_length=experiment_config.trial_length, 
+                                            queue=queue, 
+                                            configs=experiment_config.client_configs)
             p = Process(target=benchmarker.run, args=(experiment_config.num_trials, arrival_process))
             p.start()
             procs.append(p)
@@ -373,15 +398,14 @@ if __name__ == "__main__":
             all_stats.append(queue.get())
 
         # Save Results
-
-        all_configs = model_configs.values()
-
-        fname = "{clients}_clients".format(clients=experiment_config.num_clients)
-        tfs_utils.save_results(
-                               all_configs, 
-                               all_stats, 
-                               "tf_image_driver_1_exps", 
-                               prefix=fname, 
+        results_dir_path = "/".join(experiment_config.process_path.split("/")[:-1])
+        fname = "results_{slo}_slo_bs_1.json".format(slo=experiment_config.slo_millis)
+        tfs_utils.save_results(node_configs=experiment_config.node_configs, 
+                               client_metrics=all_stats,
+                               prefix=fname,
+                               results_dir=results_dir_path,
                                slo_millis=experiment_config.slo_millis, 
-                               arrival_process=experiment_config.process_file)
+                               cv=experiment_config.cv,
+                               lambda_val=experiment_config.lambda_val,
+                               arrival_process=experiment_config.process_path)
         sys.exit(0)
