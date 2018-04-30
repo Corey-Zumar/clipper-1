@@ -1,18 +1,18 @@
 [
     {
-        "machine_address": "172.34.180.129:9500", 
+        "machine_address": "172.34.32.111:9500", 
         "config_path": "CONFIGS_COST/tagged/1000ms_cv1.0/peak_provision/lambda_425/425_4_rep_config_m0.json"
     }, 
     {
-        "machine_address": "172.34.180.129:9501", 
+        "machine_address": "172.34.32.111:9501", 
         "config_path": "CONFIGS_COST/tagged/1000ms_cv1.0/peak_provision/lambda_425/425_4_rep_config_m0.json"
     }, 
     {
-        "machine_address": "172.34.38.246:9500", 
+        "machine_address": "172.34.168.152:9500", 
         "config_path": "CONFIGS_COST/tagged/1000ms_cv1.0/peak_provision/lambda_425/425_4_rep_config_m1.json"
     }, 
     {
-        "machine_address": "172.34.38.246:9501", 
+        "machine_address": "172.34.168.152:9501", 
         "config_path": "CONFIGS_COST/tagged/1000ms_cv1.0/peak_provision/lambda_425/425_4_rep_config_m1.json"
     }
 ]
