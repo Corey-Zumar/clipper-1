@@ -41,7 +41,7 @@ def populate_tagged_configs_directory(machine_addrs, untagged_dir_path, tagged_d
 
         machine_addr_dir_mapping = {}
 
-        if len(machine_subdir_subpaths) < len(machine_addrs):
+        if len(machine_addrs) < len(machine_subdir_subpaths):
             print("Skipping {sdp} due to an inadequate number of machines".format(sdp=lambda_subdir_path))
             continue
 
