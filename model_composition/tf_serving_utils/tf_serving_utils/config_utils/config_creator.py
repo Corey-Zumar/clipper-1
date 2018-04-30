@@ -147,25 +147,35 @@ def create_configs_hierarchy_lambda_vals(configs_base_dir_path, lambda_vals, cv,
 
     return path_outputs
 
-def create_per_model_json_configs(machine_config, pcpus_per_machine):
+def create_per_model_json_configs(machine_config, gpus_per_machine, pcpus_per_machine):
     per_model_configs = {}
 
-    for model_key in machine_configs:
-        num_model_replicas = machine_configs[model_key]
+    available_vcpus_numa_one = range(pcpus_per_machine)
+    available_vcpus_numa_two = [item + pcpus_per_machine for item in range(pcpus_per_machine)]
+    available_gpus = range(gpus_per_machine)
+    for model_key in machine_config:
+        num_model_replicas = machine_config[model_key]
+
+        if num_model_replicas <= 0:
+            continue
+
         allocated_ports = MODEL_PORT_RANGES[model_key][:num_model_replicas]
 
         vcpus_per_replica = PCPUS_PER_REPLICA[model_key] * 2 
         num_allocated_gpus = GPUS_PER_REPLICA[model_key] * num_model_replicas
         num_allocated_pcpus = PCPUS_PER_REPLICA[model_key] * num_model_replicas
 
-        allocated_gpus = range(num_allocated_gpus)
-        numa_node_two_start = pcpus_per_machine / 2
+        allocated_gpus = []
+        for _ in range(num_allocated_gpus):
+            allocated_gpu = available_gpus.pop()
+            allocated_gpus.append(allocated_gpu)
+
         allocated_vcpus = []
         for i in range(num_allocated_pcpus):
-            vcpu_numa_one = i
-            vcpu_numa_two = i + numa_node_two_start
-            alloated_vcpus.append(vcpu_numa_one)
-            alloated_vcpus.append(vcpu_numa_two)
+            allocated_vcpu_numa_one = available_vcpus_numa_one.pop()
+            allocated_vcpu_numa_two = available_vcpus_numa_two.pop()
+            allocated_vcpus.append(allocated_vcpu_numa_one)
+            allocated_vcpus.append(allocated_vcpu_numa_two)
 
         model_json_config = {
             CONFIG_KEY_MODEL_NAME : model_key,
@@ -195,7 +205,7 @@ def populate_configs_directory(hierarchy_path,
     curr_machine_num = 0
     curr_total_replica_config = {}
     curr_machine_replica_config = {}
-    for key in replica_config:
+    for key in required_replica_config:
         curr_total_replica_config[key] = 0
         curr_machine_replica_config[key] = 0
 
@@ -204,47 +214,63 @@ def populate_configs_directory(hierarchy_path,
     while True:
         # Whether or not a new replica was added during the current iteration
         added_new_replica = False 
-        for key in configured_replicas:
-           num_configured_replicas = curr_total_replica_config[key]
-           num_required_replicas = required_replica_config[key]
+        for key in curr_total_replica_config:
+            num_configured_replicas = curr_total_replica_config[key]
+            num_required_replicas, _ = required_replica_config[key]
 
-        if num_required_replicas < num_configured_replicas:
-            required_additional_gpus = GPUS_PER_REPLICA[key]
-            required_additional_pcpus = PCPUS_PER_REPLICA[key]
+            if num_configured_replicas < num_required_replicas:
+                required_additional_gpus = GPUS_PER_REPLICA[key]
+                required_additional_pcpus = PCPUS_PER_REPLICA[key]
 
-            if required_additional_gpus < remaining_machine_gpus and required_additional_pcpus < remaining_machine_pcpus:
-                curr_total_replica_config[key] += 1
-                curr_machine_replica_config[key] += 1
-                    
-                remaining_machine_gpus -= required_additional_gpus
-                remaining_machine_pcpus -= required_additional_pcpus
-                added_new_replica = True
+                if required_additional_gpus <= remaining_machine_gpus and required_additional_pcpus <= remaining_machine_pcpus:
+                    curr_total_replica_config[key] += 1
+                    curr_machine_replica_config[key] += 1
+                        
+                    remaining_machine_gpus -= required_additional_gpus
+                    remaining_machine_pcpus -= required_additional_pcpus
+                    added_new_replica = True
 
         if not added_new_replica:
-            # The fact that we did not add a a replica means that the current machine
-            # cannot support the hardware requirements of any remaining, required
-            # replicas. We should save the current machine configuration and move
+            # The fact that we did not add a a replica means that either:
+            # A) the current machine cannot support the hardware requirements of any 
+            # remaining, required replicas. We should save the current machine configuration and move
             # to the next machine.
+            #
+            # B) We have assigned all specified replicas to available machines
 
             machine_subpath = "machine_{mach_num}".format(mach_num=curr_machine_num)
             machine_path = os.path.join(hierarchy_path, machine_subpath)
             os.mkdir(machine_path)
 
-            model_json_configs = create_per_model_json_configs(curr_machine_replica_config, pcpus_per_machine)
+            model_json_configs = create_per_model_json_configs(curr_machine_replica_config, gpus_per_machine, pcpus_per_machine)
             for model_key, model_json_config in model_json_configs.iteritems():
                 config_subpath = "lambda_{lv}_{mod_name}_server_{mach_num}_config.json".format(lv=lambda_val,
-                                                                                               mod_name=key, 
+                                                                                               mod_name=model_key, 
                                                                                                mach_num=curr_machine_num)
 
                 config_path = os.path.join(machine_path, config_subpath)
                 with open(config_path, "w") as f:
                     json.dump(model_json_config, f, indent=4)
 
+            done = True 
+            for key in curr_total_replica_config:
+                num_configured_replicas = curr_total_replica_config[key]
+                num_required_replicas, _ = required_replica_config[key]
 
-            curr_machine_num += 1
-            curr_machine_replica_config = {}
-            for key in replica_config:
-                curr_machine_replica_config[key] = 0
+                if num_configured_replicas < num_required_replicas:
+                    done = False
+
+            if not done:
+                curr_machine_num += 1
+                curr_machine_replica_config = {}
+                for key in required_replica_config:
+                    curr_machine_replica_config[key] = 0
+
+                remaining_machine_gpus = gpus_per_machine
+                remaining_machine_pcpus = pcpus_per_machine
+
+            else:
+                break
 
     ### CREATE EXPERIMENT CONFIG ###
 
@@ -266,12 +292,13 @@ def populate_configs_directory(hierarchy_path,
         num_replicas, _ = required_replica_config[model_key]
         experiment_config_json[model_key] = num_replicas
 
-    experiment_config_path = "{lv}_experiment_config.json".format(lv=lambda_val)
+    experiment_config_subpath = "{lv}_experiment_config.json".format(lv=lambda_val)
+    experiment_config_path = os.path.join(hierarchy_path, experiment_config_subpath)
     with open(experiment_config_path, "w") as f:
-        json.dump(experiment_config, f)
+        json.dump(experiment_config_json, f)
 
 def parse_profiles(profiles_path):
-    with open(profile_path, "r") as f:
+    with open(profiles_path, "r") as f:
         profile_json = json.load(f)
 
     parsed_thrus = {}
@@ -304,7 +331,7 @@ def find_replica_configuration(parsed_profiles, target_thru):
 
         pipeline_thru = sys.maxint
         for key in replica_configurations:
-            num_replicas, model_replicated_thru = parsed_profiles[key]
+            num_replicas, model_replicated_thru = replica_configurations[key]
             if model_replicated_thru < pipeline_thru:
                 pipeline_thru = model_replicated_thru
                 min_key = key 
@@ -336,8 +363,8 @@ def create_configs_find_min_cost(arrival_procs_path,
         mean_thru = bench_utils.calculate_mean_throughput(lambda_proc)
         peak_thru = bench_utils.calculate_peak_throughput(lambda_proc)
 
-        mean_replica_config = find_replica_configuration(parsed_profiles, mean_thru)
-        peak_replica_config = find_replica_configuration(parsed_profiles, peak_thru)
+        mean_replica_config, mean_pipeline_thru = find_replica_configuration(parsed_profiles, mean_thru)
+        peak_replica_config, peak_pipeline_thru = find_replica_configuration(parsed_profiles, peak_thru)
 
         print("MEAN CONFIG", mean_replica_config)
         print("PEAK CONFIG", peak_replica_config) 
@@ -383,7 +410,6 @@ if __name__ == "__main__":
     
     parser.add_argument('-p',  '--arrival_procs_path', type=str, help="The path to the arrival processes directory")
     parser.add_argument('-s',  '--slo_profiles_path', type=str, help="The path to JSON-formatted profiles for all pipeline models")
-    parser.add_argument('-m', '--max_num_replicas', type=int, help="The maximum number of replicas for which to generate configs. Configs will be generated in the range (1, max]")
     parser.add_argument('-u', '--utilization_factor', type=float, help="The utilization (decay) factor used to scale target thruputs when selecting lambda values") 
     parser.add_argument('-c', '--configs_base_dir', type=str, help="The output base directory to which to write configurations")
     parser.add_argument('-gm', '--gpus_per_machine', type=int, default=4, help="The number of gpus available on search server machine")
@@ -402,7 +428,7 @@ if __name__ == "__main__":
                 args.lambda_vals = lambdas_json[slo_key_seconds][cv_key]
 
     create_configs_find_min_cost(arrival_procs_path=args.arrival_procs_path, 
-                                 profile_path=args.slo_profile_path,
+                                 profiles_path=args.slo_profiles_path,
                                  gpus_per_machine=args.gpus_per_machine,
                                  pcpus_per_machine=args.pcpus_per_machine,
                                  slo_millis=args.slo_millis,
