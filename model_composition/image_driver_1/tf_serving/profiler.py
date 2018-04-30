@@ -166,7 +166,7 @@ if __name__ == "__main__":
     wrapped_stats = { "client_metrics" : [stats] } 
 
     with open(args.output_path, "w") as f:
-        json.dump(wrapped_stats, f)
+        json.dump(wrapped_stats, f, indent=4)
 
     logger.info("Wrote profiler results to: {op}".format(op=args.output_path))
 

@@ -6,7 +6,6 @@ import time
 import base64
 import logging
 import json
-import tensorflow as tf
 
 from threading import Lock
 from datetime import datetime
