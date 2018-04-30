@@ -76,7 +76,7 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, ports, allocated
                                             batch_size=batch_size)
 
 def load_server_configs(configs_dir_path):
-    config_paths = [os.path.join(configs_dir_path, path) for path in os.listdir(configs_dir_path) if ".json" in path]
+    config_paths = [os.path.join(configs_dir_path, path) for path in os.listdir(configs_dir_path) if path.endswith("json")]
     server_configs = []
     for path in config_paths:
         with open(path, "r") as f:
@@ -103,7 +103,7 @@ def load_server_configs(configs_dir_path):
     return server_configs
 
 def load_client_configs(configs_dir_path):
-    config_paths = [os.path.join(configs_dir_path, path) for path in os.listdir(configs_dir_path) if ".json" in path]
+    config_paths = [os.path.join(configs_dir_path, path) for path in os.listdir(configs_dir_path) if path.endswith("json")]
     server_configs = []
     for path in config_paths:
         with open(path, "r") as f:
