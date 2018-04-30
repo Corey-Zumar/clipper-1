@@ -77,7 +77,8 @@ class SPDClient:
             self.replicas[i] = address
             self.threads.append(Thread(target=self._run, args=(i,)))
 
-    def start(self, 
+    def start(self,
+              fixed_batch_size,
               batch_size, 
               slo_millis, 
               stats_callback, 
@@ -92,7 +93,12 @@ class SPDClient:
         self.expiration_callback = expiration_callback
         self.inflight_msgs = inflight_msgs
         self.inflight_msgs_lock = inflight_msgs_lock
-        self.arrival_process_seconds = [item * .001 for item in arrival_process_millis] 
+
+        if fixed_batch_size:
+            # Send 50000 queries at a rate of 1000 qps
+            self.arrival_process_seconds = [.001 for _ in range(50000)]
+        else:
+            self.arrival_process_seconds = [item * .001 for item in arrival_process_millis] 
         self.active = True
 
         self.request_queue = deque()

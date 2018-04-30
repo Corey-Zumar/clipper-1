@@ -255,7 +255,7 @@ class DriverBenchmarker:
         self.experiment_config = experiment_config
         self.spd_client = self._create_client(experiment_config.machine_addrs)
     
-    def run_config(self):
+    def run(self, fixed_batch_size=None):
         def stats_update_callback(replica_num, msg_ids):
             try:
                 end_time = datetime.now()
@@ -297,7 +297,13 @@ class DriverBenchmarker:
 
         diverged = False
 
-        self.spd_client.start(self.experiment_config.batch_size, 
+        if fixed_batch_size:
+            batch_size = fixed_batch_size
+        else:
+            batch_size = experiment_config.batch_size
+
+        self.spd_client.start((fixed_batch_size is not None),
+                              batch_size, 
                               self.experiment_config.slo_millis,
                               stats_update_callback,
                               expiration_callback,
@@ -345,67 +351,6 @@ class DriverBenchmarker:
 
         self.spd_client.stop()
     
-    def run_fixed_batch(self, batch_size):
-        profiling_slo_millis = sys.maxint 
-
-        self.spd_client.start(batch_size, profiling_slo_millis, lambda msg_ids : None)
-        
-        num_trials = 30
-        trial_length = batch_size * 10
-       
-        logger.info("Generating inputs...")
-        inputs = generate_inputs()
-
-        stats_manager = StatsManager(trial_length)
-
-        inflight_ids_lock = Lock()
-        inflight_ids = {}
-
-        def callback(replica_num, msg_ids):
-            try:
-                end_time = datetime.now()
-                inflight_ids_lock.acquire()
-                completed_msgs = []
-                for msg_id in msg_ids:
-                    send_time = inflight_ids[msg_id]
-                    completed_msgs.append((msg_id, send_time))
-                    del inflight_ids[msg_id]
-                inflight_ids_lock.release()
-
-                stats_manager.update_stats(completed_msgs, end_time)
-            except Exception as e:
-                print(e)
-
-        logger.info("Starting predictions...")
-
-        last_msg_id = 0
-        while True:
-            idx_begin = np.random.randint(len(inputs) - batch_size)
-            batch_inputs = inputs[idx_begin : idx_begin + batch_size] 
-            batch_msg_ids = np.array(range(last_msg_id, last_msg_id + batch_size), dtype=np.uint32)
-            last_msg_id = batch_msg_ids[0] + batch_size
-            
-            inflight_ids_lock.acquire()
-            send_time = datetime.now()
-            for msg_id in batch_msg_ids:
-                inflight_ids[msg_id] = send_time
-            inflight_ids_lock.release()
-
-            self.spd_client.predict(batch_inputs, batch_msg_ids, callback)
-
-            if len(stats_manager.stats["thrus"]) >= num_trials:
-                diverged = False
-                save_results(self.experiment_config,
-                             self.node_configs, 
-                             [copy.deepcopy(stats_manager.stats)], 
-                             "sm_profile_bs_{}_slo_{}".format(batch_size, self.experiment_config.slo_millis), 
-                             self.experiment_config.slo_millis,
-                             diverged)
-
-                self.spd_client.stop()
-                break
-
-
     def _create_client(self, machine_addrs):
         replica_addrs = []
         for machine_addr in machine_addrs:
@@ -426,7 +371,4 @@ if __name__ == "__main__":
     experiment_config, node_configs = parse_configs(args.tagged_config_path)
     benchmarker = DriverBenchmarker(node_configs, experiment_config)
 
-    if args.fixed_batch_size:
-        benchmarker.run_fixed_batch(args.fixed_batch_size)
-    else:
-        benchmarker.run_config()
+    benchmarker.run(args.fixed_batch_size)

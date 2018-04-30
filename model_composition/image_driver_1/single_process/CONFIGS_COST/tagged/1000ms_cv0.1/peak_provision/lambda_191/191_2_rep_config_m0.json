@@ -1,6 +1,6 @@
 {
     "process_path": "CONFIGS_COST/untagged/slo_1000/cv_0.1/peak_provision/lambda_191/191_0.1.deltas", 
-    "batch_size": 175, 
+    "batch_size": 160, 
     "gpu_affinities": [
         "0 1", 
         "2 3"
@@ -18,7 +18,7 @@
     "slo_millis": 1000, 
     "cv": 0.1, 
     "process_mean_thru": 191.16001060150933, 
-    "max_estimated_thru": 332.6570490568222, 
+    "max_estimated_thru": 344.6379590826408, 
     "process_peak_thru": 228.0, 
     "lambda": 191
 }
