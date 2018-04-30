@@ -123,8 +123,6 @@ class ID1Frontend(SpdFrontend):
 
         self._predict_parallel(resnet_inputs, inception_inputs)
 
-        after2 = datetime.now()
-
         return msg_ids
 
     def _predict_parallel(self, resnet_inputs, inception_inputs):
@@ -148,7 +146,7 @@ class ID1Frontend(SpdFrontend):
             warmup_batch_sizes = []
             for i in range(1000):
                 bs = max(1, int(batch_size * (1 + np.random.normal(0, .2))))
-                bs = min(bs, 175)
+                bs = min(bs, 160)
                 batch_idxs = np.random.randint(0, len(warmup_inputs), bs)
                 curr_inputs = warmup_inputs[batch_idxs]
                 msg_ids = range(bs)
