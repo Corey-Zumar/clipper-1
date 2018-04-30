@@ -131,7 +131,8 @@ class Profiler(object):
             if len(predictor.stats["thrus"]) >= num_trials:
                 break
 
-            time.sleep(PROFILING_REQUEST_DELAY_SECONDS)
+            # time.sleep(PROFILING_REQUEST_DELAY_SECONDS)
+            time.sleep(.0001)
 
         return predictor.stats
 
@@ -144,11 +145,11 @@ def get_inception_input():
     return inception_input
 
 def get_ksvm_input():
-    ksvm_input = np.array(2048, dtype=np.float32)
+    ksvm_input = np.array(np.random.rand(2048), dtype=np.float32)
     return ksvm_input 
 
 def get_log_reg_input():
-    log_reg_input = np.array(2048, dtype=np.float32)
+    log_reg_input = np.array(np.random.rand(2048), dtype=np.float32)
     return log_reg_input 
 
 if __name__ == "__main__":
