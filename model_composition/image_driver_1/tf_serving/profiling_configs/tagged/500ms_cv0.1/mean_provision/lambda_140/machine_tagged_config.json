@@ -1,0 +1,21 @@
+{
+    "tagged_machines": [
+        {
+            "machine_address": "localhost", 
+            "config_path": "OUT/tagged/500ms_cv0.1/mean_provision/lambda_140/machine_0"
+        }
+    ], 
+    "experiment_config": {
+        "process_path": "OUT/tagged/500ms_cv0.1/mean_provision/lambda_140/140_0.1.deltas", 
+        "ksvm": 2, 
+        "resnet": 15, 
+        "log_reg": 2, 
+        "slo_millis": 500, 
+        "num_trials": 30, 
+        "trial_length": 700, 
+        "inception": 5, 
+        "cv": 0.1, 
+        "num_clients": 1, 
+        "lambda": 140
+    }
+}

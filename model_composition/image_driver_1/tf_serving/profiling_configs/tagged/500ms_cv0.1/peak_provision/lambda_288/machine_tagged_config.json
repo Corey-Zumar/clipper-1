@@ -1,0 +1,61 @@
+{
+    "tagged_machines": [
+        {
+            "machine_address": "localhost11", 
+            "config_path": "OUT/tagged/500ms_cv0.1/peak_provision/lambda_288/machine_10"
+        }, 
+        {
+            "machine_address": "localhost10", 
+            "config_path": "OUT/tagged/500ms_cv0.1/peak_provision/lambda_288/machine_9"
+        }, 
+        {
+            "machine_address": "localhost9", 
+            "config_path": "OUT/tagged/500ms_cv0.1/peak_provision/lambda_288/machine_8"
+        }, 
+        {
+            "machine_address": "localhost8", 
+            "config_path": "OUT/tagged/500ms_cv0.1/peak_provision/lambda_288/machine_7"
+        }, 
+        {
+            "machine_address": "localhost7", 
+            "config_path": "OUT/tagged/500ms_cv0.1/peak_provision/lambda_288/machine_6"
+        }, 
+        {
+            "machine_address": "localhost6", 
+            "config_path": "OUT/tagged/500ms_cv0.1/peak_provision/lambda_288/machine_5"
+        }, 
+        {
+            "machine_address": "localhost5", 
+            "config_path": "OUT/tagged/500ms_cv0.1/peak_provision/lambda_288/machine_4"
+        }, 
+        {
+            "machine_address": "localhost4", 
+            "config_path": "OUT/tagged/500ms_cv0.1/peak_provision/lambda_288/machine_3"
+        }, 
+        {
+            "machine_address": "localhost3", 
+            "config_path": "OUT/tagged/500ms_cv0.1/peak_provision/lambda_288/machine_2"
+        }, 
+        {
+            "machine_address": "localhost2", 
+            "config_path": "OUT/tagged/500ms_cv0.1/peak_provision/lambda_288/machine_1"
+        }, 
+        {
+            "machine_address": "localhost1", 
+            "config_path": "OUT/tagged/500ms_cv0.1/peak_provision/lambda_288/machine_0"
+        }
+    ], 
+    "experiment_config": {
+        "process_path": "OUT/tagged/500ms_cv0.1/peak_provision/lambda_288/288_0.1.deltas", 
+        "ksvm": 4, 
+        "resnet": 33, 
+        "log_reg": 3, 
+        "slo_millis": 500, 
+        "num_trials": 30, 
+        "trial_length": 1440, 
+        "inception": 11, 
+        "cv": 0.1, 
+        "num_clients": 1, 
+        "lambda": 288
+    }
+}
