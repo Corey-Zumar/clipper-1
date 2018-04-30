@@ -32,7 +32,7 @@ LOG_REG_MODEL_NAME = CONFIG_KEY_LOG_REG
 KERNEL_SVM_MODEL_NAME = CONFIG_KEY_KSVM
 
 PROFILING_NUM_TRIALS = 20
-PROFILING_REQUEST_DELAY_SECONDS = .001
+PROFILING_REQUEST_DELAY_SECONDS = .0001
 
 def create_client(host_name, port):
     replica_addr = ReplicaAddress(host_name, port)
@@ -126,13 +126,10 @@ class Profiler(object):
             input_data = inputs[i]
             predictor.predict(input_data)
 
-            # print(len(predictor.stats["thrus"]), num_trials)
-
             if len(predictor.stats["thrus"]) >= num_trials:
                 break
 
-            # time.sleep(PROFILING_REQUEST_DELAY_SECONDS)
-            time.sleep(.0001)
+            time.sleep(PROFILING_REQUEST_DELAY_SECONDS)
 
         return predictor.stats
 
