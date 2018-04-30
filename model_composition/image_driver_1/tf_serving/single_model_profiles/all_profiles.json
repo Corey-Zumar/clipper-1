@@ -1,0 +1,6 @@
+{
+    "resnet" : "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/mock_profiles/resnet_profile.json",  
+    "inception" : "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/mock_profiles/inception_profile.json",
+    "ksvm" : "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/mock_profiles/ksvm_profile.json",
+    "log_reg" : "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/mock_profiles/log_reg_profile.json"
+}

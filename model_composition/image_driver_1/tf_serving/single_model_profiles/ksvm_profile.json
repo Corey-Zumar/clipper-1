@@ -1,0 +1,62 @@
+{
+    "client_metrics": [
+        {
+            "thrus": [
+                90.0,
+                90.0,
+                90.0,
+                90.0,
+                90.0,
+                90.0,
+                90.0,
+                90.0
+            ]
+        }
+    ], 
+    "node_configs": [
+        {
+            "input_type": "floats", 
+            "batch_size": 60, 
+            "num_replicas": 1, 
+            "allocated_cpus": [
+                "m0:0 m0:1 m0:2 m0:3 m0:16 m0:17 m0:18 m0:19"
+            ], 
+            "gpus": [
+                "m0:0 m0:1"
+            ], 
+            "model_name": "tf_resnet_feats"
+        }, 
+        {
+            "input_type": "floats", 
+            "batch_size": 60, 
+            "num_replicas": 1, 
+            "allocated_cpus": [
+                "m0:0 m0:1 m0:2 m0:3 m0:16 m0:17 m0:18 m0:19"
+            ], 
+            "gpus": [
+                "m0:0 m0:1"
+            ], 
+            "model_name": "inception_feats"
+        }, 
+        {
+            "input_type": "floats", 
+            "batch_size": 60, 
+            "num_replicas": 1, 
+            "allocated_cpus": [
+                "m0:0 m0:1 m0:2 m0:3 m0:16 m0:17 m0:18 m0:19"
+            ], 
+            "gpus": [], 
+            "model_name": "kernel_svm"
+        }, 
+        {
+            "input_type": "floats", 
+            "batch_size": 60, 
+            "num_replicas": 1, 
+            "allocated_cpus": [
+                "m0:0 m0:1 m0:2 m0:3 m0:16 m0:17 m0:18 m0:19"
+            ], 
+            "gpus": [], 
+            "model_name": "tf_log_reg"
+        }
+    ]
+}
