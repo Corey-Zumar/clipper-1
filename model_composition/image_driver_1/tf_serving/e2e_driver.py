@@ -81,7 +81,14 @@ def load_experiment_config(config_path):
     with open(config_path, "r") as f:
         experiment_config_json = json.load(f)
 
-    tagged_machines = experiment_config_json[TAGGED_CONFIG_KEY_TAGGED_MACHINES]
+    # Temporary hack
+    nodes_path = "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/CONFIGS_COST/tagged/1000ms_cv1.0/peak_provision/lambda_425/machine_tagged_config.json"
+    with open(nodes_path, "r") as f:
+        nodes_json = json.load(f)
+
+    tagged_machines = nodes_json[TAGGED_CONFIG_KEY_TAGGED_MACHINES]
+    
+    # tagged_machines = experiment_config_json[TAGGED_CONFIG_KEY_TAGGED_MACHINES]
     experiment_config_params = experiment_config_json[TAGGED_CONFIG_KEY_EXPERIMENT_CONFIG]
 
     num_trials = experiment_config_params[CONFIG_KEY_NUM_TRIALS]
@@ -137,7 +144,6 @@ def create_clients(configs):
     clients = {}
     for key in configs:
         replica_addrs = [ReplicaAddress(client_config.host, int(client_config.port)) for client_config in configs[key]]
-        print(key, replica_addrs)
         client = GRPCClient(replica_addrs)
         client.start()
         clients[key] = client
