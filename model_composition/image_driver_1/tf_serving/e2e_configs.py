@@ -29,8 +29,8 @@ KERNEL_SVM_MODEL_BASE_PATH = os.path.join(MODEL_BASE_DIR_PATH, "kernel_svm_tfser
 CONFIG_KEY_MODEL_NAME = "model_name"
 CONFIG_KEY_BATCH_SIZE = "batch_size"
 CONFIG_KEY_NUM_REPLICAS = "num_replicas"
-CONFIG_KEY_CPUS_PER_REPLICA = "cpus_per_replica"
-CONFIG_KEY_ALLOCATED_CPUS = "allocated_cpus"
+CONFIG_KEY_CPUS_PER_REPLICA = "vcpus_per_replica"
+CONFIG_KEY_ALLOCATED_CPUS = "allocated_vcpus"
 CONFIG_KEY_ALLOCATED_GPUS = "allocated_gpus"
 CONFIG_KEY_PORTS = "ports"
 

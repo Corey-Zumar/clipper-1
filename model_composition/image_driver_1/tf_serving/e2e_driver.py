@@ -110,7 +110,6 @@ def create_clients(configs):
     """
     Parameters
     ------------
-    configs : [ClientConfig]
     configs : dict
         Dictionary of ClientConfig objects,
         keyed on model names

@@ -10,19 +10,68 @@ import e2e_utils
 
 import numpy as np
 
+FIXED_MIN_LAT_BATCH_SIZE = 1
+FIXED_NUM_CLIENTS = 1
+
+CONFIG_KEY_MODEL_NAME = "model_name"
 CONFIG_KEY_BATCH_SIZE = "batch_size"
-CONFIG_KEY_CPU_AFFINITIES = "cpu_affinities"
-CONFIG_KEY_GPU_AFFINITIES = "gpu_affinities"
-CONFIG_KEY_PROCESS_PATH = "process_path"
-CONFIG_KEY_REPLICA_NUMS = "replica_nums"
-CONFIG_KEY_TRIAL_LENGTH = "trial_length"
+CONFIG_KEY_NUM_REPLICAS = "num_replicas"
+CONFIG_KEY_VCPUS_PER_REPLICA = "vcpus_per_replica"
+CONFIG_KEY_ALLOCATED_VCPUS = "allocated_vcpus"
+CONFIG_KEY_ALLOCATED_GPUS = "allocated_gpus"
+CONFIG_KEY_PORTS = "ports"
+
 CONFIG_KEY_NUM_TRIALS = "num_trials"
+CONFIG_KEY_TRIAL_LENGTH = "trial_length"
+CONFIG_KEY_NUM_CLIENTS = "num_clients"
 CONFIG_KEY_SLO_MILLIS = "slo_millis"
 CONFIG_KEY_LAMBDA = "lambda"
 CONFIG_KEY_CV = "cv"
-CONFIG_KEY_MAX_ESTIMATED_THRU = "max_estimated_thru"
-CONFIG_KEY_PEAK_THRU = "process_peak_thru"
-CONFIG_KEY_MEAN_THRU = "process_mean_thru"
+CONFIG_KEY_PROCESS_PATH = "process_path"
+CONFIG_KEY_PROCESS_HASH = "process_hash"
+
+CONFIG_KEY_RESNET = "resnet"
+CONFIG_KEY_INCEPTION = "inception"
+CONFIG_KEY_KSVM = "ksvm"
+CONFIG_KEY_LOG_REG = "log_reg"
+
+PROFILE_KEY_RESNET = CONFIG_KEY_RESNET
+PROFILE_KEY_INCEPTION = CONFIG_KEY_INCEPTION
+PROFILE_KEY_KSVM = CONFIG_KEY_KSVM
+PROFILE_KEY_LOG_REG = CONFIG_KEY_LOG_REG
+
+PROFILE_KEYS = [
+    PROFILE_KEY_RESNET,
+    PROFILE_KEY_INCEPTION,
+    PROFILE_KEY_KSVM,
+    PROFILE_KEY_LOG_REG
+]
+
+GPUS_PER_REPLICA = {
+    PROFILE_KEY_RESNET : 1,
+    PROFILE_KEY_INCEPTION : 1,
+    PROFILE_KEY_KSVM : 0,
+    PROFILE_KEY_LOG_REG : 0
+}
+
+PCPUS_PER_REPLICA = {
+    PROFILE_KEY_RESNET : 1,
+    PROFILE_KEY_INCEPTION : 1,
+    PROFILE_KEY_KSVM : 1,
+    PROFILE_KEY_LOG_REG : 1
+}
+
+RESNET_PORT_RANGE = range(9500,9508)
+INCEPTION_PORT_RANGE = range(9508, 9516)
+KSVM_PORT_RANGE = range(9516, 9524)
+LOG_REG_PORT_RANGE = range(9524, 9532)
+
+MODEL_PORT_RANGES = {
+    PROFILE_KEY_RESNET : RESNET_PORT_RANGE,
+    PROFILE_KEY_INCEPTION : INCEPTION_PORT_RANGE,
+    PROFILE_KEY_KSVM : KSVM_PORT_RANGE,
+    PROFILE_KEY_LOG_REG : LOG_REG_PORT_RANGE
+}
 
 HIERARCHY_KEY_MEAN_PATHS = "mean"
 HIERARCHY_KEY_PEAK_PATHS = "peak"
@@ -46,57 +95,6 @@ def get_arrival_process_path(procs_dir_path, cv, lambda_val, tagged_num_replicas
 
     return os.path.join(procs_dir_path, fname)
 
-def create_configs_hierarchy_no_lambda(configs_base_dir_path, max_num_replicas, cv):
-    if not os.path.exists(configs_base_dir_path):
-        try: 
-            os.makedirs(configs_base_dir_path)
-        except OSError:
-            print("Failed to create outputs base directory with path: {}".format(configs_base_dir_path))
-            raise
-
-    cv_subpath = "cv_{cv_val}".format(cv_val=cv)
-    cv_path = os.path.join(configs_base_dir_path, cv_subpath)
-
-    mean_path = os.path.join(cv_path, HIERARCHY_SUBDIR_MEAN_PROVISION)
-    peak_path = os.path.join(cv_path, HIERARCHY_SUBDIR_PEAK_PROVISION)
-
-    try:
-        os.makedirs(mean_path)
-    except OSError:
-        print("Failed to create mean provision directory with path: {}".format(mean_path))
-        raise
-
-    try:
-        os.makedirs(peak_path)
-    except OSError:
-        print("Failed to create peak provision directory with path: {}".format(peak_path))
-        raise
-
-    path_outputs = { HIERARCHY_KEY_MEAN_PATHS : {}, HIERARCHY_KEY_PEAK_PATHS : {} }
-
-    for replica_num in range(1, max_num_replicas + 1):
-        replica_subpath = "{rn}_rep".format(rn=replica_num)
-        mean_replica_path = os.path.join(mean_path, replica_subpath)
-        peak_replica_path = os.path.join(peak_path, replica_subpath)
-
-        try:
-            os.mkdir(mean_replica_path)
-        except OSError:
-            print("Failed to create mean provision replica directory with path: {}".format(mean_replica_path))
-            raise
-
-        try:
-            os.mkdir(peak_replica_path)
-        except OSError:
-            print("Failed to create peak provision replica directory with path: {}".format(peak_replica_path))
-            raise
-
-        path_outputs[HIERARCHY_KEY_MEAN_PATHS][replica_num] = mean_replica_path
-        path_outputs[HIERARCHY_KEY_PEAK_PATHS][replica_num] = peak_replica_path
-
-    return path_outputs
-
-
 def create_configs_hierarchy_lambda_vals(configs_base_dir_path, lambda_vals, cv, slo_millis):
     if not os.path.exists(configs_base_dir_path):
         try: 
@@ -112,7 +110,6 @@ def create_configs_hierarchy_lambda_vals(configs_base_dir_path, lambda_vals, cv,
     cv_path = os.path.join(slo_path, cv_subpath)
 
     mean_path = os.path.join(cv_path, HIERARCHY_SUBDIR_MEAN_PROVISION)
-    print("MEAN PATH", mean_path)
     peak_path = os.path.join(cv_path, HIERARCHY_SUBDIR_PEAK_PROVISION)
 
     try:
@@ -129,7 +126,6 @@ def create_configs_hierarchy_lambda_vals(configs_base_dir_path, lambda_vals, cv,
 
     path_outputs = { HIERARCHY_KEY_MEAN_PATHS : {}, HIERARCHY_KEY_PEAK_PATHS : {} }
 
-    print(lambda_vals)
     for lambda_val in lambda_vals:
         lambda_subpath = "lambda_{lv}".format(lv=lambda_val)
         mean_lambda_path = os.path.join(mean_path, lambda_subpath)
@@ -151,6 +147,40 @@ def create_configs_hierarchy_lambda_vals(configs_base_dir_path, lambda_vals, cv,
         path_outputs[HIERARCHY_KEY_PEAK_PATHS][lambda_val] = peak_lambda_path
 
     return path_outputs
+
+def create_per_model_json_configs(machine_config, pcpus_per_machine):
+    per_model_configs = {}
+
+    for model_key in machine_configs:
+        num_model_replicas = machine_configs[model_key]
+        allocated_ports = MODEL_PORT_RANGES[model_key][:num_model_replicas]
+
+        vcpus_per_replica = PCPUS_PER_REPLICA[model_key] * 2 
+        num_allocated_gpus = GPUS_PER_REPLICA[model_key] * num_model_replicas
+        num_allocated_pcpus = PCPUS_PER_REPLICA[model_key] * num_model_replicas
+
+        allocated_gpus = range(num_allocated_gpus)
+        numa_node_two_start = pcpus_per_machine / 2
+        allocated_vcpus = []
+        for i in range(num_allocated_pcpus):
+            vcpu_numa_one = i
+            vcpu_numa_two = i + numa_node_two_start
+            alloated_vcpus.append(vcpu_numa_one)
+            alloated_vcpus.append(vcpu_numa_two)
+
+        model_json_config = {
+            CONFIG_KEY_MODEL_NAME : model_key,
+            CONFIG_KEY_BATCH_SIZE : FIXED_MIN_LAT_BATCH_SIZE,
+            CONFIG_KEY_NUM_REPLICAS : num_model_replicas,
+            CONFIG_KEY_VCPUS_PER_REPLICA : 2,
+            CONFIG_KEY_ALLOCATED_GPUS : allocated_gpus,
+            CONFIG_KEY_ALLOCATED_VCPUS : allocated_vcpus,
+            CONFIG_KEY_PORTS: allocated_ports
+        }
+
+        per_model_configs[model_key] = model_json_config
+
+    return per_model_configs
 
 def create_config_json(process_path,
                        replicas_per_machine,
@@ -206,151 +236,138 @@ def create_config_json(process_path,
 
 def populate_configs_directory(hierarchy_path,
                                process_path_output,
-                               num_replicas,
-                               replicas_per_machine,
-                               gpus_per_replica, 
-                               pcpus_per_replica, 
+                               required_replica_config,
+                               gpus_per_machine,
+                               pcpus_per_machine,
                                lambda_val,
                                cv,
-                               peak_thru,
-                               mean_thru,
-                               max_estimated_thru,
-                               slo_millis, 
-                               batch_size):
-    i = 0
-    j = 0
-    while i < num_replicas:
-        replica_nums = range(i, min(num_replicas, i + replicas_per_machine))
-        config_json = create_config_json(process_path_output,
-                                         replicas_per_machine,
-                                         gpus_per_replica, 
-                                         pcpus_per_replica, 
-                                         replica_nums, 
-                                         batch_size,
-                                         lambda_val,
-                                         cv,
-                                         peak_thru,
-                                         mean_thru,
-                                         max_estimated_thru,
-                                         slo_millis)
+                               slo_millis):
 
-        config_subpath = "{lv}_{nr}_rep_config_{tag}.json".format(lv=lambda_val,
-                                                                  nr=num_replicas,
-                                                                  tag="m{}".format(j))
+    ### CREATE MACHINE CONFIGS ###
 
-        config_path = os.path.join(hierarchy_path, config_subpath) 
+    curr_machine_num = 0
+    curr_total_replica_config = {}
+    curr_machine_replica_config = {}
+    for key in replica_config:
+        curr_total_replica_config[key] = 0
+        curr_machine_replica_config[key] = 0
 
-        with open(config_path, "w") as f:
-            json.dump(config_json, f, indent=4)
+    remaining_machine_gpus = gpus_per_machine
+    remaining_machine_pcpus = pcpus_per_machine
+    while True:
+        # Whether or not a new replica was added during the current iteration
+        added_new_replica = False 
+        for key in configured_replicas:
+           num_configured_replicas = curr_total_replica_config[key]
+           num_required_replicas = required_replica_config[key]
 
-        i += replicas_per_machine
-        j += 1
+        if num_required_replicas < num_configured_replicas:
+            required_additional_gpus = GPUS_PER_REPLICA[key]
+            required_additional_pcpus = PCPUS_PER_REPLICA[key]
 
-def create_configs_find_lambda(arrival_procs_path, 
-                               profile_path, 
-                               max_num_replicas,
-                               replicas_per_machine,
-                               gpus_per_replica,
-                               pcpus_per_replica,
-                               batch_size,
-                               slo_millis,
-                               cv, 
-                               utilization_factor, 
-                               configs_base_dir,
-                               tag_procs):
+            if required_additional_gpus < remaining_machine_gpus and required_additional_pcpus < remaining_machine_pcpus:
+                curr_total_replica_config[key] += 1
+                curr_machine_replica_config[key] += 1
+                    
+                remaining_machine_gpus -= required_additional_gpus
+                remaining_machine_pcpus -= required_additional_pcpus
+                added_new_replica = True
 
-    configs_hierarchy = create_configs_hierarchy_no_lambda(configs_base_dir, max_num_replicas, cv)
-    arrival_procs, _ = bench_utils.load_relevant_arrival_procs(arrival_procs_path, cv)
+        if not added_new_replica:
+            # The fact that we did not add a a replica means that the current machine
+            # cannot support the hardware requirements of any remaining, required
+            # replicas. We should save the current machine configuration and move
+            # to the next machine.
 
-    mean_profile_thruput = bench_utils.get_mean_throughput(profile_path)
-    for num_replicas in xrange(1, max_num_replicas + 1):
-        target_thruput = num_replicas * mean_profile_thruput * utilization_factor
-        target_thrus = [target_thruput]
+            machine_subpath = "machine_{mach_num}".format(mach_num=curr_machine_num)
+            machine_path = os.path.join(hierarchy_path, machine_subpath)
+            os.mkdir(machine_path)
 
-        peak_lambda, peak_thru = bench_utils.find_peak_arrival_proc(arrival_procs, target_thrus, slo_millis)[target_thruput]
-        mean_lambda, mean_thru = bench_utils.find_mean_arrival_proc(arrival_procs, target_thrus)[target_thruput] 
+            model_json_configs = create_per_model_json_configs(curr_machine_replica_config, pcpus_per_machine)
+            for model_key, model_json_config in model_json_configs.iteritems():
+                config_subpath = "lambda_{lv}_{mod_name}_server_{mach_num}_config.json".format(lv=lambda_val,
+                                                                                               mod_name=key, 
+                                                                                               mach_num=curr_machine_num)
 
-        peak_lambda = int(peak_lambda)
-        mean_lambda = int(mean_lambda)
-
-        mean_process_path = get_arrival_process_path(arrival_procs_path, 
-                                                     cv=cv, 
-                                                     lambda_val=mean_lambda, 
-                                                     tagged_num_replicas=None)
-
-        peak_process_path = get_arrival_process_path(arrival_procs_path, 
-                                                     cv=cv, 
-                                                     lambda_val=peak_lambda, 
-                                                     tagged_num_replicas=None)
-
-        
-        hierarchy_mean_path = configs_hierarchy[HIERARCHY_KEY_MEAN_PATHS][num_replicas] 
-        hierarchy_peak_path = configs_hierarchy[HIERARCHY_KEY_PEAK_PATHS][num_replicas] 
-
-        if tag_procs:
-            mean_process_path_output = get_arrival_process_path(hierarchy_mean_path, 
-                                                                cv=cv, 
-                                                                lambda_val=mean_lambda, 
-                                                                tagged_num_replicas=num_replicas)
+                config_path = os.path.join(machine_path, config_subpath)
+                with open(config_path, "w") as f:
+                    json.dump(model_json_config, f, indent=4)
 
 
-            peak_process_path_output = get_arrival_process_path(hierarchy_peak_path,                                                            cv=cv, 
-                                                                lambda_val=peak_lambda, 
-                                                                tagged_num_replicas=num_replicas)
+            curr_machine_num += 1
+            curr_machine_replica_config = {}
+            for key in replica_config:
+                curr_machine_replica_config[key] = 0
 
-            e2e_utils.tag_arrival_process(mean_process_path, mean_process_path_output, num_replicas) 
-            e2e_utils.tag_arrival_process(peak_process_path, peak_process_path_output, num_replicas)
+    ### CREATE EXPERIMENT CONFIG ###
 
-        else:
-            mean_process_path_output = get_arrival_process_path(hierarchy_mean_path, 
-                                                                  cv=cv, 
-                                                                  lambda_val=mean_lambda, 
-                                                                  tagged_num_replicas=None)
+    num_trials = CONFIG_NUM_TRIALS
+    trial_length = max(30, lambda_val * 5)
+    
+    experiment_config_json = {
+        CONFIG_KEY_NUM_TRIALS : num_trials,
+        CONFIG_KEY_TRIAL_LENGTH : trial_length,
+        CONFIG_KEY_NUM_CLIENTS : FIXED_NUM_CLIENTS,
+        CONFIG_KEY_SLO_MILLIS : slo_millis,
+        CONFIG_KEY_CV : cv,
+        CONFIG_KEY_LAMBDA : lambda_val,
+        CONFIG_KEY_PROCESS_PATH : process_path_output
+        # ADD PROCESS HASH CONFIG KEY!!!
+    }
 
+    for model_key in required_replica_config:
+        num_replicas, _ = required_replica_config[model_key]
+        experiment_config_json[model_key] = num_replicas
 
-            peak_process_path_output = get_arrival_process_path(hierarchy_peak_path,                                                            
-                                                                  cv=cv, 
-                                                                  lambda_val=peak_lambda, 
-                                                                  tagged_num_replicas=None)
+    experiment_config_path = "{lv}_experiment_config.json".format(lv=lambda_val)
+    with open(experiment_config_path, "w") as f:
+        json.dump(experiment_config, f)
 
+def parse_profiles(profiles_path):
+    with open(profile_path, "r") as f:
+        profile_json = json.load(f)
 
-        shutil.copyfile(mean_process_path, mean_process_path_output) 
-        shutil.copyfile(peak_process_path, peak_process_path_output)
+    parsed_thrus = {}
 
-        populate_configs_directory(hierarchy_mean_path,
-                                   mean_process_path_output, 
-                                   num_replicas,
-                                   replicas_per_machine,
-                                   gpus_per_replica,
-                                   pcpus_per_replica,
-                                   mean_lambda,
-                                   cv,
-                                   peak_thru,
-                                   mean_thru,
-                                   target_thru,
-                                   slo_millis,
-                                   batch_size)
+    for profile_key in PROFILE_KEYS:
+        profile_path = profile_json[profile_key]
+        mean_thru = bench_utils.get_mean_throughput(profile_path)
+        parsed_thrus[profile_key] = mean_thru
 
-        populate_configs_directory(hierarchy_peak_path,
-                                   peak_process_path_output, 
-                                   num_replicas,
-                                   replicas_per_machine,
-                                   gpus_per_replica,
-                                   pcpus_per_replica,
-                                   peak_lambda,
-                                   cv,
-                                   peak_thru,
-                                   mean_thru,
-                                   target_thru,
-                                   slo_millis,
-                                   batch_size)
+    return parsed_thrus
+
+def find_replica_configuration(parsed_profiles, target_thru):
+    replica_configurations = {}
+    pipeline_thru = sys.maxint
+    min_key = None
+    for key in parsed_profiles:
+        model_mean_thru = parsed_profiles[key]
+        if model_mean_thru < pipeline_thru:
+            min_key = key
+            pipeline_thru = model_mean_thru
+
+        replica_configurations[key] = (1, model_mean_thru)
+
+    while pipeline_thru < target_thru:
+        num_replicas, model_replicated_thru = replica_configurations[min_key]
+        model_mean_thru = parsed_profiles[min_key]
+        new_num_replicas = num_replicas + 1
+        new_model_replicated_thru = model_replicated_thru + model_mean_thru
+        replica_configurations[min_key] = (new_num_replicas, new_model_replicated_thru)
+
+        pipeline_thru = sys.maxint
+        for key in replica_configurations:
+            num_replicas, model_replicated_thru = parsed_profiles[key]
+            if model_replicated_thru < pipeline_thru:
+                pipeline_thru = model_replicated_thru
+                min_key = key 
+
+    return replica_configurations, pipeline_thru
 
 def create_configs_find_min_cost(arrival_procs_path, 
-                                 profile_path, 
-                                 replicas_per_machine,
-                                 gpus_per_replica,
-                                 pcpus_per_replica,
-                                 batch_size,
+                                 profiles_path,
+                                 gpus_per_machine,
+                                 pcpus_per_machine,
                                  slo_millis,
                                  lambda_vals,
                                  cv, 
@@ -358,11 +375,9 @@ def create_configs_find_min_cost(arrival_procs_path,
                                  configs_base_dir):
 
     configs_hierarchy = create_configs_hierarchy_lambda_vals(configs_base_dir, lambda_vals, cv, slo_millis)
-
-    mean_profile_thruput = bench_utils.get_mean_throughput(profile_path)
-    one_rep_thruput =  mean_profile_thruput * utilization_factor
-
     arrival_procs, fpaths = bench_utils.load_relevant_arrival_procs(arrival_procs_path, cv)
+
+    parsed_profiles = parse_profiles(profiles_path)
 
     for lambda_val in lambda_vals:
         hierarchy_mean_path = configs_hierarchy[HIERARCHY_KEY_MEAN_PATHS][lambda_val] 
@@ -374,8 +389,11 @@ def create_configs_find_min_cost(arrival_procs_path,
         mean_thru = bench_utils.calculate_mean_throughput(lambda_proc)
         peak_thru = bench_utils.calculate_peak_throughput(lambda_proc)
 
-        num_mean_replicas = int(math.ceil(float(mean_thru) / one_rep_thruput))
-        num_peak_replicas = int(math.ceil(float(peak_thru) / one_rep_thruput))
+        mean_replica_config = find_replica_configuration(parsed_profiles, mean_thru)
+        peak_replica_config = find_replica_configuration(parsed_profiles, peak_thru)
+
+        print("MEAN CONFIG", mean_replica_config)
+        print("PEAK CONFIG", peak_replica_config) 
 
         mean_process_path_output = get_arrival_process_path(hierarchy_mean_path, 
                                                             cv=cv, 
@@ -393,32 +411,22 @@ def create_configs_find_min_cost(arrival_procs_path,
         shutil.copyfile(lambda_fpath, peak_process_path_output)
 
         populate_configs_directory(hierarchy_mean_path,
-                                   mean_process_path_output, 
-                                   num_mean_replicas,
-                                   replicas_per_machine,
-                                   gpus_per_replica,
-                                   pcpus_per_replica,
+                                   mean_process_path_output,
+                                   mean_replica_config,
+                                   gpus_per_machine,
+                                   pcpus_per_machine,
                                    lambda_val,
                                    cv,
-                                   peak_thru,
-                                   mean_thru,
-                                   one_rep_thruput * num_mean_replicas,
-                                   slo_millis,
-                                   batch_size)
+                                   slo_millis)
 
         populate_configs_directory(hierarchy_peak_path,
-                                   peak_process_path_output, 
-                                   num_peak_replicas,
-                                   replicas_per_machine,
-                                   gpus_per_replica,
-                                   pcpus_per_replica,
+                                   peak_process_path_output,
+                                   peak_replica_config,
+                                   gpus_per_machine,
+                                   pcpus_per_machine,
                                    lambda_val,
                                    cv,
-                                   peak_thru,
-                                   mean_thru,
-                                   one_rep_thruput * num_peak_replicas,
-                                   slo_millis,
-                                   batch_size)
+                                   slo_millis)
 
 
 if __name__ == "__main__":
@@ -428,15 +436,13 @@ if __name__ == "__main__":
     parser.add_argument('-lp', '--lambdas_path', type=str, help="If specified, a path to an SLO-keyed json file containing lambda values")
     
     parser.add_argument('-p',  '--arrival_procs_path', type=str, help="The path to the arrival processes directory")
-    parser.add_argument('-s',  '--slo_profile_path', type=str, help="The path to a JSON profile for a fixed batch size corresponding to some SLO")
+    parser.add_argument('-s',  '--slo_profiles_path', type=str, help="The path to JSON-formatted profiles for all pipeline models")
     parser.add_argument('-m', '--max_num_replicas', type=int, help="The maximum number of replicas for which to generate configs. Configs will be generated in the range (1, max]")
     parser.add_argument('-u', '--utilization_factor', type=float, help="The utilization (decay) factor used to scale target thruputs when selecting lambda values") 
     parser.add_argument('-c', '--configs_base_dir', type=str, help="The output base directory to which to write configurations")
-    parser.add_argument('-r', '--replicas_per_machine', type=int, default=1, help="The number of replicas of SPD that can be launched per machine")
-    parser.add_argument('-b', '--batch_size', type=int, help="The batch size that will be used when running experiments")
+    parser.add_argument('-gm', '--gpus_per_machine', type=int, default=4, help="The number of gpus available on search server machine")
+    parser.add_argument('-pcm', '--pcpus_per_machine', type=int, default=16, help="The number of cpus available on each server machine")
     parser.add_argument('-sm', '--slo_millis', type=int, help="The latency SLO, in milliseconds, that will be recorded when running experiments")
-    parser.add_argument('-gr', '--gpus_per_replica', type=int, default=2, help="The number of GPUs required to run a single replica of SPD")
-    parser.add_argument('-cr', '--cpus_per_replica', type=int, default=4, help="The number of PHYSICAL CPUs required to run a single replica of SPD")
     parser.add_argument('-t', '--tag_procs', action="store_true", help="If specified, tags arrival processes in accordance with replica configurations")
 
     args = parser.parse_args()
@@ -449,30 +455,12 @@ if __name__ == "__main__":
                 lambdas_json = json.load(f)
                 args.lambda_vals = lambdas_json[slo_key_seconds][cv_key]
 
-        create_configs_find_min_cost(arrival_procs_path=args.arrival_procs_path, 
-                                     profile_path=args.slo_profile_path,
-                                     replicas_per_machine=args.replicas_per_machine,
-                                     gpus_per_replica=args.gpus_per_replica,
-                                     pcpus_per_replica=args.cpus_per_replica,
-                                     batch_size=args.batch_size,
-                                     slo_millis=args.slo_millis,
-                                     lambda_vals=args.lambda_vals,
-                                     cv=args.cv,
-                                     utilization_factor=args.utilization_factor,
-                                     configs_base_dir=args.configs_base_dir)
-
-
-    else:
-        create_configs_find_lambda(arrival_procs_path=args.arrival_procs_path, 
-                                   profile_path=args.slo_profile_path, 
-                                   max_num_replicas=args.max_num_replicas,
-                                   replicas_per_machine=args.replicas_per_machine,
-                                   gpus_per_replica=args.gpus_per_replica,
-                                   pcpus_per_replica=args.cpus_per_replica,
-                                   batch_size=args.batch_size,
-                                   slo_millis=args.slo_millis,
-                                   cv=args.cv, 
-                                   utilization_factor=args.utilization_factor,
-                                   configs_base_dir=args.configs_base_dir,
-                                   tag_procs=args.tag_procs)
-
+    create_configs_find_min_cost(arrival_procs_path=args.arrival_procs_path, 
+                                 profile_path=args.slo_profile_path,
+                                 gpus_per_machine=args.gpus_per_machine,
+                                 pcpus_per_machine=args.pcpus_per_machine,
+                                 slo_millis=args.slo_millis,
+                                 lambda_vals=args.lambda_vals,
+                                 cv=args.cv,
+                                 utilization_factor=args.utilization_factor,
+                                 configs_base_dir=args.configs_base_dir)
