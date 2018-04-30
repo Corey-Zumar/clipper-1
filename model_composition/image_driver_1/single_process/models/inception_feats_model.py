@@ -7,7 +7,7 @@ import single_proc_utils
 
 from single_proc_utils import ModelBase
 
-GPU_MEM_FRAC = .95
+GPU_MEM_FRAC = 1.0
 
 class InceptionFeaturizationModel(ModelBase):
 

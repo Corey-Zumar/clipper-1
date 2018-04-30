@@ -11,7 +11,7 @@ CHECKPOINT_RELATIVE_PATH = "tf_resnet_152_feats.ckpt"
 
 class TfResNetModel(ModelBase):
 
-    def __init__(self, model_data_path, gpu_num, gpu_mem_frac=.95):
+    def __init__(self, model_data_path, gpu_num, gpu_mem_frac=1.0):
         ModelBase.__init__(self)
 
         graph_path = os.path.join(model_data_path, GRAPH_RELATIVE_PATH)
