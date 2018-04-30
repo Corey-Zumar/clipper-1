@@ -34,15 +34,19 @@ def create_tagged_config(machine_addr_dir_mapping):
 
 def populate_tagged_configs_directory(machine_addrs, untagged_dir_path, tagged_dir_path):
     for lambda_subdir in os.listdir(untagged_dir_path):
-        output_lambda_subdir_path = os.path.join(tagged_dir_path, lambda_subdir)
-        os.mkdir(output_lambda_subdir_path)
-
         lambda_subdir_path = os.path.join(untagged_dir_path, lambda_subdir)
 
         machine_subdir_subpaths = sorted([dirname for dirname in os.listdir(lambda_subdir_path) if "machine" in dirname], cmp=machine_dir_comparator, reverse=True)
         machine_subdir_paths = [os.path.join(lambda_subdir_path, dirname) for dirname in machine_subdir_subpaths] 
 
         machine_addr_dir_mapping = {}
+
+        if len(machine_subdir_subpaths) < len(machine_addrs):
+            print("Skipping {sdp} due to an inadequate number of machines".format(sdp=lambda_subdir_path))
+            continue
+
+        output_lambda_subdir_path = os.path.join(tagged_dir_path, lambda_subdir)
+        os.mkdir(output_lambda_subdir_path)
 
         for idx in range(len(machine_subdir_subpaths)):
             machine_subdir_output_path = os.path.join(output_lambda_subdir_path, machine_subdir_subpaths[idx])
