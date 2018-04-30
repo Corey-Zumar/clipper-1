@@ -5,12 +5,10 @@ import shutil
 import argparse
 
 from config_creator import HIERARCHY_SUBDIR_MEAN_PROVISION, HIERARCHY_SUBDIR_PEAK_PROVISION
-from config_creator import CONFIG_KEY_REPLICA_NUMS
+# from config_creator import CONFIG_KEY_REPLICA_NUMS
 
 TAGGED_CONFIG_KEY_MACHINE_ADDRESS = "machine_address"
 TAGGED_CONFIG_KEY_CONFIG_PATH = "config_path"
-
-from config_creator import CONFIG_KEY_REPLICA_NUMS
 
 def create_tagged_config(machine_addrs, config_paths, machines_per_config):
     tagged_config = []

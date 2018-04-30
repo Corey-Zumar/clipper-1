@@ -7,7 +7,6 @@ import math
 
 import bench_utils
 import e2e_utils
-
 import numpy as np
 
 FIXED_MIN_LAT_BATCH_SIZE = 1
@@ -181,58 +180,6 @@ def create_per_model_json_configs(machine_config, pcpus_per_machine):
         per_model_configs[model_key] = model_json_config
 
     return per_model_configs
-
-def create_config_json(process_path,
-                       replicas_per_machine,
-                       gpus_per_replica,
-                       pcpus_per_replica,
-                       replica_nums,
-                       batch_size,
-                       lambda_val,
-                       cv,
-                       peak_thru,
-                       mean_thru,
-                       max_estimated_thru,
-                       slo_millis):
-
-    """
-    replica_num : [int]
-        The ZERO-INDEXED replica numbers for which to create a json config
-    """
-
-    trial_length = max(30, lambda_val * 5)
-    num_trials = CONFIG_NUM_TRIALS
-
-    config_json = {
-        CONFIG_KEY_BATCH_SIZE : batch_size,
-        CONFIG_KEY_PROCESS_PATH : process_path,
-        CONFIG_KEY_REPLICA_NUMS : replica_nums,
-        CONFIG_KEY_TRIAL_LENGTH : trial_length,
-        CONFIG_KEY_NUM_TRIALS : CONFIG_NUM_TRIALS,
-        CONFIG_KEY_SLO_MILLIS : slo_millis,
-        CONFIG_KEY_GPU_AFFINITIES : [],
-        CONFIG_KEY_CPU_AFFINITIES : [],
-        CONFIG_KEY_LAMBDA : lambda_val,
-        CONFIG_KEY_CV : cv,
-        CONFIG_KEY_PEAK_THRU : peak_thru,
-        CONFIG_KEY_MEAN_THRU : mean_thru,
-        CONFIG_KEY_MAX_ESTIMATED_THRU : max_estimated_thru
-    }
-
-    for replica_num in replica_nums:
-        machine_replica_num = replica_num % replicas_per_machine
-
-        gpu_affinities = range(machine_replica_num * gpus_per_replica, (machine_replica_num + 1) * gpus_per_replica)
-        cpu_affinities = range(machine_replica_num * pcpus_per_replica, (machine_replica_num + 1) * pcpus_per_replica)
-        cpu_affinities = cpu_affinities + [16 + item for item in cpu_affinities]
-
-        gpu_affinities_str = " ".join([str(aff_item) for aff_item in gpu_affinities])
-        cpu_affinities_str = " ".join([str(aff_item) for aff_item in cpu_affinities])
-
-        config_json[CONFIG_KEY_GPU_AFFINITIES].append(gpu_affinities_str)
-        config_json[CONFIG_KEY_CPU_AFFINITIES].append(cpu_affinities_str)
-
-    return config_json
 
 def populate_configs_directory(hierarchy_path,
                                process_path_output,
@@ -427,7 +374,6 @@ def create_configs_find_min_cost(arrival_procs_path,
                                    lambda_val,
                                    cv,
                                    slo_millis)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Create configurations for SPD experiments')
