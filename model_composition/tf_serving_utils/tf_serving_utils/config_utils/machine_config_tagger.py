@@ -5,6 +5,7 @@ import shutil
 import argparse
 
 from config_creator import HIERARCHY_SUBDIR_MEAN_PROVISION, HIERARCHY_SUBDIR_PEAK_PROVISION
+from config_creator import CONFIG_KEY_PROCESS_PATH 
 
 TAGGED_CONFIG_KEY_TAGGED_MACHINES = "tagged_machines"
 TAGGED_CONFIG_KEY_EXPERIMENT_CONFIG = "experiment_config"
@@ -61,6 +62,12 @@ def populate_tagged_configs_directory(machine_addrs, untagged_dir_path, tagged_d
         experiment_config_path = os.path.join(lambda_subdir_path, [fname for fname in os.listdir(lambda_subdir_path) if "experiment" in fname][0])
         with open(experiment_config_path, "r") as f:
             experiment_config_json = json.load(f)
+
+        deltas_subpath = [fname for fname in os.listdir(lambda_subdir_path) if "deltas" in fname][0]
+        deltas_path = os.path.join(lambda_subdir_path, deltas_subpath)
+        deltas_output_path = os.path.join(output_lambda_subdir_path, deltas_subpath)
+        shutil.copy2(deltas_path, deltas_output_path)
+        experiment_config_json[CONFIG_KEY_PROCESS_PATH] = deltas_output_path
 
         output_config = { TAGGED_CONFIG_KEY_TAGGED_MACHINES : tagged_config , TAGGED_CONFIG_KEY_EXPERIMENT_CONFIG : experiment_config_json } 
 

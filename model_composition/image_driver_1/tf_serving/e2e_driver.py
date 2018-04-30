@@ -15,18 +15,15 @@ from multiprocessing import Process, Queue
 from tf_serving_utils import GRPCClient, ReplicaAddress
 from tf_serving_utils import tfs_utils
 
-from tf_serving_utils.config_utils import CONFIG_KEY_NUM_TRIALS, CONFIG_KEY_TRIAL_LENGTH, CONFIG_KEY_NUM_CLIENTS, 
-from tf_serving_utils.config_utils import CONFIG_KEY_SLO_MILLIS, CONFIG_KEY_PROCESS_PATH, CONFIG_KEY_PROCESS_HASH
+from tf_serving_utils.config_utils import CONFIG_KEY_NUM_TRIALS, CONFIG_KEY_TRIAL_LENGTH, CONFIG_KEY_NUM_CLIENTS
+from tf_serving_utils.config_utils import CONFIG_KEY_SLO_MILLIS, CONFIG_KEY_PROCESS_PATH 
 from tf_serving_utils.config_utils import CONFIG_KEY_CV, CONFIG_KEY_LAMBDA
+from tf_serving_utils.config_utils import CONFIG_KEY_RESNET, CONFIG_KEY_INCEPTION, CONFIG_KEY_KSVM, CONFIG_KEY_LOG_REG
 
 from tf_serving_utils.config_utils import TAGGED_CONFIG_KEY_TAGGED_MACHINES, TAGGED_CONFIG_KEY_EXPERIMENT_CONFIG
 from tf_serving_utils.config_utils import TAGGED_CONFIG_KEY_MACHINE_ADDRESS, TAGGED_CONFIG_KEY_CONFIG_PATH 
 
 from e2e_configs import load_client_configs, load_server_configs
-
-CONFIG_KEY_CLIENT_CONFIG_PATHS = "client_config_paths"
-CONFIG_KEY_CLIENT_CONFIG_ITEM_PATH = "config_path"
-CONFIG_KEY_CLIENT_CONFIG_HOST = "host"
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -37,10 +34,10 @@ logger = logging.getLogger(__name__)
 
 # Models and applications for each heavy node
 # will share the same name
-INCEPTION_FEATS_MODEL_NAME = "inception"
-RESNET_152_MODEL_NAME = "resnet"
-LOG_REG_MODEL_NAME = "log_reg"
-KERNEL_SVM_MODEL_NAME = "kernel_svm"
+INCEPTION_FEATS_MODEL_NAME = CONFIG_KEY_INCEPTION
+RESNET_152_MODEL_NAME = CONFIG_KEY_RESNET
+LOG_REG_MODEL_NAME = CONFIG_KEY_LOG_REG
+KERNEL_SVM_MODEL_NAME = CONFIG_KEY_KSVM
 
 CURR_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -70,7 +67,7 @@ class ExperimentConfig:
                  lambda_val,
                  process_path,
                  node_configs,
-                 client_configs)
+                 client_configs):
         self.num_trials = num_trials
         self.trial_length = trial_length
         self.num_clients = num_clients
@@ -98,9 +95,9 @@ def load_experiment_config(config_path):
 
     client_model_configs = {}
     all_node_configs = []
-    for tagged_machine in client_config_items:
-        config_path = tagged_machine[CONFIG_KEY_CLIENT_CONFIG_ITEM_PATH]
-        host = tagged_machine[CONFIG_KEY_CLIENT_CONFIG_HOST]
+    for tagged_machine in tagged_machines:
+        config_path = tagged_machine[TAGGED_CONFIG_KEY_CONFIG_PATH]
+        host = tagged_machine[TAGGED_CONFIG_KEY_MACHINE_ADDRESS]
 
         client_configs = load_client_configs(config_path)
         for config in client_configs:
