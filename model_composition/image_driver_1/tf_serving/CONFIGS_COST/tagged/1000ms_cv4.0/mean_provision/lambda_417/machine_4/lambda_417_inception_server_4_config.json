@@ -1,0 +1,20 @@
+{
+    "vcpus_per_replica": 2, 
+    "batch_size": 1, 
+    "ports": [
+        9508, 
+        9509
+    ], 
+    "num_replicas": 2, 
+    "allocated_gpus": [
+        3, 
+        2
+    ], 
+    "allocated_vcpus": [
+        15, 
+        31, 
+        14, 
+        30
+    ], 
+    "model_name": "inception"
+}

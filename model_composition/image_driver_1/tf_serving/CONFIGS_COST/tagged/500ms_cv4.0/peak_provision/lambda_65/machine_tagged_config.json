@@ -1,0 +1,41 @@
+{
+    "tagged_machines": [
+        {
+            "machine_address": "172.34.182.139", 
+            "config_path": "CONFIGS_COST/tagged/500ms_cv4.0/peak_provision/lambda_65/machine_5"
+        }, 
+        {
+            "machine_address": "172.34.85.131", 
+            "config_path": "CONFIGS_COST/tagged/500ms_cv4.0/peak_provision/lambda_65/machine_4"
+        }, 
+        {
+            "machine_address": "172.34.38.246", 
+            "config_path": "CONFIGS_COST/tagged/500ms_cv4.0/peak_provision/lambda_65/machine_1"
+        }, 
+        {
+            "machine_address": "172.34.180.129", 
+            "config_path": "CONFIGS_COST/tagged/500ms_cv4.0/peak_provision/lambda_65/machine_0"
+        }, 
+        {
+            "machine_address": "172.34.145.26", 
+            "config_path": "CONFIGS_COST/tagged/500ms_cv4.0/peak_provision/lambda_65/machine_3"
+        }, 
+        {
+            "machine_address": "172.34.62.21", 
+            "config_path": "CONFIGS_COST/tagged/500ms_cv4.0/peak_provision/lambda_65/machine_2"
+        }
+    ], 
+    "experiment_config": {
+        "process_path": "CONFIGS_COST/tagged/500ms_cv4.0/peak_provision/lambda_65/65_4.0.deltas", 
+        "ksvm": 1, 
+        "resnet": 16, 
+        "log_reg": 1, 
+        "slo_millis": 500, 
+        "num_trials": 30, 
+        "trial_length": 325, 
+        "inception": 6, 
+        "cv": 4.0, 
+        "num_clients": 1, 
+        "lambda": 65
+    }
+}
