@@ -2,18 +2,15 @@
     "process_path": "CONFIGS_COST_SPD3/slo_500/cv_0.1/peak_provision/lambda_355/355_0.1.deltas", 
     "batch_size": 30, 
     "gpu_affinities": [
-        "0 1", 
-        "2 3"
+        "0 1 2"
     ], 
     "num_trials": 30, 
     "cpu_affinities": [
-        "0 1 2 3 16 17 18 19", 
-        "4 5 6 7 20 21 22 23"
+        "0 1 2 16 17 18"
     ], 
     "trial_length": 1775, 
     "replica_nums": [
-        0, 
-        1
+        0
     ], 
     "slo_millis": 500, 
     "cv": 0.1, 
