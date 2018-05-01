@@ -32,9 +32,12 @@ def tag_arrival_process(process_path, output_path, num_replicas):
 
     validate(tagged_process)
 
-    with open(output_path, "w+") as f:
-        for delta, replica_num in tagged_process:
-            f.write("{},{}\n".format(delta, replica_num))
+    if output_path:
+        with open(output_path, "w") as f:
+            for delta, replica_num in tagged_process:
+                f.write("{},{}\n".format(delta, replica_num))
+
+    return tagged_process
 
 def load_tagged_arrival_deltas(path):
     with open(path, "r") as f:
