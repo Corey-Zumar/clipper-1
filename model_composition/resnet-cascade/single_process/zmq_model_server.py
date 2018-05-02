@@ -10,7 +10,7 @@ from threading import Thread, Lock
 from PIL import Image
 
 from single_proc_utils.spd_zmq_utils import SpdFrontend, SpdServer
-from models import cascade_model
+from models import cascade_model, preprocessor
 from models.cascade_model import CASCADE_MODEL_ARCHITECTURE_RES50, CASCADE_MODEL_ARCHITECTURE_RES152, CASCADE_MODEL_ARCHITECTURE_ALEXNET
 
 logging.basicConfig(
@@ -26,6 +26,7 @@ MODELS_DIR = os.path.join(CURR_DIR, "models")
 RES50_MODEL_NAME = "res50"
 RES152_MODEL_NAME = "res152"
 ALEXNET_MODEL_NAME = "alexnet"
+PREPROCESSOR_MODEL_NAME = "preprocessor"
 
 # AlexNet is the first model in the pipeline and is 
 # therefore always queried
@@ -51,11 +52,15 @@ def create_res152_model(gpu_num):
 def create_alexnet_model(gpu_num):
     return cascade_model.CascadeModel(CASCADE_MODEL_ARCHITECTURE_ALEXNET, gpu_num)
 
+def create_preprocessor():
+    return preprocessor.Preprocessor()
+
 def load_models(res50_gpu, res152_gpu, alexnet_gpu):
     models_dict = {
         RES50_MODEL_NAME : create_res50_model(res50_gpu),
         RES152_MODEL_NAME : create_res152_model(res152_gpu),
-        ALEXNET_MODEL_NAME : create_alexnet_model(alexnet_gpu)
+        ALEXNET_MODEL_NAME : create_alexnet_model(alexnet_gpu),
+        PREPROCESSOR_MODEL_NAME : create_preprocessor()
     }
 
     return models_dict
@@ -85,6 +90,7 @@ class CascadeFrontend(SpdFrontend):
         self.res50_model = models_dict[RES50_MODEL_NAME]
         self.res152_model = models_dict[RES152_MODEL_NAME]
         self.alexnet_model = models_dict[ALEXNET_MODEL_NAME]
+        self.preprocessor = models_dict[PREPROCESSOR_MODEL_NAME]
 
         self.warmup_lock = Lock()
         self.warming_up = False
@@ -93,6 +99,8 @@ class CascadeFrontend(SpdFrontend):
             self.warming_up = True
             warmup_thread = Thread(target=self._warm_up)
             warmup_thread.start()
+
+        self.lats = []
 
     def predict(self, inputs, msg_ids):
         """
@@ -115,6 +123,12 @@ class CascadeFrontend(SpdFrontend):
         return self._predict(inputs, msg_ids)
 
     def _predict(self, inputs, msg_ids):
+        t0 = datetime.now()
+
+        inputs = self.preprocessor.predict(inputs)
+
+        t1 = datetime.now()
+
         self.alexnet_model.predict(inputs)
 
         if np.random.rand() < RES50_QUERY_PROBABILITY:
@@ -122,6 +136,33 @@ class CascadeFrontend(SpdFrontend):
 
             if np.random.rand() < RES152_QUERY_PROBABILITY:
                 self.res152_model.predict(inputs)
+
+        t2 = datetime.now()
+
+        preprocessing_latency = (t1 - t0).total_seconds()
+        model_eval_latency = (t2 - t1).total_seconds()
+
+        self.lats.append((preprocessing_latency, model_eval_latency))
+        if len(self.lats) >= 100:
+            preproc_lats, eval_lats = zip(*self.lats)
+            p99_preproc = np.percentile(preproc_lats, 99)
+            mean_preproc = np.mean(preproc_lats)
+            std_preproc = np.std(preproc_lats)
+
+            p99_eval = np.percentile(eval_lats, 99)
+            mean_eval = np.mean(eval_lats)
+            std_eval = np.std(eval_lats)
+
+            print("PREPROC - p99: {}, mean: {}, std: {}".format(p99_preproc, 
+                                                                mean_preproc, 
+                                                                std_preproc))
+
+
+            print("MODEL EVAL - p99: {}, mean: {}, std: {}".format(p99_eval, 
+                                                                   mean_eval, 
+                                                                   std_eval))
+
+            self.lats = []
 
         return msg_ids
 
@@ -163,8 +204,8 @@ class CascadeFrontend(SpdFrontend):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Single Process Image Driver 1')
     parser.add_argument('-r50',  '--res50_gpu', type=int, default=0, help="The GPU on which to run the ResNet 50 featurization model")
-    parser.add_argument('-r152', '--res152_gpu', type=int, default=1, help="The GPU on which to run the ResNet 152 classification model")
-    parser.add_argument('-a', '--alexnet_gpu', type=int, default=2, help="The GPU on which to run the alexnet classification model")
+    parser.add_argument('-r152', '--res152_gpu', type=int, default=0, help="The GPU on which to run the ResNet 152 classification model")
+    parser.add_argument('-a', '--alexnet_gpu', type=int, default=0, help="The GPU on which to run the alexnet classification model")
     parser.add_argument('-p',  '--port', type=int, help="The port on which to run the grpc server")
     parser.add_argument('-nw', '--no_warmup', action="store_true", help="If true, disables warmup")
 
