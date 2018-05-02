@@ -61,11 +61,11 @@ def create_inception_model(model_path, gpu_num):
 def create_log_reg_model():
     return tf_log_reg_model.TfLogRegModel()
 
-# def load_models(resnet_gpu, inception_gpu):
-def load_models(alexnet_gpu, inception_gpu):
+def load_models(resnet_gpu, inception_gpu):
+# def load_models(alexnet_gpu, inception_gpu):
     models_dict = {
-        # TF_RESNET_FEATS_MODEL_NAME : create_resnet_model(RESNET_MODEL_PATH, gpu_num=resnet_gpu),
-        TF_ALEXNET_FEATS_MODEL_NAME : create_alexnet_model(ALEXNET_MODEL_PATH, gpu_num=alexnet_gpu),
+        TF_RESNET_FEATS_MODEL_NAME : create_resnet_model(RESNET_MODEL_PATH, gpu_num=resnet_gpu),
+        # TF_ALEXNET_FEATS_MODEL_NAME : create_alexnet_model(ALEXNET_MODEL_PATH, gpu_num=alexnet_gpu),
         TF_KERNEL_SVM_MODEL_NAME : create_kernel_svm_model(),
         TF_INCEPTION_FEATS_MODEL_NAME : create_inception_model(INCEPTION_MODEL_PATH, gpu_num=inception_gpu),
         TF_LOG_REG_MODEL_NAME : create_log_reg_model()
@@ -93,8 +93,8 @@ class ID1Frontend(SpdFrontend):
         self.models_dict = models_dict
 
         # Models
-        # self.resnet_model = models_dict[TF_RESNET_FEATS_MODEL_NAME]
-        self.alexnet_model = models_dict[TF_ALEXNET_FEATS_MODEL_NAME]
+        self.resnet_model = models_dict[TF_RESNET_FEATS_MODEL_NAME]
+        # self.alexnet_model = models_dict[TF_ALEXNET_FEATS_MODEL_NAME]
         self.kernel_svm_model = models_dict[TF_KERNEL_SVM_MODEL_NAME]
         self.inception_model = models_dict[TF_INCEPTION_FEATS_MODEL_NAME]
         self.log_reg_model = models_dict[TF_LOG_REG_MODEL_NAME]
@@ -128,27 +128,27 @@ class ID1Frontend(SpdFrontend):
         return self._predict(inputs, msg_ids)
 
     def _predict(self, inputs, msg_ids):
-        # resnet_inputs = self._transform_inputs_resnet(inputs)
-        alexnet_inputs = self._transform_inputs_alexnet(inputs)
+        resnet_inputs = self._transform_inputs_resnet(inputs)
+        # alexnet_inputs = self._transform_inputs_alexnet(inputs)
         inception_inputs = self._transform_inputs_inception(inputs)
 
-        # self._predict_parallel(resnet_inputs, inception_inputs)
-        self._predict_parallel(alexnet_inputs, inception_inputs)
+        self._predict_parallel(resnet_inputs, inception_inputs)
+        # self._predict_parallel(alexnet_inputs, inception_inputs)
 
         return msg_ids
 
-    # def _predict_parallel(self, resnet_inputs, inception_inputs):
-    def _predict_parallel(self, alexnet_inputs, inception_inputs):
-            alexnet_svm_future = self.task_execution_thread_pool.submit(
-                lambda inputs : self.kernel_svm_model.predict(self.alexnet_model.predict(inputs)), alexnet_inputs)
-            # resnet_svm_future = self.task_execution_thread_pool.submit(
-            #     lambda inputs : self.kernel_svm_model.predict(self.resnet_model.predict(inputs)), resnet_inputs)
+    def _predict_parallel(self, resnet_inputs, inception_inputs):
+    # def _predict_parallel(self, alexnet_inputs, inception_inputs):
+            # alexnet_svm_future = self.task_execution_thread_pool.submit(
+            #     lambda inputs : self.kernel_svm_model.predict(self.alexnet_model.predict(inputs)), alexnet_inputs)
+            resnet_svm_future = self.task_execution_thread_pool.submit(
+                lambda inputs : self.kernel_svm_model.predict(self.resnet_model.predict(inputs)), resnet_inputs)
             
             inception_log_reg_future = self.task_execution_thread_pool.submit(
                 lambda inputs : self.log_reg_model.predict(self.inception_model.predict(inputs)), inception_inputs)
 
-            # resnet_svm_classes = resnet_svm_future.result()
-            alexnet_svm_classes = alexnet_svm_future.result()
+            resnet_svm_classes = resnet_svm_future.result()
+            # alexnet_svm_classes = alexnet_svm_future.result()
             inception_log_reg_classes = inception_log_reg_future.result()
 
     def _warm_up(self):
@@ -187,14 +187,14 @@ class ID1Frontend(SpdFrontend):
 
         logger.info("Warmup complete!")
 
-    # def _transform_inputs_resnet(self, inputs):
-    def _transform_inputs_alexnet(self, inputs):
+    def _transform_inputs_resnet(self, inputs):
+    # def _transform_inputs_alexnet(self, inputs):
         resized = []
         for inp in inputs:
             w, h, c = INCEPTION_IMAGE_SHAPE
             img = Image.fromarray(inp.reshape(w, h, c).astype(np.uint8), mode="RGB")
-            # img = img.resize(RESNET_IMAGE_SHAPE[:2])
-            img = img.resize(ALEXNET_IMAGE_SHAPE[:2])
+            img = img.resize(RESNET_IMAGE_SHAPE[:2])
+            # img = img.resize(ALEXNET_IMAGE_SHAPE[:2])
             resized.append(np.asarray(img, dtype=np.float32))
 
         return resized
@@ -208,16 +208,16 @@ class ID1Frontend(SpdFrontend):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Single Process Image Driver 1')
-    # parser.add_argument('-r',  '--resnet_gpu', type=int, default=0, help="The GPU on which to run the ResNet 152 featurization model")
-    parser.add_argument('-a',  '--alexnet_gpu', type=int, default=0, help="The GPU on which to run the AlexNet featurization model")
+    parser.add_argument('-r',  '--resnet_gpu', type=int, default=0, help="The GPU on which to run the ResNet 152 featurization model")
+    # parser.add_argument('-a',  '--alexnet_gpu', type=int, default=0, help="The GPU on which to run the AlexNet featurization model")
     parser.add_argument('-i',  '--inception_gpu', type=int, default=1, help="The GPU on which to run the inception featurization model")
     parser.add_argument('-p',  '--port', type=int, help="The port on which to run the grpc server")
     parser.add_argument('-nw', '--no_warmup', action="store_true", help="If true, disables warmup")
 
     args = parser.parse_args()
 
-    # models_dict = load_models(args.resnet_gpu, args.inception_gpu)
-    models_dict = load_models(args.alexnet_gpu, args.inception_gpu)
+    models_dict = load_models(args.resnet_gpu, args.inception_gpu)
+    # models_dict = load_models(args.alexnet_gpu, args.inception_gpu)
 
     warmup = not args.no_warmup
     frontend = ID1Frontend(models_dict, warmup)
