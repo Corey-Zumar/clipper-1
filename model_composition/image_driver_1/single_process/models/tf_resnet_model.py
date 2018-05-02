@@ -23,7 +23,6 @@ class TfResNetModel(ModelBase):
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_mem_frac)
         
         self.sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True))
-        #self.sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True, device_count={'GPU': 1, 'CPU': 2}))
 
         self._load_model(graph_path, checkpoint_path, gpu_num)
 
