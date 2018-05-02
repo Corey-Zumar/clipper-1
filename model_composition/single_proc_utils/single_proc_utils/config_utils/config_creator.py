@@ -371,7 +371,8 @@ def create_configs_find_min_cost(arrival_procs_path,
         lambda_proc = arrival_procs[lambda_val]
         lambda_fpath = fpaths[lambda_val]
 
-        mean_thru = bench_utils.calculate_mean_throughput(lambda_proc)
+        mean_thru = lambda_val # DON'T CALCULATE MEAN THROUGHPUT, ACCEPT IT AT FACE VALUE
+        # mean_thru = bench_utils.calculate_mean_throughput(lambda_proc)
         peak_thru = bench_utils.calculate_peak_throughput(lambda_proc, slo_millis)
 
         num_mean_replicas = int(math.ceil(float(mean_thru) / one_rep_thruput))
