@@ -44,19 +44,19 @@ SERVICE_INGEST_RATIO_DIVERGENCE_THRESHOLD = .95
 ########## Setup ##########
 
 def get_heavy_node_configs(num_replicas, batch_size, allocated_cpus, allocated_gpus):
-    # resnet_config = HeavyNodeConfig(model_name=TF_RESNET_FEATS_MODEL_NAME,
-    #                                 input_type="floats",
-    #                                 num_replicas=num_replicas,
-    #                                 allocated_cpus=allocated_cpus,
-    #                                 gpus=allocated_gpus,
-    #                                 batch_size=batch_size)
+    resnet_config = HeavyNodeConfig(model_name=TF_RESNET_FEATS_MODEL_NAME,
+                                    input_type="floats",
+                                    num_replicas=num_replicas,
+                                    allocated_cpus=allocated_cpus,
+                                    gpus=allocated_gpus,
+                                    batch_size=batch_size)
 
-    alexnet_config = HeavyNodeConfig(model_name=TF_ALEXNET_FEATS_MODEL_NAME,
-                                     input_type="floats",
-                                     num_replicas=num_replicas,
-                                     allocated_cpus=allocated_cpus,
-                                     gpus=allocated_gpus,
-                                     batch_size=batch_size)
+    # alexnet_config = HeavyNodeConfig(model_name=TF_ALEXNET_FEATS_MODEL_NAME,
+    #                                  input_type="floats",
+    #                                  num_replicas=num_replicas,
+    #                                  allocated_cpus=allocated_cpus,
+    #                                  gpus=allocated_gpus,
+    #                                  batch_size=batch_size)
 
     inception_config = HeavyNodeConfig(model_name=TF_INCEPTION_FEATS_MODEL_NAME,
                                        input_type="floats",
@@ -79,8 +79,8 @@ def get_heavy_node_configs(num_replicas, batch_size, allocated_cpus, allocated_g
                                      gpus=[],
                                      batch_size=batch_size)
 
-    # return [resnet_config, inception_config, kernel_svm_config, log_reg_config]
-    return [alexnet_config, inception_config, kernel_svm_config, log_reg_config]
+    return [resnet_config, inception_config, kernel_svm_config, log_reg_config]
+    # return [alexnet_config, inception_config, kernel_svm_config, log_reg_config]
 
 class ExperimentConfig:
 
