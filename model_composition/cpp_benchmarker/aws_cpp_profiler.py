@@ -23,7 +23,8 @@ CLIPPER_ADDRESS = "localhost"
 
 RES50 = "res50"
 RES152 = "res152"
-ALEXNET = "alexnet"
+PYTORCH_ALEXNET = "alexnet"
+TF_ALEXNET = "tf-alexnet"
 INCEPTION_FEATS = "inception"
 TF_KERNEL_SVM = "tf-kernel-svm"
 TF_LOG_REG = "tf-log-reg"
@@ -47,7 +48,7 @@ def get_heavy_node_config(model_name,
                           remote_addr=None,
                           input_size=None):
 
-    if model_name == ALEXNET:
+    if model_name == PYTORCH_ALEXNET:
         image = "gcr.io/clipper-model-comp/pytorch-alexnet:bench"
         return driver_utils.HeavyNodeConfig(name="alexnet",
                                             input_type="floats",
@@ -60,6 +61,21 @@ def get_heavy_node_config(model_name,
                                             use_nvidia_docker=True,
                                             no_diverge=True,
                                             remote_addr=remote_addr)
+
+    elif model_name == TF_ALEXNET:
+        image = "gcr.io/clipper-model-comp/tf-alexnet-feats:bench"
+        return driver_utils.HeavyNodeConfig(name="tf-alexnet",
+                                            input_type="floats",
+                                            model_image=image,
+                                            allocated_cpus=allocated_cpus,
+                                            cpus_per_replica=cpus_per_replica,
+                                            gpus=allocated_gpus,
+                                            batch_size=batch_size,
+                                            num_replicas=num_replicas,
+                                            use_nvidia_docker=True,
+                                            no_diverge=True,
+                                            remote_addr=remote_addr)
+
 
     elif model_name == RES50:
         image = "gcr.io/clipper-model-comp/pytorch-res50:bench"
@@ -226,9 +242,9 @@ def get_heavy_node_config(model_name,
 def get_input_size(config):
     if config.name in [TF_LOG_REG, TF_KERNEL_SVM]:
         return 2048
-    elif config.name in [ALEXNET, RES50, RES152, INCEPTION_FEATS]:
+    elif config.name in [PYTORCH_ALEXNET, RES50, RES152, INCEPTION_FEATS]:
         return 299*299*3
-    elif config.name in [TF_RESNET, ]:
+    elif config.name in [TF_RESNET, TF_ALEXNET]:
         return 224*224*3
     elif config.name in [TF_RESNET_VAR, TF_RESNET_SLEEP]:
         return config.input_size
@@ -490,7 +506,7 @@ def run_profiler(config, trial_length, driver_path, input_size, profiler_cores_s
 
 if __name__ == "__main__":
     gpu = 0
-    model = TF_RESNET
+    model = TF_ALEXNET 
     batch_sizes = [1, 2, 4, 6, 8, 12]
     for batch_size in batch_sizes:
         config = get_heavy_node_config(

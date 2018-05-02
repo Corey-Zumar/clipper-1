@@ -1,0 +1,12 @@
+FROM model-comp/tf-rpc:latest
+
+WORKDIR /container
+
+COPY tf_alexnet_container.py /container/
+COPY alexnet.py /container/
+
+COPY tf_alexnet_model_data/ /model_data
+
+ENV CLIPPER_MODEL_WEIGHTS_PATH=/model_data/alexnet_weights.npy
+
+CMD ["python", "/container/tf_alexnet_container.py"]
