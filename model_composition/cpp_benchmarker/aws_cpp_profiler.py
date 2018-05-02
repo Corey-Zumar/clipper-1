@@ -36,7 +36,7 @@ TF_LANG_DETECT = "tf-lang-detect"
 TF_NMT = "tf-nmt"
 TF_LSTM = "tf-lstm"
 
-REMOTE_ADDR = "172.30.0.164"
+REMOTE_ADDR = "localhost"
 
 
 def get_heavy_node_config(model_name,
@@ -255,7 +255,7 @@ def get_input_size(config):
 def setup_clipper(configs):
     cl = ClipperConnection(DockerContainerManager(redis_port=6380))
     cl.connect()
-    cl.stop_all(remote_addrs=[REMOTE_ADDR])
+    cl.stop_all()
     cl.start_clipper(
         query_frontend_image="clipper/zmq_frontend:develop",
         redis_cpu_str="0",
@@ -500,7 +500,7 @@ def run_profiler(config, trial_length, driver_path, input_size, profiler_cores_s
     cl.set_full_batches()
     time.sleep(1)
     latency_results = run(0, 8, "latency", "batch", batch_size=config.batch_size)
-    cl.stop_all(remote_addrs=[REMOTE_ADDR])
+    cl.stop_all()
     return throughput_results, latency_results
 
 
@@ -515,8 +515,7 @@ if __name__ == "__main__":
             num_replicas=1,
             cpus_per_replica=1,
             allocated_cpus=[8],
-            allocated_gpus=[7],
-            remote_addr=REMOTE_ADDR,
+            allocated_gpus=[7]
         )
 
         input_size = get_input_size(config)
