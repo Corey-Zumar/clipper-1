@@ -65,7 +65,7 @@ def create_log_reg_model():
 def load_models(alexnet_gpu, inception_gpu):
     models_dict = {
         # TF_RESNET_FEATS_MODEL_NAME : create_resnet_model(RESNET_MODEL_PATH, gpu_num=resnet_gpu),
-        TF_ALEXNET_FEATS_MODEL_NAME : create_alexnet_model(ALEXNET_MODEL_PATH, gpu_num=resnet_gpu),
+        TF_ALEXNET_FEATS_MODEL_NAME : create_alexnet_model(ALEXNET_MODEL_PATH, gpu_num=alexnet_gpu),
         TF_KERNEL_SVM_MODEL_NAME : create_kernel_svm_model(),
         TF_INCEPTION_FEATS_MODEL_NAME : create_inception_model(INCEPTION_MODEL_PATH, gpu_num=inception_gpu),
         TF_LOG_REG_MODEL_NAME : create_log_reg_model()

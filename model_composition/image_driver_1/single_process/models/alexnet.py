@@ -24,6 +24,7 @@ folder as this file:
 import tensorflow as tf
 import numpy as np
 
+NUM_CLASSES = 1000
 
 class AlexNet(object):
     """Implementation of the AlexNet."""
@@ -73,7 +74,7 @@ class AlexNet(object):
 
         # 5th Layer: Conv (w ReLu) -> Pool splitted into two groups
         conv5 = conv(conv4, 3, 3, 256, 1, 1, groups=2, name='conv5')
-        pool5 = max_pool(conv5, 3, 3, 2, 2, padding='VALID', name='pool5')
+        pool5 = max_pool(conv5, 3, 3, 2, 2, padding='SAME', name='pool5')
 
         # 6th Layer: Flatten -> FC (w ReLu) -> Dropout
         flattened = tf.reshape(pool5, [-1, 6*6*256])
@@ -84,7 +85,10 @@ class AlexNet(object):
         fc7 = fc(dropout6, 4096, 4096, name='fc7')
         dropout7 = dropout(fc7, self.KEEP_PROB)
 
-        self.output_tensor = dropout7
+        # 8th Layer: FC and return unscaled activations
+        self.fc8 = fc(dropout7, 4096, NUM_CLASSES, relu=False, name='fc8')
+
+        self.output_tensor = fc(dropout7, 4096, 2048, name='output')
 
     def load_initial_weights(self, session):
         """Load weights from file into network.
