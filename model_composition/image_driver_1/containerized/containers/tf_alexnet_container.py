@@ -2,6 +2,7 @@ from __future__ import print_function
 import sys
 import os
 import rpc
+import logging
 import numpy as np
 import tensorflow as tf
 
