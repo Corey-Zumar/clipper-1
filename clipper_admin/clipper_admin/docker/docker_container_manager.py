@@ -137,11 +137,14 @@ class DockerContainerManager(ContainerManager):
             ports={
                 '4455/tcp': 4455,
                 '4456/tcp': 4456,
+                '9999/tcp': 9999,  # for gdbserver
                 '1337/tcp': 1337,
                 '%s/tcp' % CLIPPER_INTERNAL_RPC_PORT: self.clipper_rpc_port
             },
             labels=query_labels,
             cpuset_cpus=query_cpu_str,
+            cap_add=["sys_ptrace"],
+            privileged=True,
             **self.extra_container_kwargs)
         self.connect()
 

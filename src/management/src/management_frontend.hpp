@@ -18,9 +18,9 @@
 #include <clipper/datatypes.hpp>
 #include <clipper/json_util.hpp>
 #include <clipper/logging.hpp>
-#include <clipper/persistent_state.hpp>
+// #include <clipper/persistent_state.hpp>
 #include <clipper/redis.hpp>
-#include <clipper/selection_policies.hpp>
+// #include <clipper/selection_policies.hpp>
 #include <clipper/util.hpp>
 
 using HttpServer = SimpleWeb::Server<SimpleWeb::HTTP>;
@@ -158,8 +158,7 @@ std::string json_error_msg(const std::string& exception_msg,
 
 class RequestHandler {
  public:
-  RequestHandler(int portno, int num_threads)
-      : server_(portno, num_threads), state_db_{} {
+  RequestHandler(int portno, int num_threads) : server_(portno, num_threads) {
     clipper::Config& conf = clipper::get_config();
     while (!redis_connection_.connect(conf.get_redis_address(),
                                       conf.get_redis_port())) {
@@ -477,7 +476,7 @@ class RequestHandler {
     parse_json(json, d);
 
     std::string app_name = get_string(d, "app_name");
-    std::vector<string> model_names = get_string_array(d, "model_names");
+    std::vector<std::string> model_names = get_string_array(d, "model_names");
 
     // Confirm that the app exists
     auto app_info =
@@ -583,8 +582,7 @@ class RequestHandler {
         clipper::parse_input_type(get_string(d, "input_type"));
     std::string default_output = get_string(d, "default_output");
 
-    std::string selection_policy =
-        clipper::DefaultOutputSelectionPolicy::get_name();
+    std::string selection_policy = "DefaultOutputSelectionPolicy";
     int latency_slo_micros = get_int(d, "latency_slo_micros");
     // check if application already exists
     std::unordered_map<std::string, std::string> existing_app_data =
@@ -656,7 +654,8 @@ class RequestHandler {
     check_updated_model_consistent_with_app_links(model_name, input_type);
 
     if (clipper::redis::add_model(redis_connection_, model_id, input_type,
-                                  labels, container_name, model_data_path, batch_size)) {
+                                  labels, container_name, model_data_path,
+                                  batch_size)) {
       attempt_model_version_update(model_id.get_name(), model_id.get_id());
       return "Success!";
     }
@@ -723,7 +722,7 @@ class RequestHandler {
     std::vector<std::string> linked_models;
 
     if (verbose) {
-      for (const string& app_name : app_names) {
+      for (const std::string& app_name : app_names) {
         std::unordered_map<std::string, std::string> app_metadata =
             clipper::redis::get_application(redis_connection_, app_name);
         rapidjson::Document app_doc(&response_doc.GetAllocator());
@@ -737,7 +736,7 @@ class RequestHandler {
         response_doc.PushBack(app_doc, response_doc.GetAllocator());
       }
     } else {
-      for (const string& app_name : app_names) {
+      for (const std::string& app_name : app_names) {
         rapidjson::Value v;
         v.SetString(app_name.c_str(), app_name.length(),
                     response_doc.GetAllocator());
@@ -1100,8 +1099,8 @@ class RequestHandler {
    * Attempts to update the version of model with name `model_name` to
    * `new_model_version`.
    */
-  void attempt_model_version_update(const string& model_name,
-                                    const string& new_model_version) {
+  void attempt_model_version_update(const std::string& model_name,
+                                    const std::string& new_model_version) {
     if (!clipper::redis::set_current_model_version(
             redis_connection_, model_name, new_model_version)) {
       std::stringstream ss;
@@ -1117,7 +1116,6 @@ class RequestHandler {
   HttpServer server_;
   redox::Redox redis_connection_;
   redox::Subscriber redis_subscriber_;
-  clipper::StateDB state_db_;
 };
 
 }  // namespace management

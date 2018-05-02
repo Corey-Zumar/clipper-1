@@ -1,0 +1,14 @@
+{
+    "vcpus_per_replica": 2, 
+    "batch_size": 1, 
+    "ports": [
+        9524
+    ], 
+    "num_replicas": 1, 
+    "allocated_gpus": [], 
+    "allocated_vcpus": [
+        10, 
+        26
+    ], 
+    "model_name": "log_reg"
+}

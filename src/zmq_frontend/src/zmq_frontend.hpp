@@ -8,8 +8,6 @@
 #include <utility>
 #include <vector>
 
-#include <folly/futures/Future.h>
-
 #include "frontend_rpc_service.hpp"
 
 #include <clipper/config.hpp>
@@ -19,49 +17,15 @@
 #include <clipper/json_util.hpp>
 #include <clipper/logging.hpp>
 #include <clipper/metrics.hpp>
-#include <clipper/query_processor.hpp>
 #include <clipper/redis.hpp>
+#include <clipper/task_executor.hpp>
 
-using clipper::Response;
-using clipper::FeedbackAck;
-using clipper::VersionedModelId;
-using clipper::DataType;
-using clipper::Input;
-using clipper::Output;
-using clipper::OutputData;
-using clipper::Query;
-using clipper::Feedback;
-using clipper::FeedbackQuery;
-using clipper::json::json_parse_error;
-using clipper::json::json_semantic_error;
+using namespace clipper;
 using clipper::redis::labels_to_str;
 
 namespace zmq_frontend {
 
 const std::string LOGGING_TAG_RPC_FRONTEND = "RPC FRONTEND";
-const std::string GET_METRICS = "^/metrics$";
-
-const char* PREDICTION_RESPONSE_KEY_QUERY_ID = "query_id";
-const char* PREDICTION_RESPONSE_KEY_OUTPUT = "output";
-const char* PREDICTION_RESPONSE_KEY_USED_DEFAULT = "default";
-const char* PREDICTION_RESPONSE_KEY_DEFAULT_EXPLANATION = "default_explanation";
-const char* PREDICTION_ERROR_RESPONSE_KEY_ERROR = "error";
-const char* PREDICTION_ERROR_RESPONSE_KEY_CAUSE = "cause";
-
-const std::string PREDICTION_ERROR_NAME_REQUEST = "Request error";
-const std::string PREDICTION_ERROR_NAME_JSON = "Json error";
-const std::string PREDICTION_ERROR_NAME_QUERY_PROCESSING =
-    "Query processing error";
-
-/* Generate a user-facing error message containing the exception
- * content and the expected JSON schema. */
-std::string json_error_msg(const std::string& exception_msg,
-                           const std::string& expected_schema) {
-  std::stringstream ss;
-  ss << "Error parsing JSON: " << exception_msg << ". "
-     << "Expected JSON schema: " << expected_schema;
-  return ss.str();
-}
 
 class AppMetrics {
  public:
@@ -101,10 +65,9 @@ class ServerImpl {
  public:
   ServerImpl(const std::string ip, int send_port, int recv_port)
       : rpc_service_(std::make_shared<FrontendRPCService>()),
-        query_processor_(),
-        futures_executor_(std::make_shared<wangle::CPUThreadPoolExecutor>(6)) {
-    // Init Clipper stuff
-
+        task_executor_(),
+        request_rate_(metrics::MetricsRegistry::get_metrics().create_meter(
+            "zmq_frontend:request_rate")) {
     // Start the frontend rpc service
     rpc_service_->start(ip, send_port, recv_port);
 
@@ -124,19 +87,6 @@ class ServerImpl {
                          "Retrying in 1 second...");
       std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-
-    // server_.add_endpoint(GET_METRICS, "GET",
-    //                      [](std::shared_ptr<HttpServer::Response> response,
-    //                         std::shared_ptr<HttpServer::Request>
-    //                         #<{(|request|)}>#) {
-    //                        clipper::metrics::MetricsRegistry& registry =
-    //                            clipper::metrics::MetricsRegistry::get_metrics();
-    //                        std::string metrics_report =
-    //                            registry.report_metrics();
-    //                        clipper::log_info(LOGGING_TAG_RPC_FRONTEND,
-    //                                          "METRICS", metrics_report);
-    //                        respond_http(metrics_report, "200 OK", response);
-    //                      });
 
     clipper::redis::subscribe_to_application_changes(
         redis_subscriber_,
@@ -274,113 +224,51 @@ class ServerImpl {
   void add_application(std::string name, DataType input_type,
                        std::string policy, std::string default_output,
                        long latency_slo_micros) {
-    // TODO: QueryProcessor should handle this. We need to decide how the
-    // default output fits into the generic selection policy API. Do all
-    // selection policies have a default output?
-
-    // Initialize selection state for this application
-    if (policy == clipper::DefaultOutputSelectionPolicy::get_name()) {
-      clipper::DefaultOutputSelectionPolicy p;
-      std::shared_ptr<char> default_output_content(
-          static_cast<char*>(malloc(sizeof(default_output))), free);
-      memcpy(default_output_content.get(), default_output.data(),
-             default_output.size());
-      clipper::Output parsed_default_output(
-          std::make_shared<clipper::StringOutput>(default_output_content, 0,
-                                                  default_output.size()),
-          {});
-      auto init_state = p.init_state(parsed_default_output);
-      clipper::StateKey state_key{name, clipper::DEFAULT_USER_ID, 0};
-      query_processor_.get_state_table()->put(state_key,
-                                              p.serialize(init_state));
-    }
-
     AppMetrics app_metrics(name);
 
     auto predict_fn = [
-      this, name, application_input_type = input_type, policy,
-      latency_slo_micros, app_metrics
+      this, name, application_input_type = input_type, latency_slo_micros,
+      app_metrics
     ](FrontendRPCRequest request) {
-      try {
-        std::vector<std::string> models = get_linked_models_for_app(name);
-        std::vector<VersionedModelId> versioned_models;
-        {
-          std::unique_lock<std::mutex> l(current_model_versions_mutex_);
-          for (auto m : models) {
-            auto version = current_model_versions_.find(m);
-            if (version != current_model_versions_.end()) {
-              versioned_models.emplace_back(m, version->second);
-            }
+      std::vector<std::string> models = get_linked_models_for_app(name);
+      std::vector<VersionedModelId> versioned_models;
+      {
+        std::unique_lock<std::mutex> l(current_model_versions_mutex_);
+        for (auto m : models) {
+          auto version = current_model_versions_.find(m);
+          if (version != current_model_versions_.end()) {
+            versioned_models.emplace_back(m, version->second);
           }
         }
-
-        long uid = 0;
-        int request_id = std::get<1>(request);
-        int client_id = std::get<2>(request);
-        auto prediction = query_processor_.predict(
-            Query{name, uid, std::get<0>(request), latency_slo_micros, policy,
-                  versioned_models});
-
-        prediction.via(futures_executor_.get())
-            .then([this, app_metrics, request_id, client_id](Response r) {
-              // Update metrics
-              if (r.output_is_default_) {
-                app_metrics.default_pred_ratio_->increment(1, 1);
-              } else {
-                app_metrics.default_pred_ratio_->increment(0, 1);
-                if (r.output_.y_hat_->type() == clipper::DataType::Strings) {
-                  std::string debugstr = std::string(
-                      static_cast<const char *>(r.output_.y_hat_->get_data()),
-                      r.output_.y_hat_->byte_size());
-                  clipper::log_info_formatted(clipper::LOGGING_TAG_CLIPPER,
-                      "Responding with: {}", debugstr);
-                }
-              }
-              app_metrics.latency_->insert(r.duration_micros_);
-              app_metrics.num_predictions_->increment(1);
-
-              rpc_service_->send_response(
-                  std::make_tuple(std::move(r.output_), request_id, client_id));
-            })
-            .onError([request_id](const std::exception& e) {
-              clipper::log_error_formatted(clipper::LOGGING_TAG_CLIPPER,
-                                           "Unexpected error: {}", e.what());
-              // TODO(czumar): Do something here!
-              return;
-            });
-      } catch (const std::invalid_argument& e) {
-        // This invalid argument exception is most likely the propagation of an
-        // exception thrown
-        // when Rapidjson attempts to parse an invalid json schema
-        std::string error_response = get_prediction_error_response_content(
-            PREDICTION_ERROR_NAME_JSON, e.what());
-        // TODO(czumar): Do something here!
-      } catch (const clipper::PredictError& e) {
-        std::string error_response = get_prediction_error_response_content(
-            PREDICTION_ERROR_NAME_QUERY_PROCESSING, e.what());
-        // TODO(czumar): Do something here!
       }
+
+      int request_id = std::get<1>(request);
+      int client_id = std::get<2>(request);
+      long query_id = query_counter_.fetch_add(1);
+      std::chrono::time_point<std::chrono::system_clock> create_time =
+          std::chrono::system_clock::now();
+
+      task_executor_.schedule_prediction(
+          PredictTask{std::get<0>(request), versioned_models.front(), 1.0,
+                      query_id, latency_slo_micros},
+          [this, app_metrics, request_id, client_id,
+           create_time](Output output) mutable {
+            std::chrono::time_point<std::chrono::system_clock> end =
+                std::chrono::system_clock::now();
+            long duration_micros =
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    end - create_time)
+                    .count();
+
+            app_metrics.latency_->insert(duration_micros);
+            app_metrics.num_predictions_->increment(1);
+
+            rpc_service_->send_response(
+                std::make_tuple(std::move(output), request_id, client_id));
+          });
     };
 
     rpc_service_->add_application(name, predict_fn);
-  }
-
-  /**
-   * Obtains user-readable http response content for a query
-   * that could not be completed due to an error
-   */
-  static const std::string get_prediction_error_response_content(
-      const std::string error_name, const std::string error_msg) {
-    std::stringstream ss;
-    ss << error_name << ": " << error_msg;
-    return ss.str();
-  }
-
-  /**
-   * Returns a copy of the map containing current model names and versions.
-   */
-  std::unordered_map<std::string, std::string> get_current_model_versions() {
-    return current_model_versions_;
   }
 
   std::string get_metrics() const {
@@ -393,7 +281,8 @@ class ServerImpl {
 
  private:
   std::shared_ptr<FrontendRPCService> rpc_service_;
-  clipper::QueryProcessor query_processor_;
+  TaskExecutor task_executor_;
+  std::atomic<long> query_counter_{0};
   redox::Redox redis_connection_;
   redox::Subscriber redis_subscriber_;
   std::mutex current_model_versions_mutex_;
@@ -402,8 +291,7 @@ class ServerImpl {
   std::mutex linked_models_for_apps_mutex_;
   std::unordered_map<std::string, std::vector<std::string>>
       linked_models_for_apps_;
-
-  std::shared_ptr<wangle::CPUThreadPoolExecutor> futures_executor_;
+  std::shared_ptr<metrics::Meter> request_rate_;
 };
 
 }  // namespace zmq_frontend

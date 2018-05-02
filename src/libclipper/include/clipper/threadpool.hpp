@@ -5,6 +5,8 @@
 #include <queue>
 #include <thread>
 #include <unordered_map>
+#include <condition_variable>
+#include <concurrentqueue.h>
 
 #include <boost/thread.hpp>
 
@@ -17,109 +19,6 @@ const std::string LOGGING_TAG_THREADPOOL = "THREADPOOL";
 
 /// Implementation adapted from
 /// https://goo.gl/Iav87R
-
-template <typename T>
-class ThreadSafeQueue {
- public:
-  /**
-   * Destructor.
-   */
-  ~ThreadSafeQueue(void) { invalidate(); }
-
-  /**
-   * Attempt to get the first value in the queue.
-   * Returns true if a value was successfully written to the out parameter,
-   * false otherwise.
-   */
-  bool try_pop(T& out) {
-    std::lock_guard<std::mutex> lock{mutex_};
-    if (queue_.empty() || !valid_) {
-      return false;
-    }
-    out = std::move(queue_.front());
-    queue_.pop();
-    return true;
-  }
-
-  /**
-   * Get the first value in the queue.
-   * Will block until a value is available unless clear is called or the
-   * instance is destructed.
-   * Returns true if a value was successfully written to the out parameter,
-   * false otherwise.
-   */
-  bool wait_pop(T& out) {
-    std::unique_lock<std::mutex> lock{mutex_};
-    condition_.wait(lock, [this]() { return !queue_.empty() || !valid_; });
-    /*
-     * Using the condition in the predicate ensures that spurious wakeups with a
-     * valid
-     * but empty queue will not proceed, so only need to check for validity
-     * before proceeding.
-     */
-    if (!valid_) {
-      return false;
-    }
-    out = std::move(queue_.front());
-    queue_.pop();
-    return true;
-  }
-
-  /**
-   * Push a new value onto the queue.
-   */
-  void push(T value) {
-    std::lock_guard<std::mutex> lock{mutex_};
-    queue_.push(std::move(value));
-    condition_.notify_one();
-  }
-
-  /**
-   * Check whether or not the queue is empty.
-   */
-  bool empty(void) const {
-    std::lock_guard<std::mutex> lock{mutex_};
-    return queue_.empty();
-  }
-
-  /**
-   * Clear all items from the queue.
-   */
-  void clear(void) {
-    std::lock_guard<std::mutex> lock{mutex_};
-    while (!queue_.empty()) {
-      queue_.pop();
-    }
-    condition_.notify_all();
-  }
-
-  /**
-   * Invalidate the queue.
-   * Used to ensure no conditions are being waited on in wait_pop when
-   * a thread or the application is trying to exit.
-   * The queue is invalid after calling this method and it is an error
-   * to continue using a queue after this method has been called.
-   */
-  void invalidate(void) {
-    std::lock_guard<std::mutex> lock{mutex_};
-    valid_ = false;
-    condition_.notify_all();
-  }
-
-  /**
-   * Returns whether or not this queue is valid.
-   */
-  bool is_valid(void) const {
-    std::lock_guard<std::mutex> lock{mutex_};
-    return valid_;
-  }
-
- private:
-  std::atomic_bool valid_{true};
-  mutable std::mutex mutex_;
-  std::queue<T> queue_;
-  std::condition_variable condition_;
-};
 
 class ThreadPool {
  private:
@@ -216,7 +115,7 @@ class ThreadPool {
     boost::shared_lock<boost::shared_mutex> l(queues_mutex_);
     auto queue = queues_.find(queue_id);
     if (queue != queues_.end()) {
-      queue->second.push(std::make_unique<TaskType>(std::move(task)));
+      queue->second.enqueue(std::make_unique<TaskType>(std::move(task)));
     } else {
       std::stringstream error_msg;
       error_msg << "No work queue for model " << vm.serialize() << ", replica "
@@ -249,7 +148,7 @@ class ThreadPool {
         // NOTE: The use of try_pop here means the worker will spin instead of
         // block while waiting for work. This is intentional. We defer to the
         // submitted tasks to block when no work is available.
-        work_to_do = queues_[worker_id].try_pop(pTask);
+        work_to_do = queues_[worker_id].try_dequeue(pTask);
       }
       if (work_to_do) {
         pTask->execute();
@@ -269,9 +168,9 @@ class ThreadPool {
   void destroy(void) {
     log_info(LOGGING_TAG_THREADPOOL, "Destroying threadpool");
     done_ = true;
-    for (auto& queue : queues_) {
-      queue.second.invalidate();
-    }
+    // for (auto& queue : queues_) {
+      // queue.second.invalidate();
+    // }
     for (auto& thread : threads_) {
       if (thread.second.joinable()) {
         thread.second.join();
@@ -282,7 +181,7 @@ class ThreadPool {
  private:
   std::atomic_bool done_;
   boost::shared_mutex queues_mutex_;
-  std::unordered_map<size_t, ThreadSafeQueue<std::unique_ptr<IThreadTask>>>
+  std::unordered_map<size_t, moodycamel::ConcurrentQueue<std::unique_ptr<IThreadTask>>>
       queues_;
   std::unordered_map<size_t, std::thread> threads_;
 };

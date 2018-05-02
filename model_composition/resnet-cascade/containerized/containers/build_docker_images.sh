@@ -18,6 +18,7 @@ time docker build -t model-comp/cuda-rpc -f CudaPyRpcDockerfile ./
 cd $DIR
 # Build model-specific images
 time docker build -t model-comp/pytorch -f PyTorchDockerfile ./
+# time docker build -t model-comp/pytorch-alex-sleep -f PyTorchSleepDockerfile ./
 time docker build -t model-comp/pytorch-alexnet -f AlexnetPyTorchDockerfile ./
 time docker build -t model-comp/pytorch-res50 -f Res50PyTorchDockerfile ./
 time docker build -t model-comp/pytorch-res152 -f Res152PyTorchDockerfile ./

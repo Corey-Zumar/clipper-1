@@ -1,50 +1,73 @@
-FROM frolvlad/alpine-gxx
+FROM ubuntu:16.04
+
+RUN apt-get update && apt-get install -y g++ automake autoconf autoconf-archive libtool libboost-all-dev \
+        libevent-dev libdouble-conversion-dev libgoogle-glog-dev libgflags-dev liblz4-dev \
+        liblzma-dev libsnappy-dev make zlib1g-dev binutils-dev libjemalloc-dev libssl-dev \
+        pkg-config libiberty-dev git cmake libev-dev libhiredis-dev libzmq5 libzmq5-dev
 
 
-RUN echo "@testing http://nl.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
-
-RUN apk add --update --no-cache curl git bash make boost-dev cmake libev-dev hiredis-dev zeromq-dev \
-    libtool automake autoconf-archive@testing lz4-dev xz-dev snappy-dev zlib-dev \
-    glog-dev@testing scons openssl-dev libevent-dev ca-certificates perl
-
-
-# Set up Folly
-
-## Install DoubleConversion
-RUN git clone https://github.com/google/double-conversion \
-    && cd double-conversion \
-    && cmake -DBUILD_SHARED_LIBS=ON . \
-    && make -j8 \
-    && make install \
-    && ln -s src double-conversion
-
-ENV DOUBLE_CONVERSION_HOME=/double-conversion/double-conversion/
-
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$DOUBLE_CONVERSION_HOME
-
-## Install GFLags
-RUN git clone https://github.com/gflags/gflags \
-    && mkdir gflags/build \
-    && cd gflags/build \
-    && cmake -DBUILD_SHARED_LIBS=ON .. \
-    && make install
-
-## Install Folly
-RUN git clone https://github.com/facebook/folly \
-    && cd folly/folly \
-    && autoreconf -ivf \
-    && ./configure LDFLAGS=-L$DOUBLE_CONVERSION_HOME/ CPPFLAGS=-I$DOUBLE_CONVERSION_HOME \
-    && make -j8 \
-    && make install
+# FROM frolvlad/alpine-gxx
+# RUN echo "@testing http://nl.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
+#
+# RUN apk add --update --no-cache curl git bash make boost-dev cmake hiredis-dev zeromq-dev \
+#     libtool automake autoconf-archive@testing lz4-dev xz-dev snappy-dev zlib-dev \
+#     glog-dev@testing scons openssl-dev libevent-dev ca-certificates perl \
+#     libev-dev
 
 
+# # Set up Folly
+#
+# ## Install DoubleConversion
+# RUN git clone https://github.com/google/double-conversion \
+#     && cd double-conversion \
+#     && cmake -DBUILD_SHARED_LIBS=ON . \
+#     && make -j8 \
+#     && make install \
+#     && ln -s src double-conversion
+#
+# ENV DOUBLE_CONVERSION_HOME=/double-conversion/double-conversion/
+#
+# ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$DOUBLE_CONVERSION_HOME
+#
+# ## Install GFLags
+# RUN git clone https://github.com/gflags/gflags \
+#     && mkdir gflags/build \
+#     && cd gflags/build \
+#     && cmake -DBUILD_SHARED_LIBS=ON .. \
+#     && make install
+#
+# ## Install Folly
+# RUN git clone https://github.com/facebook/folly \
+#     && cd folly/folly \
+#     && autoreconf -ivf \
+#     && ./configure LDFLAGS=-L$DOUBLE_CONVERSION_HOME/ CPPFLAGS=-I$DOUBLE_CONVERSION_HOME \
+#     && make -j8 \
+#     && make install
+#
+#
+#
+# RUN git clone https://github.com/facebook/wangle.git \
+#     && cd wangle/wangle \
+#     && cmake . \
+#     && make -j8 \
+#     && make install
 
-RUN git clone https://github.com/facebook/wangle.git \
-    && cd wangle/wangle \
-    && cmake . \
-    && make -j8 \
-    && make install
-
+# RUN apk add --update --no-cache libev-dev 
+#
+# ## Install GDB Server
+#
+# RUN apk add --no-cache make linux-headers texinfo gcc g++
+#
+# RUN mkdir gdb-build \
+#         && cd gdb-build \
+#         && wget http://ftp.gnu.org/gnu/gdb/gdb-7.11.tar.xz \
+#         && tar -xvf gdb-7.11.tar.xz \
+#         && cd gdb-7.11 \
+#         && ./configure --prefix=/usr \
+#         && make \
+#         && make -C gdb install \
+#         && cd .. \
+#         && rm -rf gdb-build/
 
 # Prep Clipper
 

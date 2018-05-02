@@ -20,3 +20,5 @@ pip install -e $CLIPPER_ROOT/clipper_admin
 pip install -e $CLIPPER_ROOT/model_composition/containerized_utils
 
 pip install -e $CLIPPER_ROOT/model_composition/single_proc_utils
+
+pip install -e $CLIPPER_ROOT/model_composition/tf_serving_utils

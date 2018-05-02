@@ -1,11 +1,12 @@
 #include "frontend_rpc_service.hpp"
 
+#include <cstdlib>
 #include <mutex>
 
-#include <folly/ProducerConsumerQueue.h>
 #include <boost/functional/hash.hpp>
 #include <zmq.hpp>
 
+#include <clipper/callback_threadpool.hpp>
 #include <clipper/config.hpp>
 #include <clipper/datatypes.hpp>
 #include <clipper/logging.hpp>
@@ -20,14 +21,44 @@ namespace zmq_frontend {
 
 FrontendRPCService::FrontendRPCService()
     : response_queue_(
-          std::make_shared<folly::ProducerConsumerQueue<FrontendRPCResponse>>(
+          std::make_shared<moodycamel::ConcurrentQueue<FrontendRPCResponse>>(
               RESPONSE_QUEUE_SIZE)),
-      prediction_executor_(std::make_shared<wangle::CPUThreadPoolExecutor>(6)),
-      active_(false) {}
+      // prediction_executor_(
+      //     std::make_shared<clipper::CallbackThreadPool>("frontend", 15)),
+      active_(false),
+      request_enqueue_meter_(
+          metrics::MetricsRegistry::get_metrics().create_meter(
+              "frontend_rpc:request_enqueue")),
+      response_enqueue_meter_(
+          metrics::MetricsRegistry::get_metrics().create_meter(
+              "frontend_rpc:response_enqueue")),
+      response_dequeue_meter_(
+          metrics::MetricsRegistry::get_metrics().create_meter(
+              "frontend_rpc:response_dequeue")),
+      recv_latency_(metrics::MetricsRegistry::get_metrics().create_histogram(
+          "frontend_rpc:recv_latency", "microseconds", 4096)),
+      next_data_offset_(0) {
+  std::chrono::time_point<std::chrono::system_clock> start_time =
+      std::chrono::system_clock::now();
+  recv_data_buffer_ = static_cast<uint8_t *>(std::calloc(1, TOTAL_DATA_BYTES));
+  std::chrono::time_point<std::chrono::system_clock> end_time =
+      std::chrono::system_clock::now();
+  auto calloc_latency = end_time - start_time;
+  long calloc_latency_micros =
+      std::chrono::duration_cast<std::chrono::microseconds>(calloc_latency)
+          .count();
 
-FrontendRPCService::~FrontendRPCService() { stop(); }
+  std::cout << "Memory allocation time (us): "
+            << std::to_string(calloc_latency_micros) << std::endl;
+}
 
-void FrontendRPCService::start(const std::string address, int send_port, int recv_port) {
+FrontendRPCService::~FrontendRPCService() {
+  stop();
+  std::free(recv_data_buffer_);
+}
+
+void FrontendRPCService::start(const std::string address, int send_port,
+                               int recv_port) {
   active_ = true;
   rpc_send_thread_ = std::thread([this, address, send_port]() {
     manage_send_service(address, send_port);
@@ -52,8 +83,8 @@ void FrontendRPCService::add_application(
 }
 
 void FrontendRPCService::send_response(FrontendRPCResponse response) {
-  std::lock_guard<std::mutex> lock(response_queue_insertion_mutex_);
-  response_queue_->write(response);
+  response_enqueue_meter_->mark(1);
+  response_queue_->enqueue(response);
 }
 
 void FrontendRPCService::manage_send_service(const std::string ip, int port) {
@@ -63,7 +94,7 @@ void FrontendRPCService::manage_send_service(const std::string ip, int port) {
   socket.bind(send_address);
   zmq::pollitem_t items[] = {{socket, 0, ZMQ_POLLIN, 0}};
   int client_id = 0;
-  while(active_) {
+  while (active_) {
     zmq_poll(items, 1, 1);
     if (items[0].revents & ZMQ_POLLIN) {
       handle_new_connection(socket, client_id);
@@ -75,11 +106,11 @@ void FrontendRPCService::manage_send_service(const std::string ip, int port) {
 
 void FrontendRPCService::manage_recv_service(const std::string ip, int port) {
   std::string recv_address = "tcp://" + ip + ":" + std::to_string(port);
-  zmq::context_t context(1);
+  zmq::context_t context(2);
   zmq::socket_t socket(context, ZMQ_ROUTER);
   socket.bind(recv_address);
   zmq::pollitem_t items[] = {{socket, 0, ZMQ_POLLIN, 0}};
-  while(active_) {
+  while (active_) {
     zmq_poll(items, 1, 1);
     if (items[0].revents & ZMQ_POLLIN) {
       receive_request(socket);
@@ -88,7 +119,8 @@ void FrontendRPCService::manage_recv_service(const std::string ip, int port) {
   shutdown_service(socket);
 }
 
-void FrontendRPCService::handle_new_connection(zmq::socket_t &socket, int &client_id) {
+void FrontendRPCService::handle_new_connection(zmq::socket_t &socket,
+                                               int &client_id) {
   zmq::message_t msg_routing_identity;
   zmq::message_t msg_delimiter;
   zmq::message_t msg_establish_connection;
@@ -144,38 +176,19 @@ void FrontendRPCService::receive_request(zmq::socket_t &socket) {
       static_cast<DataType>(static_cast<int *>(msg_data_type.data())[0]);
   int input_size_typed = static_cast<int *>(msg_data_size_typed.data())[0];
 
-  std::shared_ptr<clipper::Input> input;
+  // NOTE(dcrankshaw): It would make more sense to just have the RPC message
+  // include the size in bytes, but to maintain backwards compatibility I'm
+  // leaving it as the typed_size for now.
+  size_t bytes_per_input;
   switch (input_type) {
     case DataType::Bytes: {
-      std::shared_ptr<uint8_t> data(
-          static_cast<uint8_t *>(malloc(input_size_typed)), free);
-      socket.recv(data.get(), input_size_typed, 0);
-      input = std::make_shared<ByteVector>(data, input_size_typed);
-    } break;
-    case DataType::Ints: {
-      std::shared_ptr<int> data(
-          static_cast<int *>(malloc(input_size_typed * sizeof(int))), free);
-      socket.recv(data.get(), input_size_typed * sizeof(int), 0);
-      input = std::make_shared<IntVector>(data, input_size_typed);
+      bytes_per_input = sizeof(uint8_t);
     } break;
     case DataType::Floats: {
-      std::shared_ptr<float> data(
-          static_cast<float *>(malloc(input_size_typed * sizeof(float))), free);
-      socket.recv(data.get(), input_size_typed * sizeof(float), 0);
-      input = std::make_shared<FloatVector>(data, input_size_typed);
+      bytes_per_input = sizeof(float);
     } break;
     case DataType::Doubles: {
-      std::shared_ptr<double> data(
-          static_cast<double *>(malloc(input_size_typed * sizeof(double))),
-          free);
-      socket.recv(data.get(), input_size_typed * sizeof(double), 0);
-      input = std::make_shared<DoubleVector>(data, input_size_typed);
-    } break;
-    case DataType::Strings: {
-      std::shared_ptr<char> data(
-          static_cast<char *>(malloc(input_size_typed * sizeof(char))), free);
-      socket.recv(data.get(), input_size_typed * sizeof(char), 0);
-      input = std::make_shared<SerializableString>(data, input_size_typed);
+      bytes_per_input = sizeof(double);
     } break;
     case DataType::Invalid:
     default: {
@@ -185,6 +198,29 @@ void FrontendRPCService::receive_request(zmq::socket_t &socket) {
       throw std::runtime_error(ss.str());
     }
   }
+
+  size_t input_size_bytes = ((size_t)input_size_typed) * bytes_per_input;
+
+  std::chrono::time_point<std::chrono::system_clock> start_time =
+      std::chrono::system_clock::now();
+
+  // uint8_t *input_buffer =
+  //     reinterpret_cast<uint8_t *>(malloc(input_size_bytes));
+
+  uint8_t *input_buffer =
+      reinterpret_cast<uint8_t *>(alloc_data(input_size_bytes));
+
+  socket.recv(input_buffer, input_size_bytes, 0);
+  std::chrono::time_point<std::chrono::system_clock> recv_end_time =
+      std::chrono::system_clock::now();
+  InputVector input(input_buffer, input_size_typed, input_size_bytes,
+                    input_type);
+
+  auto recv_latency = recv_end_time - start_time;
+  long recv_latency_micros =
+      std::chrono::duration_cast<std::chrono::microseconds>(recv_latency)
+          .count();
+  recv_latency_->insert(recv_latency_micros);
 
   std::lock_guard<std::mutex> lock(app_functions_mutex_);
   auto app_functions_search = app_functions_.find(app_name);
@@ -199,19 +235,28 @@ void FrontendRPCService::receive_request(zmq::socket_t &socket) {
 
     int client_id = static_cast<int *>(msg_client_id.data())[0];
 
-    // Submit the function call with the request to a threadpool!!!
-    prediction_executor_->add([app_function, input, request_id, client_id]() {
-      app_function(std::make_tuple(input, request_id, client_id));
-    });
+    // The app_function should be very cheap, it's just constructing
+    // an object and putting it on the task queue. Try executing it directly.
+    app_function(std::make_tuple(input, request_id, client_id));
+
+    request_enqueue_meter_->mark(1);
+    // prediction_executor_->submit(
+    //     [app_function, input, request_id, client_id]() {
+    //       app_function(std::make_tuple(input, request_id, client_id));
+    //     });
   }
 }
 
-void FrontendRPCService::send_responses(zmq::socket_t &socket, size_t num_responses) {
-  while (!response_queue_->isEmpty() && num_responses > 0) {
-    FrontendRPCResponse *response = response_queue_->frontPtr();
-    Output &output = std::get<0>(*response);
-    int request_id = std::get<1>(*response);
-    int client_id = std::get<2>(*response);
+void FrontendRPCService::send_responses(zmq::socket_t &socket,
+                                        size_t num_responses) {
+  FrontendRPCResponse response;
+  size_t sent_responses = 0;
+  while (sent_responses < num_responses &&
+         response_queue_->try_dequeue(response)) {
+    response_dequeue_meter_->mark(1);
+    Output &output = std::get<0>(response);
+    int request_id = std::get<1>(response);
+    int client_id = std::get<2>(response);
 
     std::lock_guard<std::mutex> routing_lock(client_routing_mutex_);
     auto routing_id_search = client_routing_map_.find(client_id);
@@ -222,7 +267,7 @@ void FrontendRPCService::send_responses(zmq::socket_t &socket, size_t num_respon
       throw std::runtime_error(ss.str());
     }
 
-    const std::vector<uint8_t>& routing_id = routing_id_search->second;
+    const std::vector<uint8_t> &routing_id = routing_id_search->second;
 
     int output_type = static_cast<int>(output.y_hat_->type());
 
@@ -232,16 +277,28 @@ void FrontendRPCService::send_responses(zmq::socket_t &socket, size_t num_respon
     socket.send("", 0, ZMQ_SNDMORE);
     socket.send(&request_id, sizeof(int), ZMQ_SNDMORE);
     socket.send(&output_type, sizeof(int), ZMQ_SNDMORE);
-    socket.send(output.y_hat_->get_data(),
-                output.y_hat_->byte_size());
+    socket.send(output.y_hat_->get_data(), output.y_hat_->byte_size());
 
-    // Remove the response from the outbound queue now that we're done
-    // processing it
-    response_queue_->popFront();
-    // Remove the oustanding request from the map
-
-    num_responses--;
+    sent_responses += 1;
   }
+}
+
+// WARNING: THIS IS A QUICK AND DIRTY HACK. IT'S TOTALLY NOT SAFE TO ACTUALLY
+// USE.
+void *FrontendRPCService::alloc_data(size_t size_bytes) {
+  if (size_bytes > TOTAL_DATA_BYTES) {
+    throw std::runtime_error("Requested a memory allocation that was too big");
+  }
+  std::lock_guard<std::mutex> l(data_mutex_);
+  // Check if we've reached end of buffer and need to wrap back
+  if ((next_data_offset_ + size_bytes) > TOTAL_DATA_BYTES) {
+    std::cout << "Wrapping around to front of buffer" << std::endl;
+    next_data_offset_ = 0;
+  }
+
+  void *alloc_ptr = static_cast<void *>(recv_data_buffer_ + next_data_offset_);
+  next_data_offset_ += size_bytes;
+  return alloc_ptr;
 }
 
 }  // namespace zmq_frontend

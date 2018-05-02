@@ -6,10 +6,10 @@
 #include <string>
 #include <vector>
 
+#include <concurrentqueue.h>
 #include <boost/bimap.hpp>
 #include <redox.hpp>
 #include <zmq.hpp>
-#include <concurrentqueue.h>
 
 #include <clipper/containers.hpp>
 #include <clipper/datatypes.hpp>
@@ -32,8 +32,7 @@ const std::string LOGGING_TAG_RPC = "RPC";
 using RPCResponse = std::tuple<int, DataType, std::shared_ptr<void>>;
 
 /// Tuple of zmq_connection_id, message_id, vector of messages, creation time
-using RPCRequest =
-    std::tuple<int, int, std::vector<ByteBuffer>, long>;
+using RPCRequest = std::tuple<int, int, std::vector<zmq::message_t>, long>;
 
 enum class RPCEvent {
   SentHeartbeat = 1,
@@ -74,15 +73,7 @@ class RPCService {
    */
   void stop();
 
-  /*
-  * Send message takes ownership of the msg data because the caller cannot
-  * know when the message will actually be sent.
-  *
-  * \param `msg`: A vector of individual messages to send to this container.
-  * The messages will be sent as a single, multi-part ZeroMQ message so
-  * it is very efficient.
-  */
-  int send_message(const std::vector<ByteBuffer> &msg,
+  int send_message(std::vector<zmq::message_t> msg,
                    const int zmq_connection_id);
 
  private:

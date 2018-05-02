@@ -8,8 +8,7 @@ target_link_libraries(clipper_zmq_frontend
         clipper
         boost
         cxxopts
-        folly
         httpserver
         zmqcpp
-        wangle
-        base64json)
+        base64json
+)

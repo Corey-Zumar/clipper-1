@@ -55,8 +55,7 @@ def get_heavy_node_config(model_name,
                           num_replicas,
                           cpus_per_replica,
                           allocated_cpus,
-                          allocated_gpus,
-                          instance_type="p2.8xlarge"):
+                          allocated_gpus):
 
     if model_name == "alexnet":
         return driver_utils.HeavyNodeConfig(name="alexnet",
@@ -68,7 +67,6 @@ def get_heavy_node_config(model_name,
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
                                             use_nvidia_docker=True,
-                                            instance_type=instance_type
                                             )
 
     elif model_name == "res50":
@@ -81,7 +79,6 @@ def get_heavy_node_config(model_name,
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
                                             use_nvidia_docker=True,
-                                            instance_type=instance_type
                                             )
 
     elif model_name == "res152":
@@ -94,13 +91,12 @@ def get_heavy_node_config(model_name,
                                             batch_size=batch_size,
                                             num_replicas=num_replicas,
                                             use_nvidia_docker=True,
-                                            instance_type=instance_type
                                             )
 
 
 class Predictor(object):
 
-    def __init__(self):
+    def __init__(self, config):
         self.outstanding_reqs = {}
         self.client = Client(CLIPPER_ADDRESS, CLIPPER_SEND_PORT, CLIPPER_RECV_PORT)
         self.client.start()
@@ -111,6 +107,7 @@ class Predictor(object):
             "p99_lats": [],
             "mean_lats": []}
         self.total_num_complete = 0
+        self.config = config
 
     def init_stats(self):
         self.latencies = []
@@ -143,7 +140,7 @@ class Predictor(object):
             self.latencies.append(latency)
             self.total_num_complete += 1
             self.batch_num_complete += 1
-            if self.batch_num_complete % 100 == 0:
+            if self.batch_num_complete % (10*self.config.batch_size) == 0:
                 self.print_stats()
                 self.init_stats()
 
@@ -156,10 +153,11 @@ class ModelBenchmarker(object):
 
     def run(self):
         logger.info("Generating random inputs")
-        inputs = [np.array(np.random.rand(299*299*3), dtype=np.float32) for _ in range(10000)]
+        base_inputs = [np.array(np.random.rand(299*299*3), dtype=np.float32) for _ in range(1000)]
+        inputs = [i for _ in range(50) for i in base_inputs]
         logger.info("Starting predictions")
         # start_time = datetime.now()
-        predictor = Predictor()
+        predictor = Predictor(self.config)
         for input_item in inputs:
             predictor.predict(model_app_name=self.config.name, input_item=input_item)
             # time.sleep(0.005)
@@ -171,7 +169,7 @@ class ModelBenchmarker(object):
         cl.connect()
         driver_utils.save_results([self.config],
                                   cl,
-                                  predictor.stats,
+                                  [predictor.stats],
                                   "single_model_prof_%s" % self.config.name)
 
 
@@ -181,24 +179,22 @@ if __name__ == "__main__":
 
     # for cpus in [1, 2]:
     cpus = 1
-    for gpus in [1, 0]:
-        for m in models:
-            if gpus == 0 and m is not "alexnet":
-                continue
-            for batch_size in [1, 2, 4, 6, 8, 10, 12, 16, 20, 24, 30]:
-                if gpus == 0 and batch_size > 8:
-                    continue
-                model_config = get_heavy_node_config(
-                    model_name=m,
-                    batch_size=batch_size,
-                    num_replicas=1,
-                    cpus_per_replica=cpus,
-                    allocated_cpus=range(8, 20),
-                    allocated_gpus=range(gpus)
-                )
-                setup_clipper(model_config)
-                benchmarker = ModelBenchmarker(model_config)
+    gpus = 0
+    m = "alexnet"
+    # for gpus in [0,]:
+        # for m in models:
+    for batch_size in [10, 12, 16, 20, 24, 30, 48, 64, 128]:
+        model_config = get_heavy_node_config(
+            model_name=m,
+            batch_size=batch_size,
+            num_replicas=1,
+            cpus_per_replica=cpus,
+            allocated_cpus=range(8, 20),
+            allocated_gpus=range(gpus)
+        )
+        setup_clipper(model_config)
+        benchmarker = ModelBenchmarker(model_config)
 
-                p = Process(target=benchmarker.run, args=())
-                p.start()
-                p.join()
+        p = Process(target=benchmarker.run, args=())
+        p.start()
+        p.join()

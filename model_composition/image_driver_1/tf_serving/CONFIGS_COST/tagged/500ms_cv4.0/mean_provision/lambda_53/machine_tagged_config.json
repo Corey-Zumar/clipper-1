@@ -1,0 +1,25 @@
+{
+    "tagged_machines": [
+        {
+            "machine_address": "172.34.180.129", 
+            "config_path": "CONFIGS_COST/tagged/500ms_cv4.0/mean_provision/lambda_53/machine_0"
+        }, 
+        {
+            "machine_address": "172.34.38.246", 
+            "config_path": "CONFIGS_COST/tagged/500ms_cv4.0/mean_provision/lambda_53/machine_1"
+        }
+    ], 
+    "experiment_config": {
+        "process_path": "CONFIGS_COST/tagged/500ms_cv4.0/mean_provision/lambda_53/53_4.0.deltas", 
+        "ksvm": 1, 
+        "resnet": 5, 
+        "log_reg": 1, 
+        "slo_millis": 500, 
+        "num_trials": 30, 
+        "trial_length": 265, 
+        "inception": 2, 
+        "cv": 4.0, 
+        "num_clients": 1, 
+        "lambda": 53
+    }
+}

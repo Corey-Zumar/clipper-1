@@ -6,18 +6,13 @@
 #include <tuple>
 #include <utility>
 
-#include <folly/futures/Future.h>
-
-#include <folly/futures/Future.h>
-#include <wangle/concurrent/CPUThreadPoolExecutor.h>
-
 #include "datatypes.hpp"
 #include "metrics.hpp"
 #include "persistent_state.hpp"
 #include "rpc_service.hpp"
 #include "selection_policies.hpp"
 #include "task_executor.hpp"
-#include "timers.hpp"
+// #include "timers.hpp"
 
 namespace clipper {
 
@@ -37,8 +32,7 @@ class QueryProcessor {
   QueryProcessor(QueryProcessor&& other) = default;
   QueryProcessor& operator=(QueryProcessor&& other) = default;
 
-  folly::Future<Response> predict(Query query);
-  folly::Future<FeedbackAck> update(FeedbackQuery feedback);
+  void predict(Query query, std::function<void(Response)>&& on_response_callback);
 
   std::shared_ptr<StateDB> get_state_table() const;
 
@@ -47,7 +41,7 @@ class QueryProcessor {
   std::shared_ptr<StateDB> state_db_;
   std::shared_ptr<SelectionState> selection_state_;
   TaskExecutor task_executor_;
-  TimerSystem<HighPrecisionClock> timer_system_{HighPrecisionClock()};
+  // TimerSystem<HighPrecisionClock> timer_system_{HighPrecisionClock()};
   // This is a heteregenous container of different instances of selection
   // policy. The key is the name of the specific selection policy, the value is
   // an instance of that policy. All SelectionPolicy implementations (derived
@@ -55,7 +49,7 @@ class QueryProcessor {
   // same instance for different applications or users.
   std::unordered_map<std::string, std::shared_ptr<SelectionPolicy>>
       selection_policies_;
-  std::shared_ptr<wangle::CPUThreadPoolExecutor> futures_executor_;
+  std::shared_ptr<metrics::Meter> request_rate_;
 };
 
 }  // namespace clipper

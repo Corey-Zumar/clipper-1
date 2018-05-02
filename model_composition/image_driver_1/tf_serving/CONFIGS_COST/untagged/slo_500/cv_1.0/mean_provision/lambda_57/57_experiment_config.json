@@ -1,0 +1,1 @@
+{"process_path": "CONFIGS_COST/untagged/slo_500/cv_1.0/mean_provision/lambda_57/57.deltas", "ksvm": 1, "resnet": 6, "log_reg": 1, "slo_millis": 500, "num_trials": 30, "trial_length": 285, "inception": 2, "cv": 1.0, "num_clients": 1, "lambda": 57}

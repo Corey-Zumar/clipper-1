@@ -22,11 +22,13 @@ size_t serialize_to_buffer(const std::shared_ptr<T> &data, const size_t size,
 
 std::string get_readable_input_type(DataType type) {
   switch (type) {
-    case DataType::Bytes: return std::string("bytes");
-    case DataType::Ints: return std::string("integers");
+    case DataType::Bytes:
+      return std::string("bytes");
+    // case DataType::Ints: return std::string("integers");
     case DataType::Floats: return std::string("floats");
-    case DataType::Doubles: return std::string("doubles");
-    case DataType::Strings: return std::string("strings");
+    case DataType::Doubles:
+      return std::string("doubles");
+    // case DataType::Strings: return std::string("strings");
     case DataType::Invalid:
     default: return std::string("Invalid input type");
   }
@@ -35,20 +37,20 @@ std::string get_readable_input_type(DataType type) {
 DataType parse_input_type(std::string type_string) {
   if (type_string == "bytes" || type_string == "byte" || type_string == "b") {
     return DataType::Bytes;
-  } else if (type_string == "integers" || type_string == "ints" ||
-             type_string == "integer" || type_string == "int" ||
-             type_string == "i") {
-    return DataType::Ints;
+    // } else if (type_string == "integers" || type_string == "ints" ||
+    //            type_string == "integer" || type_string == "int" ||
+    //            type_string == "i") {
+    //   return DataType::Ints;
   } else if (type_string == "floats" || type_string == "float" ||
              type_string == "f") {
     return DataType::Floats;
   } else if (type_string == "doubles" || type_string == "double" ||
              type_string == "d") {
     return DataType::Doubles;
-  } else if (type_string == "strings" || type_string == "string" ||
-             type_string == "str" || type_string == "strs" ||
-             type_string == "s") {
-    return DataType::Strings;
+    // } else if (type_string == "strings" || type_string == "string" ||
+    //            type_string == "str" || type_string == "strs" ||
+    //            type_string == "s") {
+    //   return DataType::Strings;
   } else {
     throw std::invalid_argument(type_string + " is not a valid input string");
   }
@@ -98,172 +100,12 @@ bool Output::operator!=(const Output &rhs) const {
            models_used_ == rhs.models_used_);
 }
 
-ByteVector::ByteVector(std::shared_ptr<uint8_t> data, size_t size)
-    : data_(data), size_(size) {}
-
-ByteVector::ByteVector(const uint8_t* data, size_t size) : ByteVector(size) {
-  set_data(data, size);
-}
-
-ByteVector::ByteVector(size_t size)
-    : data_(std::shared_ptr<uint8_t>(static_cast<uint8_t*>(malloc(size)), free)), size_(size) {
-
-}
-
-DataType ByteVector::type() const { return DataType::Bytes; }
-
-void ByteVector::set_data(const void *buf, size_t size) {
-  memcpy(data_.get(), buf, size);
-}
-
-void ByteVector::serialize(std::vector<std::shared_ptr<void>> &buf) const {
-  buf.push_back(data_);
-}
-
-size_t ByteVector::hash() const { return hash_shared_ptr(data_, size_); }
-
-size_t ByteVector::size() const { return size_; }
-
-size_t ByteVector::byte_size() const { return size_ * sizeof(uint8_t); }
-
-const std::shared_ptr<uint8_t> &ByteVector::get_data() const { return data_; }
-
-IntVector::IntVector(std::shared_ptr<int> data, size_t size)
-    : data_(data), size_(size) {}
-
-IntVector::IntVector(const int *data, size_t size) : IntVector(size) {
-  set_data(data, size);
-}
-
-IntVector::IntVector(size_t size)
-    : data_(std::shared_ptr<int>(static_cast<int*>(malloc(size * sizeof(int))), free)), size_(size) {
-
-}
-
-void IntVector::set_data(const void *buf, size_t size) {
-  memcpy(data_.get(), buf, size * sizeof(int));
-}
-
-DataType IntVector::type() const { return DataType::Ints; }
-
-void IntVector::serialize(std::vector<std::shared_ptr<void>> &buf) const {
-  buf.push_back(data_);
-}
-
-size_t IntVector::hash() const { return hash_shared_ptr(data_, size_); }
-
-size_t IntVector::size() const { return size_; }
-
-size_t IntVector::byte_size() const { return size_ * sizeof(int); }
-
-const std::shared_ptr<int> &IntVector::get_data() const { return data_; }
-
-FloatVector::FloatVector(std::shared_ptr<float> data, size_t size)
-    : data_(data), size_(size) {}
-
-FloatVector::FloatVector(const float *data, size_t size) : FloatVector(size) {
-  set_data(data, size);
-}
-
-FloatVector::FloatVector(size_t size)
-    : data_(std::shared_ptr<float>(static_cast<float*>(malloc(size * sizeof(float))), free)), size_(size) {
-
-}
-
-void FloatVector::set_data(const void *buf, size_t size) {
-  memcpy(data_.get(), buf, size * sizeof(float));
-}
-
-void FloatVector::serialize(std::vector<std::shared_ptr<void>> &buf) const {
-  buf.push_back(data_);
-}
-
-DataType FloatVector::type() const { return DataType::Floats; }
-
-size_t FloatVector::hash() const {
-  // TODO [CLIPPER-63]: Find an alternative to hashing floats directly, as this
-  // is generally a bad idea due to loss of precision from floating point
-  // representations
-  return hash_shared_ptr(data_, size_);
-}
-
-size_t FloatVector::size() const { return size_; }
-
-size_t FloatVector::byte_size() const { return size_ * sizeof(float); }
-
-const std::shared_ptr<float> &FloatVector::get_data() const { return data_; }
-
-DoubleVector::DoubleVector(std::shared_ptr<double> data, size_t size)
-    : data_(data), size_(size) {}
-
-DoubleVector::DoubleVector(const double *data, size_t size) : DoubleVector(size) {
-  set_data(data, size);
-}
-
-DoubleVector::DoubleVector(size_t size)
-    : data_(std::shared_ptr<double>(static_cast<double*>(malloc(size * sizeof(double))), free)), size_(size) {
-
-}
-
-DataType DoubleVector::type() const { return DataType::Doubles; }
-
-void DoubleVector::set_data(const void *buf, size_t size) {
-  memcpy(data_.get(), buf, size * sizeof(double));
-}
-
-void DoubleVector::serialize(std::vector<std::shared_ptr<void>> &buf) const {
-  buf.push_back(data_);
-}
-
-size_t DoubleVector::hash() const {
-  // TODO [CLIPPER-63]: Find an alternative to hashing doubles directly, as
-  // this is generally a bad idea due to loss of precision from floating point
-  // representations
-  return hash_shared_ptr(data_, size_);
-}
-
-size_t DoubleVector::size() const { return size_; }
-
-size_t DoubleVector::byte_size() const { return size_ * sizeof(double); }
-
-const std::shared_ptr<double> &DoubleVector::get_data() const { return data_; }
-
-SerializableString::SerializableString(std::shared_ptr<char> data, size_t size)
-    : data_(data), size_(size) {}
-
-SerializableString::SerializableString(const char *data, size_t size) : SerializableString(size) {
-  set_data(data, size);
-}
-
-SerializableString::SerializableString(size_t size)
-    : data_(std::shared_ptr<char>(static_cast<char*>(malloc(size * sizeof(char))), free)), size_(size) {
-
-}
-
-DataType SerializableString::type() const { return DataType::Strings; }
-
-void SerializableString::set_data(const void *buf, size_t size) {
-  memcpy(data_.get(), buf, size * sizeof(char));
-}
-
-void SerializableString::serialize(std::vector<std::shared_ptr<void>> &buf) const {
-  buf.push_back(data_);
-}
-
-size_t SerializableString::hash() const {
-  return hash_shared_ptr(data_, size_);
-}
-
-size_t SerializableString::size() const { return 1; }
-
-size_t SerializableString::byte_size() const {
-  // The length of the string with an extra byte for the null terminator
-  return size_ + 1;
-}
-
-const std::shared_ptr<char> &SerializableString::get_data() const {
-  return data_;
-}
+InputVector::InputVector(void *data, size_t size_typed, size_t size_bytes,
+                         DataType type)
+    : data_(data),
+      size_typed_(size_typed),
+      size_bytes_(size_bytes),
+      type_(type) {}
 
 std::shared_ptr<OutputData> OutputData::create_output(
     DataType type, std::shared_ptr<void> data, size_t start, size_t end) {
@@ -312,9 +154,7 @@ size_t ByteVectorOutput::serialize(void *buf) const {
   return end_ - start_;
 }
 
-const void* ByteVectorOutput::get_data() const {
-  return data_.get() + start_;
-}
+void *ByteVectorOutput::get_data() const { return data_.get() + start_; }
 
 IntVectorOutput::IntVectorOutput(std::shared_ptr<int> data, size_t start,
                                  size_t end)
@@ -337,9 +177,7 @@ size_t IntVectorOutput::serialize(void *buf) const {
   return end_ - start_;
 }
 
-const void* IntVectorOutput::get_data() const {
-  return data_.get() + start_;
-}
+void *IntVectorOutput::get_data() const { return data_.get() + start_; }
 
 FloatVectorOutput::FloatVectorOutput(std::shared_ptr<float> data, size_t start,
                                      size_t end)
@@ -362,9 +200,7 @@ size_t FloatVectorOutput::serialize(void *buf) const {
   return end_ - start_;
 }
 
-const void* FloatVectorOutput::get_data() const {
-  return data_.get() + start_;
-}
+void *FloatVectorOutput::get_data() const { return data_.get() + start_; }
 
 StringOutput::StringOutput(std::shared_ptr<char> data, size_t start, size_t end)
     : data_(data), start_(start), end_(end) {}
@@ -386,90 +222,114 @@ size_t StringOutput::serialize(void *buf) const {
   return end_ - start_;
 }
 
-const void* StringOutput::get_data() const {
-  return data_.get() + start_;
-}
+void *StringOutput::get_data() const { return data_.get() + start_; }
 
-rpc::PredictionRequest::PredictionRequest(DataType input_type)
-    : input_type_(input_type) {}
+// rpc::PredictionRequest::PredictionRequest(DataType input_type)
+//     : input_type_(input_type) {}
+//
+// rpc::PredictionRequest::PredictionRequest(
+//     std::vector<std::shared_ptr<Input>> inputs, DataType input_type)
+//     : inputs_(inputs), input_type_(input_type) {
+//   for (int i = 0; i < (int)inputs.size(); i++) {
+//     validate_input_type(inputs[i]);
+//     input_data_size_ += inputs[i]->byte_size();
+//   }
+// }
+//
+// void rpc::PredictionRequest::validate_input_type(
+//     std::shared_ptr<Input> &input) const {
+//   if (input->type() != input_type_) {
+//     std::ostringstream ss;
+//     ss << "Attempted to add an input of type "
+//        << get_readable_input_type(input->type())
+//        << " to a prediction request with input type "
+//        << get_readable_input_type(input_type_);
+//     log_error(LOGGING_TAG_CLIPPER, ss.str());
+//     throw std::invalid_argument(ss.str());
+//   }
+// }
+//
+// void rpc::PredictionRequest::add_input(std::shared_ptr<Input> input) {
+//   validate_input_type(input);
+//   inputs_.push_back(input);
+//   input_data_size_ += input->byte_size();
+// }
 
-rpc::PredictionRequest::PredictionRequest(
-    std::vector<std::shared_ptr<Input>> inputs, DataType input_type)
-    : inputs_(inputs), input_type_(input_type) {
-  for (int i = 0; i < (int)inputs.size(); i++) {
-    validate_input_type(inputs[i]);
-    input_data_size_ += inputs[i]->byte_size();
-  }
-}
-
-void rpc::PredictionRequest::validate_input_type(
-    std::shared_ptr<Input> &input) const {
-  if (input->type() != input_type_) {
-    std::ostringstream ss;
-    ss << "Attempted to add an input of type "
-       << get_readable_input_type(input->type())
-       << " to a prediction request with input type "
-       << get_readable_input_type(input_type_);
-    log_error(LOGGING_TAG_CLIPPER, ss.str());
-    throw std::invalid_argument(ss.str());
-  }
-}
-
-void rpc::PredictionRequest::add_input(std::shared_ptr<Input> input) {
-  validate_input_type(input);
-  inputs_.push_back(input);
-  input_data_size_ += input->byte_size();
-}
-
-std::vector<ByteBuffer> rpc::PredictionRequest::serialize() {
-  if (input_data_size_ <= 0) {
-    throw std::length_error(
-        "Attempted to serialize a request with no input data!");
-  }
-
-  size_t request_metadata_size = 1 * sizeof(uint32_t);
-  std::shared_ptr<uint8_t> request_metadata(
-      static_cast<uint8_t *>(malloc(request_metadata_size)), free);
-  uint32_t *request_metadata_raw =
-      reinterpret_cast<uint32_t *>(request_metadata.get());
-  request_metadata_raw[0] = static_cast<uint32_t>(RequestType::PredictRequest);
-
-  size_t input_metadata_size = (2 + (inputs_.size() - 1)) * sizeof(uint32_t);
-  std::shared_ptr<uint8_t> input_metadata(
-      static_cast<uint8_t *>(malloc(input_metadata_size)), free);
-  uint32_t *input_metadata_raw =
-      reinterpret_cast<uint32_t *>(input_metadata.get());
-  input_metadata_raw[0] = static_cast<uint32_t>(input_type_);
-  input_metadata_raw[1] = static_cast<uint32_t>(inputs_.size());
-
-  std::vector<std::shared_ptr<void>> input_bufs;
-  for (size_t i = 0; i < inputs_.size(); i++) {
-    inputs_[i]->serialize(input_bufs);
-    input_metadata_raw[i + 2] = static_cast<uint32_t>(inputs_[i]->byte_size());
-  }
-
-  size_t input_metadata_size_buf_size = 1 * sizeof(long);
-  std::shared_ptr<uint8_t> input_metadata_size_buf(
-      static_cast<uint8_t *>(malloc(input_metadata_size_buf_size)), free);
-  long *input_metadata_size_buf_raw =
-      reinterpret_cast<long *>(input_metadata_size_buf.get());
-  // Add the size of the input metadata in bytes. This will be
-  // sent prior to the input metadata to allow for proactive
-  // buffer allocation in the receiving container
-  input_metadata_size_buf_raw[0] = input_metadata_size;
-
-  std::vector<ByteBuffer> serialized_request;
-  serialized_request.push_back(
-      std::make_pair(request_metadata, request_metadata_size));
-  serialized_request.push_back(
-      std::make_pair(input_metadata_size_buf, input_metadata_size_buf_size));
-  serialized_request.push_back(
-      std::make_pair(input_metadata, input_metadata_size));
-  for (size_t i = 0; i < input_bufs.size(); i++) {
-    serialized_request.push_back(std::make_pair(input_bufs[i], input_metadata_raw[i + 2]));
-  }
-  return serialized_request;
-}
+// std::vector<ByteBuffer> rpc::PredictionRequest::serialize() {
+//   if (input_data_size_ <= 0) {
+//     throw std::length_error(
+//         "Attempted to serialize a request with no input data!");
+//   }
+//
+//   size_t request_metadata_size = 1 * sizeof(uint32_t);
+//   uint32_t *request_metadata =
+//       static_cast<uint32_t *>(malloc(request_metadata_size));
+//   request_metadata[0] = static_cast<uint32_t>(RequestType::PredictRequest);
+//
+//   // std::shared_ptr<uint8_t> request_metadata(
+//   //     static_cast<uint8_t *>(malloc(request_metadata_size)), free);
+//   // uint32_t *request_metadata_raw =
+//   //     reinterpret_cast<uint32_t *>(request_metadata.get());
+//   // request_metadata_raw[0] =
+//   // static_cast<uint32_t>(RequestType::PredictRequest);
+//
+//   size_t input_metadata_size = (2 + (inputs_.size() - 1)) * sizeof(uint32_t);
+//   uint32_t *input_metadata =
+//       static_cast<uint32_t *>(malloc(input_metadata_size));
+//   input_metadata[0] = static_cast<uint32_t>(input_type_);
+//   input_metadata[1] = static_cast<uint32_t>(inputs_.size());
+//
+//   for (size_t i = 0; i < inputs_.size(); ++i) {
+//     input_metadata[i + 2] = static_cast<uint32_t>(inputs_[i]->byte_size());
+//   }
+//
+//   // std::shared_ptr<uint8_t> input_metadata(
+//   //     static_cast<uint8_t *>(malloc(input_metadata_size)), free);
+//   // uint32_t *input_metadata_raw =
+//   //     reinterpret_cast<uint32_t *>(input_metadata.get());
+//   // input_metadata_raw[0] = static_cast<uint32_t>(input_type_);
+//   // input_metadata_raw[1] = static_cast<uint32_t>(inputs_.size());
+//   //
+//   // std::vector<std::shared_ptr<void>> input_bufs;
+//   // for (size_t i = 0; i < inputs_.size(); i++) {
+//   //   inputs_[i]->serialize(input_bufs);
+//   //   input_metadata_raw[i + 2] =
+//   //   static_cast<uint32_t>(inputs_[i]->byte_size());
+//   // }
+//
+//   size_t input_metadata_size_buf_size = 1 * sizeof(long);
+//   long *input_metadata_size_buf =
+//       static_cast<long *>(malloc(input_metadata_size_buf_size));
+//   // Add the size of the input metadata in bytes. This will be
+//   // sent prior to the input metadata to allow for proactive
+//   // buffer allocation in the receiving container
+//   input_metadata_size_buf[0] = input_metadata_size;
+//
+//   // size_t input_metadata_size_buf_size = 1 * sizeof(long);
+//   // std::shared_ptr<uint8_t> input_metadata_size_buf(
+//   //     static_cast<uint8_t *>(malloc(input_metadata_size_buf_size)), free);
+//   // long *input_metadata_size_buf_raw =
+//   //     reinterpret_cast<long *>(input_metadata_size_buf.get());
+//   // // Add the size of the input metadata in bytes. This will be
+//   // // sent prior to the input metadata to allow for proactive
+//   // // buffer allocation in the receiving container
+//   // input_metadata_size_buf_raw[0] = input_metadata_size;
+//
+//   std::vector<ByteBuffer> serialized_request;
+//   serialized_request.push_back(std::make_pair(
+//       reinterpret_cast<void *>(request_metadata), request_metadata_size));
+//   serialized_request.push_back(
+//       std::make_pair(reinterpret_cast<void *>(input_metadata_size_buf),
+//                      input_metadata_size_buf_size));
+//   serialized_request.push_back(std::make_pair(
+//       reinterpret_cast<void *>(input_metadata), input_metadata_size));
+//
+//   for (size_t i = 0; i < inputs_.size(); ++i) {
+//     serialized_request.push_back(
+//         std::make_pair(inputs_[i]->get_data(), inputs_[i]->byte_size()));
+//   }
+//   return serialized_request;
+// }
 
 rpc::PredictionResponse::PredictionResponse(
     const std::vector<std::shared_ptr<OutputData>> outputs)
@@ -494,52 +354,33 @@ rpc::PredictionResponse::deserialize_prediction_response(
   return PredictionResponse(outputs);
 }
 
-Query::Query(std::string label, long user_id, std::shared_ptr<Input> input,
-             long latency_budget_micros, std::string selection_policy,
-             std::vector<VersionedModelId> candidate_models)
-    : label_(label),
-      user_id_(user_id),
-      input_(input),
-      latency_budget_micros_(latency_budget_micros),
-      selection_policy_(selection_policy),
-      candidate_models_(candidate_models),
-      create_time_(std::chrono::high_resolution_clock::now()) {}
+// Query::Query(std::string label, long user_id, std::shared_ptr<Input> input,
+//              long latency_budget_micros, std::string selection_policy,
+//              std::vector<VersionedModelId> candidate_models)
+//     : label_(label),
+//       user_id_(user_id),
+//       input_(input),
+//       latency_budget_micros_(latency_budget_micros),
+//       selection_policy_(selection_policy),
+//       candidate_models_(candidate_models),
+//       create_time_(std::chrono::high_resolution_clock::now()) {}
+//
+// Response::Response(Query query, QueryId query_id, const long duration_micros,
+//                    Output output, const bool output_is_default,
+//                    const boost::optional<std::string> default_explanation)
+//     : query_(std::move(query)),
+//       query_id_(query_id),
+//       duration_micros_(duration_micros),
+//       output_(std::move(output)),
+//       output_is_default_(output_is_default),
+//       default_explanation_(std::move(default_explanation)) {}
 
-Response::Response(Query query, QueryId query_id, const long duration_micros,
-                   Output output, const bool output_is_default,
-                   const boost::optional<std::string> default_explanation)
-    : query_(std::move(query)),
-      query_id_(query_id),
-      duration_micros_(duration_micros),
-      output_(std::move(output)),
-      output_is_default_(output_is_default),
-      default_explanation_(std::move(default_explanation)) {}
-
-Feedback::Feedback(std::shared_ptr<Input> input, double y)
-    : y_(y), input_(input) {}
-
-FeedbackQuery::FeedbackQuery(std::string label, long user_id, Feedback feedback,
-                             std::string selection_policy,
-                             std::vector<VersionedModelId> candidate_models)
-    : label_(label),
-      user_id_(user_id),
-      feedback_(feedback),
-      selection_policy_(selection_policy),
-      candidate_models_(candidate_models) {}
-
-PredictTask::PredictTask(std::shared_ptr<Input> input, VersionedModelId model,
+PredictTask::PredictTask(InputVector input, VersionedModelId model,
                          float utility, QueryId query_id,
                          long latency_slo_micros)
-    : input_(std::move(input)),
+    : input_(input),
       model_(model),
       utility_(utility),
-      query_id_(query_id),
-      latency_slo_micros_(latency_slo_micros) {}
-
-FeedbackTask::FeedbackTask(Feedback feedback, VersionedModelId model,
-                           QueryId query_id, long latency_slo_micros)
-    : feedback_(feedback),
-      model_(model),
       query_id_(query_id),
       latency_slo_micros_(latency_slo_micros) {}
 

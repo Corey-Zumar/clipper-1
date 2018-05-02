@@ -4,8 +4,8 @@
 #include <chrono>
 #include <iostream>
 
-#include <redox.hpp>
 #include <concurrentqueue.h>
+#include <redox.hpp>
 
 #include <clipper/config.hpp>
 #include <clipper/datatypes.hpp>
@@ -31,8 +31,11 @@ namespace rpc {
 constexpr int INITIAL_REPLICA_ID_SIZE = 100;
 
 RPCService::RPCService()
-    : request_queue_(std::make_shared<moodycamel::ConcurrentQueue<RPCRequest>>(sizeof(RPCRequest) * 10000)),
-      response_queue_(std::make_shared<moodycamel::ConcurrentQueue<RPCResponse>>(sizeof(RPCResponse) * 10000)),
+    : request_queue_(std::make_shared<moodycamel::ConcurrentQueue<RPCRequest>>(
+          sizeof(RPCRequest) * 10000)),
+      response_queue_(
+          std::make_shared<moodycamel::ConcurrentQueue<RPCResponse>>(
+              sizeof(RPCResponse) * 10000)),
       active_(false),
       // The version of the unordered_map constructor that allows
       // you to specify your own hash function also requires you
@@ -69,7 +72,7 @@ void RPCService::stop() {
   }
 }
 
-int RPCService::send_message(const vector<ByteBuffer> &msg,
+int RPCService::send_message(std::vector<message_t> msg,
                              const int zmq_connection_id) {
   if (!active_) {
     log_error(LOGGING_TAG_RPC,
@@ -85,13 +88,14 @@ int RPCService::send_message(const vector<ByteBuffer> &msg,
           .count();
   RPCRequest request(zmq_connection_id, id, std::move(msg),
                      current_time_micros);
-  request_queue_->enqueue(request);
+  request_queue_->enqueue(std::move(request));
   return id;
 }
 
 vector<RPCResponse> RPCService::try_get_responses(const int max_num_responses) {
   std::vector<RPCResponse> vec(response_queue_->size_approx());
-  size_t num_dequeued = response_queue_->try_dequeue_bulk(vec.begin(), vec.size());
+  size_t num_dequeued =
+      response_queue_->try_dequeue_bulk(vec.begin(), vec.size());
   vec.resize(num_dequeued);
   return vec;
 }
@@ -99,8 +103,8 @@ vector<RPCResponse> RPCService::try_get_responses(const int max_num_responses) {
 void RPCService::manage_service(const string address) {
   // Map from container id to unique routing id for zeromq
   // Note that zeromq socket id is a byte vector
-  log_info_formatted(LOGGING_TAG_RPC,
-                     "RPC thread started at address: ", address);
+  log_info_formatted(LOGGING_TAG_RPC, "RPC thread started at address: ",
+                     address);
   boost::bimap<int, vector<uint8_t>> connections;
   // Initializes a map to associate the ZMQ connection IDs
   // of connected containers with their metadata, including
@@ -166,6 +170,10 @@ void RPCService::shutdown_service(socket_t &socket) {
   socket.close();
 }
 
+void noop_free(void *data, void *hint) {}
+
+void real_free(void *data, void *hint) { free(data); }
+
 void RPCService::send_messages(socket_t &socket,
                                boost::bimap<int, vector<uint8_t>> &connections,
                                int max_num_messages) {
@@ -174,14 +182,11 @@ void RPCService::send_messages(socket_t &socket,
   }
 
   std::vector<RPCRequest> requests(max_num_messages);
-  size_t num_requests = request_queue_->try_dequeue_bulk(requests.begin(), max_num_messages);
+  size_t num_requests =
+      request_queue_->try_dequeue_bulk(requests.begin(), max_num_messages);
 
-  for(size_t i = 0; i < num_requests; i++) {
-    RPCRequest& request = requests[i];
-    long current_time_micros =
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::system_clock::now().time_since_epoch())
-            .count();
+  for (size_t i = 0; i < num_requests; i++) {
+    RPCRequest &request = requests[i];
     boost::bimap<int, vector<uint8_t>>::left_const_iterator connection =
         connections.left.find(std::get<0>(request));
     if (connection == connections.left.end()) {
@@ -206,14 +211,15 @@ void RPCService::send_messages(socket_t &socket,
     int cur_msg_num = 0;
     // subtract 1 because we start counting at 0
     int last_msg_num = std::get<2>(request).size() - 1;
-    for (const ByteBuffer &m : std::get<2>(request)) {
+    for (message_t &cur_message : std::get<2>(request)) {
+      // message_t cur_buffer(m.first, m.second, noop_free);
       // send the sndmore flag unless we are on the last message part
       if (cur_msg_num < last_msg_num) {
-        socket.send(m.first.get(), m.second, ZMQ_SNDMORE);
+        socket.send(cur_message, ZMQ_SNDMORE);
       } else {
-        socket.send(m.first.get(), m.second, 0);
+        socket.send(cur_message);
       }
-      cur_msg_num++;
+      cur_msg_num += 1;
     }
   }
 }
@@ -284,7 +290,6 @@ void RPCService::receive_message(
       }
     } break;
     case MessageType::ContainerContent: {
-
       log_info(LOGGING_TAG_RPC, "receiving response from container");
       // This message is a response to a container query
       message_t msg_id;
