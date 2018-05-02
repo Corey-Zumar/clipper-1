@@ -71,7 +71,7 @@ class ExperimentConfig:
         self.machine_addrs = machine_addrs
         self.batch_size = batch_size
         self.process_path = process_path
-        self.trial_length = trial_length
+        self.trial_length = 10 * batch_size
         self.num_trials = num_trials
         self.slo_millis = slo_millis
         self.lambda_val = lambda_val
@@ -308,11 +308,9 @@ class DriverBenchmarker:
         while True:
             if len(stats_manager.stats["per_message_lats"]) < .98 * len(arrival_process):
                 time.sleep(QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS * 2)
-            else:
-                break
 
-            if len(stats_manager.stats["thrus"]) < 6:
-                continue
+            if len(stats_manager.stats["thrus"]) > 10:
+                break
             
             enqueue_rate = self.spd_client.get_enqueue_rate()
             dequeue_rate = stats_manager.get_mean_thru_for_dequeue()

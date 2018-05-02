@@ -94,9 +94,11 @@ class SPDClient:
         self.inflight_msgs = inflight_msgs
         self.inflight_msgs_lock = inflight_msgs_lock
 
+        self.fixed_batch_size = fixed_batch_size
+
         if fixed_batch_size:
-            # Send 50000 queries at a rate of 1000 qps
-            self.arrival_process_seconds = [.001 for _ in range(50000)]
+            # Send 200000 queries at a rate of 2000 qps
+            self.arrival_process_seconds = [.0005 for _ in range(200000)]
         else:
             self.arrival_process_seconds = [item * .001 for item in arrival_process_millis] 
         self.active = True
@@ -164,76 +166,93 @@ class SPDClient:
 
             input_header_buffer = bytearray(INITIAL_INPUT_HEADER_BUFFER_SIZE)
             dequeue_trial_begin = datetime.now()
+
+            inps_idx = 0
+            msg_id = 0
             while self.active:
                 self.queue_lock.acquire()
                 self.inflight_msgs_lock.acquire()
 
-                if self.last_dequeued_time:
-                    curr_time = datetime.now()
-                    time_since_dequeue = (curr_time - self.last_dequeued_time).total_seconds()
-                    accounted_delay = 0
-                    while self.process_idx < len(self.arrival_process_seconds):
-                        request_delay_seconds = self.arrival_process_seconds[self.process_idx]
-                        if accounted_delay + request_delay_seconds < time_since_dequeue:
-                            accounted_delay += request_delay_seconds
-                            send_time = self.last_dequeued_time + timedelta(seconds=accounted_delay)
-                            
-                            input_idx = np.random.randint(0, len(self.inputs))
-                            new_input = self.inputs[input_idx]
-                            msg_id = self.process_idx
+                inputs = self.inputs[inps_idx : inps_idx + self.fixed_batch_size]
+                inps_idx += self.fixed_batch_size
+                if inps_idx >= len(self.inputs) - self.fixed_batch_size:
+                    inps_idx = 0
 
-                            self.inflight_msgs[msg_id] = send_time
+                msg_ids = range(msg_id, msg_id + self.fixed_batch_size)
+                msg_id += self.fixed_batch_size
 
-                            self.request_queue.append((new_input, msg_id, send_time))
-                            self.process_idx += 1
-                            self.update_enqueue_rate(1)
-                        else:
-                            time_cut = time_since_dequeue - accounted_delay
-                            self.arrival_process_seconds[self.process_idx] -= time_cut
-                            break
+                send_time = datetime.now()
+                for outbound_msg_id in msg_ids:
+                    self.inflight_msgs[outbound_msg_id] = send_time
 
-                else:
-                    assert self.process_idx == 0
-                    time.sleep(self.arrival_process_seconds[self.process_idx])
-                    send_time = datetime.now()
-                    
-                    input_idx = np.random.randint(0, len(self.inputs))
-                    new_input = self.inputs[input_idx]
-                    msg_id = self.process_idx
-                    self.inflight_msgs[msg_id] = send_time
-
-                    self.request_queue.append((new_input, msg_id, send_time))
-                    self.process_idx += 1
-                    self.update_enqueue_rate(1)
-
-                inputs = []
-                msg_ids = []
-                expiration_ids = []
-
-                dequeue_time = datetime.now()
-                while len(inputs) < self.batch_size and len(self.request_queue) > 0:
-                    inp_item, msg_id, send_time = self.request_queue.popleft()
-                    if (dequeue_time - send_time).total_seconds() * 1000 > self.slo_millis:
-                        expiration_ids.append(msg_id)
-                    else:
-                        msg_ids.append(msg_id)
-                        inputs.append(inp_item)
-                        # Only count a query as "dequeued"
-                        # if it has not expired
-                        self.update_dequeue_rate(1)
-
-                self.last_dequeued_time = datetime.now()
+                # if self.last_dequeued_time:
+                #     curr_time = datetime.now()
+                #     time_since_dequeue = (curr_time - self.last_dequeued_time).total_seconds()
+                #     accounted_delay = 0
+                #     while self.process_idx < len(self.arrival_process_seconds):
+                #         request_delay_seconds = self.arrival_process_seconds[self.process_idx]
+                #         if accounted_delay + request_delay_seconds < time_since_dequeue:
+                #             accounted_delay += request_delay_seconds
+                #             send_time = self.last_dequeued_time + timedelta(seconds=accounted_delay)
+                #             
+                #             input_idx = np.random.randint(0, len(self.inputs))
+                #             new_input = self.inputs[input_idx]
+                #             msg_id = self.process_idx
+                #
+                #             self.inflight_msgs[msg_id] = send_time
+                #
+                #             self.request_queue.append((new_input, msg_id, send_time))
+                #             self.process_idx += 1
+                #             self.update_enqueue_rate(1)
+                #         else:
+                #             time_cut = time_since_dequeue - accounted_delay
+                #             self.arrival_process_seconds[self.process_idx] -= time_cut
+                #             break
+                #
+                # else:
+                #     assert self.process_idx == 0
+                #     time.sleep(self.arrival_process_seconds[self.process_idx])
+                #     send_time = datetime.now()
+                #     
+                #     input_idx = np.random.randint(0, len(self.inputs))
+                #     new_input = self.inputs[input_idx]
+                #     msg_id = self.process_idx
+                #     self.inflight_msgs[msg_id] = send_time
+                #
+                #     self.request_queue.append((new_input, msg_id, send_time))
+                #     self.process_idx += 1
+                #     self.update_enqueue_rate(1)
+                #
+                # inputs = []
+                # msg_ids = []
+                # expiration_ids = []
+                #
+                # dequeue_time = datetime.now()
+                # while len(inputs) < self.batch_size and len(self.request_queue) > 0:
+                #     inp_item, msg_id, send_time = self.request_queue.popleft()
+                #     if (dequeue_time - send_time).total_seconds() * 1000 > self.slo_millis:
+                #         expiration_ids.append(msg_id)
+                #     else:
+                #         msg_ids.append(msg_id)
+                #         inputs.append(inp_item)
+                #         # Only count a query as "dequeued"
+                #         # if it has not expired
+                #         self.update_dequeue_rate(1)
+                #
+                # self.last_dequeued_time = datetime.now()
                 
                 self.inflight_msgs_lock.release()
                 self.queue_lock.release()
 
-                expiration_threadpool.submit(self.expiration_callback, expiration_ids)
+                # expiration_threadpool.submit(self.expiration_callback, expiration_ids)
+                #
+                # if len(msg_ids) == 0:
+                #     # We filtered out all incoming requests because they expired. We should
+                #     # check the queue again
+                #     continue
 
-                if len(msg_ids) == 0:
-                    # We filtered out all incoming requests because they expired. We should
-                    # check the queue again
-                    continue
-
+                before = datetime.now()
+                
                 msg_ids = np.array(msg_ids, dtype=np.uint32)
 
                 input_header_size = (1 + len(inputs)) * UINT32_SIZE_BYTES
@@ -249,8 +268,6 @@ class SPDClient:
 
                 input_header = memoryview(input_header_buffer)[:input_header_size]
 
-                # input_header = np.array([len(inputs)] + [(len(inp) * INPUT_DTYPE.itemsize) for inp in inputs], dtype=np.uint32)
-                
                 # Send the empty delimeter required at the start of a new message
 
                 socket.send("", zmq.SNDMORE)
@@ -273,6 +290,10 @@ class SPDClient:
                 else:
                     logger.info("Undefined receive behavior")
                     raise
+
+                after = datetime.now()
+
+                # print((after - before).total_seconds())
 
                 callback_threadpool.submit(self.stats_callback, replica_num, parsed_output_msg_ids)
         except Exception as e:

@@ -79,7 +79,7 @@ class ExperimentConfig:
         self.machine_addrs = machine_addrs
         self.batch_size = batch_size
         self.process_path = process_path
-        self.trial_length = trial_length
+        self.trial_length = batch_size * 10 
         self.num_trials = num_trials
         self.slo_millis = slo_millis
         self.lambda_val = lambda_val
@@ -302,7 +302,7 @@ class DriverBenchmarker:
         else:
             batch_size = experiment_config.batch_size
 
-        self.spd_client.start((fixed_batch_size is not None),
+        self.spd_client.start(fixed_batch_size,
                               batch_size, 
                               self.experiment_config.slo_millis,
                               stats_update_callback,
@@ -312,7 +312,7 @@ class DriverBenchmarker:
                               arrival_process)
 
         while True:
-            if len(stats_manager.stats["per_message_lats"]) < .98 * len(arrival_process):
+            if len(stats_manager.stats["per_message_lats"]) < 1100:
                 time.sleep(QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS * 2)
             else:
                 break
