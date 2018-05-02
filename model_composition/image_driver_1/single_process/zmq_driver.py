@@ -27,7 +27,7 @@ TF_KERNEL_SVM_MODEL_NAME = "kernel_svm"
 TF_LOG_REG_MODEL_NAME = "tf_log_reg"
 TF_RESNET_FEATS_MODEL_NAME = "tf_resnet_feats"
 
-TF_ALEXNET_MODEL_NAME = "tf_alexnet_feats"
+TF_ALEXNET_FEATS_MODEL_NAME = "tf_alexnet_feats"
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
