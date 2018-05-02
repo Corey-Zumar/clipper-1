@@ -217,7 +217,8 @@ def populate_configs_directory(hierarchy_path,
             num_configured_replicas = curr_total_replica_config[key]
             num_required_replicas, _ = required_replica_config[key]
 
-            if num_configured_replicas < num_required_replicas:
+            # Only assign one replica of CPU-bound models to each machine; this avoids PCPU contention issues
+            if num_configured_replicas < num_required_replicas and not (key in [PROFILE_KEY_KSVM, PROFILE_KEY_LOG_REG] and num_configured_replicas > 0 and curr_machine_num < 6):
                 required_additional_gpus = GPUS_PER_REPLICA[key]
                 required_additional_pcpus = PCPUS_PER_REPLICA[key]
 
