@@ -1,0 +1,38 @@
+[
+    {
+        "machine_address": "172.34.127.150:9500", 
+        "config_path": "2X_EXPERIMENT/CONFIGS/tagged/600ms_cv1.0/mean_provision/lambda_1482/1482_9_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.34.127.150:9501", 
+        "config_path": "2X_EXPERIMENT/CONFIGS/tagged/600ms_cv1.0/mean_provision/lambda_1482/1482_9_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.34.127.150:9502", 
+        "config_path": "2X_EXPERIMENT/CONFIGS/tagged/600ms_cv1.0/mean_provision/lambda_1482/1482_9_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.34.127.150:9503", 
+        "config_path": "2X_EXPERIMENT/CONFIGS/tagged/600ms_cv1.0/mean_provision/lambda_1482/1482_9_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.34.68.142:9500", 
+        "config_path": "2X_EXPERIMENT/CONFIGS/tagged/600ms_cv1.0/mean_provision/lambda_1482/1482_9_rep_config_m1.json"
+    }, 
+    {
+        "machine_address": "172.34.68.142:9501", 
+        "config_path": "2X_EXPERIMENT/CONFIGS/tagged/600ms_cv1.0/mean_provision/lambda_1482/1482_9_rep_config_m1.json"
+    }, 
+    {
+        "machine_address": "172.34.68.142:9502", 
+        "config_path": "2X_EXPERIMENT/CONFIGS/tagged/600ms_cv1.0/mean_provision/lambda_1482/1482_9_rep_config_m1.json"
+    }, 
+    {
+        "machine_address": "172.34.68.142:9503", 
+        "config_path": "2X_EXPERIMENT/CONFIGS/tagged/600ms_cv1.0/mean_provision/lambda_1482/1482_9_rep_config_m1.json"
+    }, 
+    {
+        "machine_address": "172.34.104.212:9500", 
+        "config_path": "2X_EXPERIMENT/CONFIGS/tagged/600ms_cv1.0/mean_provision/lambda_1482/1482_9_rep_config_m2.json"
+    }
+]
