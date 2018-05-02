@@ -1,0 +1,24 @@
+{
+    "process_path": "CONFIGS_COST_300_500/slo_300/cv_4.0/mean_provision/lambda_210/210_4.0.deltas", 
+    "batch_size": 46, 
+    "gpu_affinities": [
+        "0 1", 
+        "2 3"
+    ], 
+    "num_trials": 30, 
+    "cpu_affinities": [
+        "0 1 16 17", 
+        "2 3 18 19"
+    ], 
+    "trial_length": 1050, 
+    "replica_nums": [
+        0, 
+        1
+    ], 
+    "slo_millis": 300, 
+    "cv": 4.0, 
+    "process_mean_thru": 210, 
+    "max_estimated_thru": 313.89286755249265, 
+    "process_peak_thru": 403.3333333333333, 
+    "lambda": 210
+}
