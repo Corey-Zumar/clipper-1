@@ -33,7 +33,6 @@ class ModelContainer {
   size_t get_batch_size(Deadline deadline);
   double get_average_throughput_per_millisecond();
   void update_throughput(size_t batch_size, long total_latency);
-  void send_feedback(PredictTask task);
   void set_batch_size(int batch_size);
 
   VersionedModelId model_;
@@ -45,7 +44,6 @@ class ModelContainer {
 
  private:
   bool connected_{true};
-  Queue<FeedbackTask> feedback_queue_;
   boost::shared_mutex throughput_mutex_;
   double avg_throughput_per_milli_;
   boost::circular_buffer<double> throughput_buffer_;

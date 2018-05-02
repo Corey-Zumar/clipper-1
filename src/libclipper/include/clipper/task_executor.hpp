@@ -10,9 +10,9 @@
 #include <boost/optional.hpp>
 
 #include <redox.hpp>
+#include <zmq.hpp>
 
-#include <folly/futures/Future.h>
-
+#include <clipper/callback_threadpool.hpp>
 #include <clipper/config.hpp>
 #include <clipper/containers.hpp>
 #include <clipper/datatypes.hpp>
@@ -72,46 +72,21 @@ class CacheEntry {
   bool completed_ = false;
   bool used_ = true;
   Output value_;
-  std::vector<folly::Promise<Output>> value_promises_;
+  std::vector<std::function<void(Output)>> value_callbacks_;
 };
 
 // A cache page is a pair of <hash, entry_size>
 using CachePage = std::pair<long, long>;
 
-class PredictionCache {
- public:
-  PredictionCache(size_t size_bytes);
-  folly::Future<Output> fetch(const VersionedModelId &model,
-                              const std::shared_ptr<Input> &input);
-
-  void put(const VersionedModelId &model, const std::shared_ptr<Input> &input,
-           const Output &output);
-
- private:
-  size_t hash(const VersionedModelId &model, size_t input_hash) const;
-  void insert_entry(const long key, CacheEntry &value);
-  void evict_entries(long space_needed_bytes);
-
-  std::mutex m_;
-  const size_t max_size_bytes_;
-  size_t size_bytes_ = 0;
-  // TODO cache needs a promise as well?
-  std::unordered_map<long, CacheEntry> entries_;
-  std::vector<long> page_buffer_;
-  size_t page_buffer_index_ = 0;
-  std::shared_ptr<metrics::Counter> lookups_counter_;
-  std::shared_ptr<metrics::RatioCounter> hit_ratio_;
-};
-
 // NOTE: Prediction cache is now a query cache
 class QueryCache {
  public:
   QueryCache(size_t size_bytes);
-  folly::Future<Output> fetch(const VersionedModelId &model,
-                              const QueryId query_id);
+  bool fetch(const VersionedModelId &model, const QueryId query_id,
+             std::function<void(Output)> callback);
 
   void put(const VersionedModelId &model, const QueryId query_id,
-              Output output);
+           Output output);
 
  private:
   size_t hash(const VersionedModelId &model, const QueryId query_id) const;
@@ -127,6 +102,7 @@ class QueryCache {
   size_t page_buffer_index_ = 0;
   std::shared_ptr<metrics::Counter> lookups_counter_;
   std::shared_ptr<metrics::RatioCounter> hit_ratio_;
+  CallbackThreadPool callback_threadpool_;
 };
 
 struct DeadlineCompare {
@@ -139,7 +115,11 @@ struct DeadlineCompare {
 // thread safe model queue
 class ModelQueue {
  public:
-  ModelQueue() : queue_(ModelPQueue{}) {}
+  ModelQueue(std::string name)
+      : queue_(ModelPQueue{}),
+        lock_latency_hist_(
+            metrics::MetricsRegistry::get_metrics().create_histogram(
+                name + ":lock_latency", "microseconds", 4096)) {}
 
   // Disallow copy and assign
   ModelQueue(const ModelQueue &) = delete;
@@ -151,9 +131,21 @@ class ModelQueue {
   ~ModelQueue() = default;
 
   void add_task(PredictTask task) {
+    std::chrono::time_point<std::chrono::system_clock> start_time =
+        std::chrono::system_clock::now();
     std::lock_guard<std::mutex> lock(queue_mutex_);
-    Deadline deadline = std::chrono::system_clock::now() +
-                        std::chrono::microseconds(task.latency_slo_micros_);
+
+    std::chrono::time_point<std::chrono::system_clock> current_time =
+        std::chrono::system_clock::now();
+
+    auto lock_latency = current_time - start_time;
+    long lock_latency_micros =
+        std::chrono::duration_cast<std::chrono::microseconds>(lock_latency)
+            .count();
+    lock_latency_hist_->insert(static_cast<int64_t>(lock_latency_micros));
+
+    Deadline deadline =
+        current_time + std::chrono::microseconds(task.latency_slo_micros_);
     queue_.emplace(deadline, std::move(task));
     queue_not_empty_condition_.notify_one();
   }
@@ -187,6 +179,7 @@ class ModelQueue {
   ModelPQueue queue_;
   std::mutex queue_mutex_;
   std::condition_variable queue_not_empty_condition_;
+  std::shared_ptr<metrics::Histogram> lock_latency_hist_;
 
   // Deletes tasks with deadlines prior or equivalent to the
   // current system time. This method should only be called
@@ -212,7 +205,7 @@ class InflightMessage {
   InflightMessage(
       const std::chrono::time_point<std::chrono::system_clock> send_time,
       const int container_id, const VersionedModelId model,
-      const int replica_id, const std::shared_ptr<Input> input, const QueryId query_id)
+      const int replica_id, const InputVector input, const QueryId query_id)
       : send_time_(send_time),
         container_id_(container_id),
         model_(model),
@@ -232,9 +225,16 @@ class InflightMessage {
   int container_id_;
   VersionedModelId model_;
   int replica_id_;
-  std::shared_ptr<Input> input_;
+  InputVector input_;
   QueryId query_id_;
 };
+
+void noop_free(void *data, void *hint);
+
+void real_free(void *data, void *hint);
+
+std::vector<zmq::message_t> construct_batch_message(
+    std::vector<PredictTask> tasks);
 
 class TaskExecutor {
  public:
@@ -283,19 +283,17 @@ class TaskExecutor {
                 "Retrying in 1 second...");
       std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-    redis::subscribe_to_model_changes(
-        redis_subscriber_,
-        [ this, task_executor_valid = active_ ](const std::string &key,
-                                               const std::string &event_type) {
-          if (event_type == "hset" && *task_executor_valid) {
-            auto model_info = redis::get_model_by_key(redis_connection_, key);
-            VersionedModelId model_id = VersionedModelId(model_info["model_name"], model_info["model_version"]);
-            int batch_size = std::stoi(model_info["batch_size"]);
-            active_containers_->register_batch_size(model_id, batch_size);
-          }
-        }
-    );
-
+    redis::subscribe_to_model_changes(redis_subscriber_, [
+      this, task_executor_valid = active_
+    ](const std::string &key, const std::string &event_type) {
+      if (event_type == "hset" && *task_executor_valid) {
+        auto model_info = redis::get_model_by_key(redis_connection_, key);
+        VersionedModelId model_id = VersionedModelId(
+            model_info["model_name"], model_info["model_version"]);
+        int batch_size = std::stoi(model_info["batch_size"]);
+        active_containers_->register_batch_size(model_id, batch_size);
+      }
+    });
 
     redis::send_cmd_no_reply<std::string>(
         redis_connection_, {"CONFIG", "SET", "notify-keyspace-events", "AKE"});
@@ -349,53 +347,28 @@ class TaskExecutor {
   TaskExecutor(TaskExecutor &&other) = default;
   TaskExecutor &operator=(TaskExecutor &&other) = default;
 
-  std::vector<folly::Future<Output>> schedule_predictions(
-      std::vector<PredictTask> tasks) {
-    predictions_counter_->increment(tasks.size());
-    std::vector<folly::Future<Output>> output_futures;
-    for (auto &t : tasks) {
-      // add each task to the queue corresponding to its associated model
-      boost::shared_lock<boost::shared_mutex> lock(model_queues_mutex_);
-      auto model_queue_entry = model_queues_.find(t.model_);
-      if (model_queue_entry != model_queues_.end()) {
-        output_futures.push_back(cache_->fetch(t.model_, t.query_id_));
-        // output_futures.push_back(cache_->fetch(t.model_, t.input_));
-        if (!output_futures.back().isReady()) {
-          t.recv_time_ = std::chrono::system_clock::now();
-          model_queue_entry->second->add_task(t);
-          log_info_formatted(LOGGING_TAG_TASK_EXECUTOR,
-                             "Adding task to queue. QueryID: {}, model: {}",
-                             t.query_id_, t.model_.serialize());
-          boost::shared_lock<boost::shared_mutex> model_metrics_lock(
-              model_metrics_mutex_);
-          auto cur_model_metric_entry = model_metrics_.find(t.model_);
-          if (cur_model_metric_entry != model_metrics_.end()) {
-            auto cur_model_metric = cur_model_metric_entry->second;
-            cur_model_metric.cache_hit_ratio_->increment(0, 1);
-          }
-        } else {
-          boost::shared_lock<boost::shared_mutex> model_metrics_lock(
-              model_metrics_mutex_);
-          auto cur_model_metric_entry = model_metrics_.find(t.model_);
-          if (cur_model_metric_entry != model_metrics_.end()) {
-            auto cur_model_metric = cur_model_metric_entry->second;
-            cur_model_metric.cache_hit_ratio_->increment(1, 1);
-          }
-        }
-      } else {
-        log_error_formatted(LOGGING_TAG_TASK_EXECUTOR,
-                            "Received task for unknown model: {} : {}",
-                            t.model_.get_name(), t.model_.get_id());
+  void schedule_prediction(
+      PredictTask task,
+      std::function<void(Output)> &&task_completion_callback) {
+    predictions_counter_->increment(1);
+    // add each task to the queue corresponding to its associated model
+    boost::shared_lock<boost::shared_mutex> lock(model_queues_mutex_);
+    auto model_queue_entry = model_queues_.find(task.model_);
+    if (model_queue_entry != model_queues_.end()) {
+      bool cached = cache_->fetch(task.model_, task.query_id_,
+                                  std::move(task_completion_callback));
+      if (!cached) {
+        task.recv_time_ = std::chrono::system_clock::now();
+        model_queue_entry->second->add_task(task);
+        log_info_formatted(LOGGING_TAG_TASK_EXECUTOR,
+                           "Adding task to queue. QueryID: {}, model: {}",
+                           task.query_id_, task.model_.serialize());
       }
+    } else {
+      log_error_formatted(LOGGING_TAG_TASK_EXECUTOR,
+                          "Received task for unknown model: {} : {}",
+                          task.model_.get_name(), task.model_.get_id());
     }
-    return output_futures;
-  }
-
-  std::vector<folly::Future<FeedbackAck>> schedule_feedback(
-      const std::vector<FeedbackTask> tasks) {
-    UNUSED(tasks);
-    // TODO Implement
-    return {};
   }
 
  private:
@@ -405,8 +378,6 @@ class TaskExecutor {
   std::shared_ptr<ActiveContainers> active_containers_;
   std::unique_ptr<rpc::RPCService> rpc_;
   std::unique_ptr<QueryCache> cache_;
-  //QueryCache cache_;
-  //std::unique_ptr<PredictionCache> cache_;
   redox::Redox redis_connection_;
   redox::Subscriber redis_subscriber_;
   std::mutex inflight_messages_mutex_;
@@ -424,8 +395,8 @@ class TaskExecutor {
     // Adds a new <model_id, task_queue> entry to the queues map, if one
     // does not already exist
     boost::unique_lock<boost::shared_mutex> l(model_queues_mutex_);
-    auto queue_added = model_queues_.emplace(
-        std::make_pair(model_id, std::make_shared<ModelQueue>()));
+    auto queue_added = model_queues_.emplace(std::make_pair(
+        model_id, std::make_shared<ModelQueue>(model_id.serialize())));
     bool queue_created = queue_added.second;
     if (queue_created) {
       boost::unique_lock<boost::shared_mutex> l(model_metrics_mutex_);
@@ -469,24 +440,17 @@ class TaskExecutor {
       // into the map
       std::unique_lock<std::mutex> l(inflight_messages_mutex_);
       std::vector<InflightMessage> cur_batch;
-      rpc::PredictionRequest prediction_request(container->input_type_);
-      std::stringstream query_ids_in_batch;
+
+      std::vector<PredictTask> batch_tasks;
       std::chrono::time_point<std::chrono::system_clock> current_time =
           std::chrono::system_clock::now();
       for (auto b : batch) {
-        prediction_request.add_input(b.input_);
+        batch_tasks.push_back(b);
         cur_batch.emplace_back(current_time, container->container_id_, b.model_,
                                container->replica_id_, b.input_, b.query_id_);
-        query_ids_in_batch << b.query_id_ << " ";
       }
-      int message_id = rpc_->send_message(prediction_request.serialize(),
+      int message_id = rpc_->send_message(construct_batch_message(batch_tasks),
                                           container->container_id_);
-      log_info_formatted(LOGGING_TAG_TASK_EXECUTOR,
-                         "Sending batch to model: {} replica {}."
-                         "Batch size: {}. Query IDs: {}",
-                         model_id.serialize(), std::to_string(replica_id),
-                         std::to_string(batch.size()),
-                         query_ids_in_batch.str());
       inflight_messages_.emplace(message_id, std::move(cur_batch));
     } else {
       log_error_formatted(
@@ -546,7 +510,8 @@ class TaskExecutor {
       for (int batch_num = 0; batch_num < batch_size; ++batch_num) {
         InflightMessage completed_msg = keys[batch_num];
         cache_->put(completed_msg.model_, completed_msg.query_id_,
-                    Output{parsed_response.outputs_[batch_num], {completed_msg.model_}});
+                    Output{parsed_response.outputs_[batch_num],
+                           {completed_msg.model_}});
       }
     }
   }

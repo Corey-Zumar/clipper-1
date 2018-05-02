@@ -306,7 +306,9 @@ class DriverBenchmarker:
                               arrival_process)
 
         while True:
-            if len(stats_manager.stats["per_message_lats"]) < .98 * len(arrival_process):
+            if fixed_batch_size and len(stats_manager.stats["per_message_lats"]) < 10000:
+                time.sleep(QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS * 2)
+            elif (not fixed_batch_size) and len(stats_manager.stats["per_message_lats"]) < .98 * len(arrival_process):
                 time.sleep(QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS * 2)
             else:
                 break
@@ -317,8 +319,6 @@ class DriverBenchmarker:
             enqueue_rate = self.spd_client.get_enqueue_rate()
             dequeue_rate = stats_manager.get_mean_thru_for_dequeue()
 
-            # dequeue_rate = self.spd_client.get_dequeue_rate()
-            #
             print(enqueue_rate, dequeue_rate)
 
             if dequeue_rate == 0 and enqueue_rate > 0:

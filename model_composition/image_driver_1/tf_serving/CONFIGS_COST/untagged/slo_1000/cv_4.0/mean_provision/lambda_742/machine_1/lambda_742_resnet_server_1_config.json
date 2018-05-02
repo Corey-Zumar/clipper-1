@@ -1,0 +1,20 @@
+{
+    "vcpus_per_replica": 2, 
+    "batch_size": 1, 
+    "ports": [
+        9500, 
+        9501
+    ], 
+    "num_replicas": 2, 
+    "allocated_gpus": [
+        1, 
+        0
+    ], 
+    "allocated_vcpus": [
+        13, 
+        29, 
+        12, 
+        28
+    ], 
+    "model_name": "resnet"
+}

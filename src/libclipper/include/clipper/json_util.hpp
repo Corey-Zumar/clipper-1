@@ -6,7 +6,6 @@
 #include <stdexcept>
 #include <unordered_map>
 
-using clipper::Input;
 using clipper::DataType;
 using clipper::Output;
 using clipper::VersionedModelId;
@@ -94,7 +93,7 @@ void parse_json(const char* json_content, size_t length,
 
 void parse_json(const std::string& json_content, rapidjson::Document& d);
 
-std::shared_ptr<Input> parse_input(DataType input_type, rapidjson::Value& d);
+// std::shared_ptr<Input> parse_input(DataType input_type, rapidjson::Value& d);
 
 /* Utilities for serialization into JSON */
 void add_kv_pair(rapidjson::Document& d, const char* key_name,

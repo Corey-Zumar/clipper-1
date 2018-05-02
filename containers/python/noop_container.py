@@ -3,14 +3,16 @@ import rpc
 import os
 import sys
 import numpy as np
-import time
+# import time
+
 
 class NoopContainer(rpc.ModelContainerBase):
     def __init__(self, prediction="1.0"):
         self.prediction = prediction
 
     def _predict(self, inputs):
-        return [self.prediction] * len(inputs)
+        return [np.array(np.sum(i)) for i in inputs]
+        # return [self.prediction] * len(inputs)
 
     def predict_ints(self, inputs):
         return self._predict(inputs)
@@ -56,7 +58,7 @@ if __name__ == "__main__":
     else:
         print("Connecting to Clipper with default port: 7000")
 
-    input_type = "doubles"
+    input_type = "floats"
     if "CLIPPER_INPUT_TYPE" in os.environ:
         input_type = os.environ["CLIPPER_INPUT_TYPE"]
     else:

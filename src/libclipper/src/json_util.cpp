@@ -16,7 +16,6 @@
 #include <clipper/json_util.hpp>
 #include <clipper/redis.hpp>
 
-using clipper::Input;
 using clipper::DataType;
 using clipper::Output;
 using clipper::VersionedModelId;
@@ -262,48 +261,53 @@ void parse_json(const std::string& json_content, rapidjson::Document& d) {
   parse_json(content_data, std::strlen(content_data), d);
 }
 
-std::shared_ptr<Input> parse_input(DataType input_type, rapidjson::Value& d) {
-  switch (input_type) {
-    case DataType::Doubles: {
-      std::vector<double> inputs = get_double_array(d, "input");
-      std::shared_ptr<double> vec_data(
-          static_cast<double*>(malloc(inputs.size() * sizeof(double))), free);
-      memcpy(vec_data.get(), inputs.data(), inputs.size() * sizeof(double));
-
-      return std::make_shared<clipper::DoubleVector>(vec_data, inputs.size());
-    }
-    case DataType::Floats: {
-      std::vector<float> inputs = get_float_array(d, "input");
-      std::shared_ptr<float> vec_data(
-          static_cast<float*>(malloc(inputs.size() * sizeof(float))), free);
-      memcpy(vec_data.get(), inputs.data(), inputs.size() * sizeof(float));
-      return std::make_shared<clipper::FloatVector>(vec_data, inputs.size());
-    }
-    case DataType::Ints: {
-      std::vector<int> inputs = get_int_array(d, "input");
-      std::shared_ptr<int> vec_data(
-          static_cast<int*>(malloc(inputs.size() * sizeof(int))), free);
-      memcpy(vec_data.get(), inputs.data(), inputs.size() * sizeof(int));
-      return std::make_shared<clipper::IntVector>(vec_data, inputs.size());
-    }
-    case DataType::Strings: {
-      std::string input_string = get_string(d, "input");
-      std::shared_ptr<char> vec_data(
-          static_cast<char*>(malloc(input_string.size() * sizeof(char))), free);
-      memcpy(vec_data.get(), input_string.data(),
-             input_string.size() * sizeof(char));
-      return std::make_shared<clipper::SerializableString>(vec_data,
-                                                           input_string.size());
-    }
-    case DataType::Bytes: {
-      std::vector<uint8_t> inputs = get_base64_encoded_byte_array(d, "input");
-      std::shared_ptr<uint8_t> vec_data(
-          static_cast<uint8_t*>(malloc(inputs.size())), free);
-      return std::make_shared<clipper::ByteVector>(vec_data, inputs.size());
-    }
-    default: throw std::invalid_argument("input_type is not a valid type");
-  }
-}
+// std::shared_ptr<Input> parse_input(DataType input_type, rapidjson::Value& d)
+// {
+//   switch (input_type) {
+//     case DataType::Doubles: {
+//       std::vector<double> inputs = get_double_array(d, "input");
+//       std::shared_ptr<double> vec_data(
+//           static_cast<double*>(malloc(inputs.size() * sizeof(double))),
+//           free);
+//       memcpy(vec_data.get(), inputs.data(), inputs.size() * sizeof(double));
+//
+//       return std::make_shared<clipper::DoubleVector>(vec_data,
+//       inputs.size());
+//     }
+//     case DataType::Floats: {
+//       std::vector<float> inputs = get_float_array(d, "input");
+//       std::shared_ptr<float> vec_data(
+//           static_cast<float*>(malloc(inputs.size() * sizeof(float))), free);
+//       memcpy(vec_data.get(), inputs.data(), inputs.size() * sizeof(float));
+//       return std::make_shared<clipper::FloatVector>(vec_data, inputs.size());
+//     }
+//     case DataType::Ints: {
+//       std::vector<int> inputs = get_int_array(d, "input");
+//       std::shared_ptr<int> vec_data(
+//           static_cast<int*>(malloc(inputs.size() * sizeof(int))), free);
+//       memcpy(vec_data.get(), inputs.data(), inputs.size() * sizeof(int));
+//       return std::make_shared<clipper::IntVector>(vec_data, inputs.size());
+//     }
+//     case DataType::Strings: {
+//       std::string input_string = get_string(d, "input");
+//       std::shared_ptr<char> vec_data(
+//           static_cast<char*>(malloc(input_string.size() * sizeof(char))),
+//           free);
+//       memcpy(vec_data.get(), input_string.data(),
+//              input_string.size() * sizeof(char));
+//       return std::make_shared<clipper::SerializableString>(vec_data,
+//                                                            input_string.size());
+//     }
+//     case DataType::Bytes: {
+//       std::vector<uint8_t> inputs = get_base64_encoded_byte_array(d,
+//       "input");
+//       std::shared_ptr<uint8_t> vec_data(
+//           static_cast<uint8_t*>(malloc(inputs.size())), free);
+//       return std::make_shared<clipper::ByteVector>(vec_data, inputs.size());
+//     }
+//     default: throw std::invalid_argument("input_type is not a valid type");
+//   }
+// }
 
 /* Utilities for serialization into JSON */
 void add_kv_pair(rapidjson::Document& d, const char* key_name,

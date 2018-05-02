@@ -282,12 +282,12 @@ class Server(threading.Thread):
                         input_header = socket.recv()
                         parsed_input_header = np.frombuffer(input_header, dtype=np.uint32)
                         [
-                            input_type, 
-                            num_inputs, 
+                            input_type,
+                            num_inputs,
                             input_sizes
                         ] = [
-                            parsed_input_header[0], 
-                            parsed_input_header[1], 
+                            parsed_input_header[0],
+                            parsed_input_header[1],
                             parsed_input_header[2:]
                         ]
 
@@ -299,7 +299,7 @@ class Server(threading.Thread):
                                         int(self.model_input_type)),
                                     received=input_type_to_string(
                                         int(input_type))))
-                            raise                           
+                            raise
 
                         inputs = []
                         for _ in range(num_inputs):
@@ -353,9 +353,9 @@ class PredictionRequest:
     Parameters
     ----------
     msg_id : bytes
-        The raw message id associated with the RPC 
+        The raw message id associated with the RPC
         prediction request message
-    inputs : 
+    inputs :
         One of [[byte]], [[int]], [[float]], [[double]], [string]
     """
 
@@ -503,4 +503,13 @@ class RPCService:
         self.server.model_version = model_version
         self.server.model_input_type = model_input_type
         self.server.model = model
+        print("Starting RPC Server. Model: {}:{}, host: {}, port: {}".format(
+            model_name, model_version, host, port))
         self.server.run()
+
+
+
+
+
+
+

@@ -1,0 +1,11 @@
+FROM model-comp/tf-rpc:latest
+
+WORKDIR /container
+
+COPY impl/tf_resnet_container.py /container/
+COPY tf_resnet_model_data/ /model
+
+ENV CLIPPER_MODEL_GRAPH_PATH=/model/tf_resnet_152_feats_graph.meta
+ENV CLIPPER_MODEL_CHECKPOINT_PATH=/model/tf_resnet_152_feats.ckpt
+
+CMD ["python", "/container/tf_resnet_container.py"]

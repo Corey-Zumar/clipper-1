@@ -22,10 +22,12 @@ from single_proc_utils.config_utils import CONFIG_KEY_BATCH_SIZE, CONFIG_KEY_CPU
 from single_proc_utils.config_utils import CONFIG_KEY_PROCESS_PATH, CONFIG_KEY_REPLICA_NUMS, CONFIG_KEY_TRIAL_LENGTH
 from single_proc_utils.config_utils import CONFIG_KEY_NUM_TRIALS, CONFIG_KEY_SLO_MILLIS, CONFIG_KEY_LAMBDA, CONFIG_KEY_CV
 
-INCEPTION_FEATS_MODEL_NAME = "inception_feats"
+TF_INCEPTION_FEATS_MODEL_NAME = "inception_feats"
 TF_KERNEL_SVM_MODEL_NAME = "kernel_svm"
 TF_LOG_REG_MODEL_NAME = "tf_log_reg"
-TF_RESNET_MODEL_NAME = "tf_resnet_feats"
+TF_RESNET_FEATS_MODEL_NAME = "tf_resnet_feats"
+
+TF_ALEXNET_FEATS_MODEL_NAME = "tf_alexnet_feats"
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -42,14 +44,21 @@ SERVICE_INGEST_RATIO_DIVERGENCE_THRESHOLD = .95
 ########## Setup ##########
 
 def get_heavy_node_configs(num_replicas, batch_size, allocated_cpus, allocated_gpus):
-    resnet_config = HeavyNodeConfig(model_name=TF_RESNET_MODEL_NAME,
-                                    input_type="floats",
-                                    num_replicas=num_replicas,
-                                    allocated_cpus=allocated_cpus,
-                                    gpus=allocated_gpus,
-                                    batch_size=batch_size)
+    # resnet_config = HeavyNodeConfig(model_name=TF_RESNET_FEATS_MODEL_NAME,
+    #                                 input_type="floats",
+    #                                 num_replicas=num_replicas,
+    #                                 allocated_cpus=allocated_cpus,
+    #                                 gpus=allocated_gpus,
+    #                                 batch_size=batch_size)
 
-    inception_config = HeavyNodeConfig(model_name=INCEPTION_FEATS_MODEL_NAME,
+    alexnet_config = HeavyNodeConfig(model_name=TF_ALEXNET_FEATS_MODEL_NAME,
+                                     input_type="floats",
+                                     num_replicas=num_replicas,
+                                     allocated_cpus=allocated_cpus,
+                                     gpus=allocated_gpus,
+                                     batch_size=batch_size)
+
+    inception_config = HeavyNodeConfig(model_name=TF_INCEPTION_FEATS_MODEL_NAME,
                                        input_type="floats",
                                        num_replicas=num_replicas,
                                        allocated_cpus=allocated_cpus,
@@ -70,7 +79,8 @@ def get_heavy_node_configs(num_replicas, batch_size, allocated_cpus, allocated_g
                                      gpus=[],
                                      batch_size=batch_size)
 
-    return [resnet_config, inception_config, kernel_svm_config, log_reg_config]
+    # return [resnet_config, inception_config, kernel_svm_config, log_reg_config]
+    return [alexnet_config, inception_config, kernel_svm_config, log_reg_config]
 
 class ExperimentConfig:
 

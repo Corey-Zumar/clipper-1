@@ -29,6 +29,10 @@ VGG_ELASTIC_NET_MODEL_APP_NAME = "elastic-net"
 INCEPTION_FEATS_MODEL_APP_NAME = "inception"
 LGBM_MODEL_APP_NAME = "lgbm"
 
+TF_KERNEL_SVM_MODEL_APP_NAME = "tf-kernel-svm"
+TF_LOG_REG_MODEL_APP_NAME = "tf-log-reg"
+TF_RESNET_MODEL_APP_NAME = "tf-resnet-feats"
+
 VGG_FEATS_IMAGE_NAME = "model-comp/vgg-feats"
 VGG_KPCA_SVM_IMAGE_NAME = "model-comp/kpca-svm"
 VGG_KERNEL_SVM_IMAGE_NAME = "model-comp/kernel-svm"
@@ -36,13 +40,20 @@ VGG_ELASTIC_NET_IMAGE_NAME = "model-comp/elastic-net"
 INCEPTION_FEATS_IMAGE_NAME = "model-comp/inception-feats"
 LGBM_IMAGE_NAME = "model-comp/lgbm"
 
+TF_KERNEL_SVM_IMAGE_NAME = "model-comp/tf-kernel-svm"
+TF_LOG_REG_IMAGE_NAME = "model-comp/tf-log-reg"
+TF_RESNET_IMAGE_NAME = "model-comp/tf-resnet-feats"
+
 VALID_MODEL_NAMES = [
     VGG_FEATS_MODEL_APP_NAME,
     VGG_KPCA_SVM_MODEL_APP_NAME,
     VGG_KERNEL_SVM_MODEL_APP_NAME,
     VGG_ELASTIC_NET_MODEL_APP_NAME,
     INCEPTION_FEATS_MODEL_APP_NAME,
-    LGBM_MODEL_APP_NAME
+    LGBM_MODEL_APP_NAME,
+    TF_KERNEL_SVM_MODEL_APP_NAME,
+    TF_LOG_REG_MODEL_APP_NAME,
+    TF_RESNET_MODEL_APP_NAME
 ]
 
 CLIPPER_ADDRESS = "localhost"
@@ -135,7 +146,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             cpus_per_replica=cpus_per_replica,
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
-                                            num_replicas=num_replicas)
+                                            num_replicas=num_replicas,
+                                            use_nvidia_docker=False)
 
     elif model_name == VGG_ELASTIC_NET_MODEL_APP_NAME:
         if not cpus_per_replica:
@@ -151,7 +163,8 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             cpus_per_replica=cpus_per_replica,
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
-                                            num_replicas=num_replicas)        
+                                            num_replicas=num_replicas,
+                                            use_nvidia_docker=False)       
 
 
     elif model_name == LGBM_MODEL_APP_NAME:
@@ -169,7 +182,62 @@ def get_heavy_node_config(model_name, batch_size, num_replicas, cpus_per_replica
                                             cpus_per_replica=cpus_per_replica,
                                             gpus=allocated_gpus,
                                             batch_size=batch_size,
-                                            num_replicas=num_replicas)
+                                            num_replicas=num_replicas,
+                                            use_nvidia_docker=False)
+
+    elif model_name == TF_KERNEL_SVM_MODEL_APP_NAME:
+        if not cpus_per_replica:
+            cpus_per_replica = 1
+        if not allocated_cpus:
+            allocated_cpus = [20]
+        if not allocated_gpus:
+            allocated_gpus = [1]
+
+        return driver_utils.HeavyNodeConfig(name=TF_KERNEL_SVM_MODEL_APP_NAME,
+                                            input_type="floats",
+                                            model_image=TF_KERNEL_SVM_IMAGE_NAME,
+                                            allocated_cpus=allocated_cpus,
+                                            cpus_per_replica=cpus_per_replica,
+                                            gpus=allocated_gpus,
+                                            batch_size=batch_size,
+                                            num_replicas=num_replicas,
+                                            use_nvidia_docker=True)
+
+    elif model_name == TF_LOG_REG_MODEL_APP_NAME:
+        if not cpus_per_replica:
+            cpus_per_replica = 1
+        if not allocated_cpus:
+            allocated_cpus = [20]
+        if not allocated_gpus:
+            allocated_gpus = [1]
+
+        return driver_utils.HeavyNodeConfig(name=TF_LOG_REG_MODEL_APP_NAME,
+                                            input_type="floats",
+                                            model_image=TF_LOG_REG_IMAGE_NAME,
+                                            allocated_cpus=allocated_cpus,
+                                            cpus_per_replica=cpus_per_replica,
+                                            gpus=allocated_gpus,
+                                            batch_size=batch_size,
+                                            num_replicas=num_replicas,
+                                            use_nvidia_docker=True)
+
+    elif model_name == TF_RESNET_MODEL_APP_NAME:
+        if not cpus_per_replica:
+            cpus_per_replica = 1
+        if not allocated_cpus:
+            allocated_cpus = [20]
+        if not allocated_gpus:
+            allocated_gpus = [1]
+
+        return driver_utils.HeavyNodeConfig(name=TF_RESNET_MODEL_APP_NAME,
+                                            input_type="floats",
+                                            model_image=TF_RESNET_IMAGE_NAME,
+                                            allocated_cpus=allocated_cpus,
+                                            cpus_per_replica=cpus_per_replica,
+                                            gpus=allocated_gpus,
+                                            batch_size=batch_size,
+                                            num_replicas=num_replicas,
+                                            use_nvidia_docker=True)
 
 
 ########## Benchmarking ##########
@@ -184,7 +252,9 @@ class Predictor(object):
         self.stats = {
             "thrus": [],
             "p99_lats": [],
-            "mean_lats": []}
+            "mean_lats": [],
+            "all_lats": [],
+        }
         self.total_num_complete = 0
 
     def init_stats(self):
@@ -202,6 +272,7 @@ class Predictor(object):
         self.stats["thrus"].append(thru)
         self.stats["p99_lats"].append(p99)
         self.stats["mean_lats"].append(mean)
+        self.stats["all_lats"] += self.latencies
         logger.info("p99: {p99}, mean: {mean}, thruput: {thru}".format(p99=p99,
                                                                        mean=mean,
                                                                        thru=thru))
@@ -247,11 +318,8 @@ class ModelBenchmarker(object):
         self.queue.put(predictor.stats)
 
     def _get_vgg_feats_input(self):
-        input_img = np.array(np.random.rand(299, 299, 3) * 255, dtype=np.float32)
-        input_img = Image.fromarray(input_img.astype(np.uint8))
-        vgg_img = input_img.resize((224, 224)).convert('RGB')
-        vgg_input = np.array(vgg_img, dtype=np.float32)
-        return vgg_input.flatten()
+        input_img = np.array(np.random.rand(224, 224, 3) * 255, dtype=np.float32)
+        return input_img.flatten()
 
     def _get_vgg_classifier_input(self):
         return np.array(np.random.rand(4096), dtype=np.float32)
@@ -263,6 +331,16 @@ class ModelBenchmarker(object):
     def _get_lgbm_input(self):
         return np.array(np.random.rand(2048), dtype=np.float32)
 
+    def _get_tf_kernel_svm_input(self):
+        return np.array(np.random.rand(2048), dtype=np.float32)
+
+    def _get_tf_log_reg_input(self):
+        return np.array(np.random.rand(2048), dtype=np.float32)
+
+    def _get_tf_resnet_input(self):
+        input_img = np.array(np.random.rand(224, 224, 3) * 255, dtype=np.float32)
+        return input_img.flatten()
+
     def _get_input_generator_fn(self, model_app_name):
         if model_app_name == VGG_FEATS_MODEL_APP_NAME:
             return self._get_vgg_feats_input
@@ -272,11 +350,17 @@ class ModelBenchmarker(object):
             return self._get_inception_input
         elif model_app_name == LGBM_MODEL_APP_NAME:
             return self._get_lgbm_input
+        elif model_app_name == TF_KERNEL_SVM_MODEL_APP_NAME:
+            return self._get_tf_kernel_svm_input
+        elif model_app_name == TF_LOG_REG_MODEL_APP_NAME:
+            return self._get_tf_log_reg_input
+        elif model_app_name == TF_RESNET_MODEL_APP_NAME:
+            return self._get_tf_resnet_input
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Clipper image driver 1')
     parser.add_argument('-d', '--duration', type=int, default=120, help='The maximum duration of the benchmarking process in seconds, per iteration')
-    parser.add_argument('-m', '--model_name', type=str, help="The name of the model to benchmark. One of: 'vgg', 'kpca-svm', 'kernel-svm', 'elastic-net', 'inception', 'lgbm'")
+    parser.add_argument('-m', '--model_name', type=str, help="The name of the model to benchmark. One of: 'vgg', 'kpca-svm', 'kernel-svm', 'elastic-net', 'inception', 'lgbm', 'tf-kernel-svm', 'tf-log-reg', 'tf-resnet-feats'")
     parser.add_argument('-b', '--batch_sizes', type=int, nargs='+', help="The batch size configurations to benchmark for the model. Each configuration will be benchmarked separately.")
     parser.add_argument('-r', '--num_replicas', type=int, nargs='+', help="The replica number configurations to benchmark for the model. Each configuration will be benchmarked separately.")
     parser.add_argument('-c', '--model_cpus', type=int, nargs='+', help="The set of cpu cores on which to run replicas of the provided model")
