@@ -1,0 +1,21 @@
+{
+    "process_path": "CONFIGS_SENSITIVITY/slo_200/cv_0.1/mean_provision/1_rep/136_0.1.deltas", 
+    "batch_size": 26, 
+    "gpu_affinities": [
+        "0 1"
+    ], 
+    "num_trials": 30, 
+    "cpu_affinities": [
+        "0 1 16 17"
+    ], 
+    "trial_length": 680, 
+    "replica_nums": [
+        0
+    ], 
+    "slo_millis": 200, 
+    "cv": 0.1, 
+    "process_mean_thru": 136.17188250534892, 
+    "max_estimated_thru": 136.67817454924645, 
+    "process_peak_thru": 135.0, 
+    "lambda": 136
+}
