@@ -288,37 +288,26 @@ class Predictor(object):
                                                                        mean=mean,
                                                                        thru=thru))
     def predict(self, msg_id):
-        # t0 = datetime.now()
-
-        # self.inflight_requests_lock.acquire()
         send_time = datetime.now()
         self.inflight_requests[msg_id] = (send_time, {}, Lock())
-        # self.inflight_requests_lock.release()
 
         resnet_replica_group_handles = self.clients[RESNET_152_MODEL_NAME]
         inception_replica_group_handles = self.clients[INCEPTION_FEATS_MODEL_NAME]
 
-        # t1 = datetime.now()
-
         resnet_handle = self._weighted_select_handle(resnet_replica_group_handles)
         inception_handle = self._weighted_select_handle(inception_replica_group_handles)
 
-        # t2 = datetime.now()
-
-        resnet_handle.send((msg_id, datetime.now()))
-        inception_handle.send((msg_id, datetime.now()))
-
-        # t3 = datetime.now()
-
-        # print((t3 - t2).total_seconds(), (t2 - t1).total_seconds(), (t1 - t0).total_seconds())
+        resnet_handle.send(msg_id)
+        inception_handle.send(msg_id)
 
         self.num_enqueued += 1
-        if self.num_enqueued >= 1000:
-            end_time = datetime.now()
-            ingest_rate = self.num_enqueued / (end_time - self.ingest_start_time).total_seconds()
-            # logger.info("INGEST RATE: {} qps".format(ingest_rate))
-            self.num_enqueued = 1
-            self.ingest_start_time = end_time
+        if self.num_enqueued > 1000:
+            trial_end_time = datetime.now()
+            ingest_rate = float(self.num_enqueued) / (trial_end_time - self.ingest_start_time).total_seconds()
+            # print("INGEST RATE: {} qps".format(ingest_rate))
+            self.num_enqueued = 0
+            self.ingest_start_time = trial_end_time
+
 
     def _weighted_select_handle(self, group_handles):
         min_size = sys.maxint
@@ -337,33 +326,9 @@ class Predictor(object):
 
         return group_handles[min_handle_idx][CLIENT_KEY_OUTBOUND_HANDLE]
         
-        # group_sizes = []
-        # for handle_item in group_handles:
-        #     replica_group_size = handle_item[CLIENT_KEY_REPLICA_GROUP_SIZE]
-        #     group_sizes.append(replica_group_size)
-        #
-        # total_replicas = sum(group_sizes)
-        # probability_spectrum = np.cumsum([float(size) / total_replicas for size in group_sizes])
-        # probability = np.random.rand()
-        #
-        # selected_idx = None
-        # for idx in range(len(probability_spectrum)):
-        #     spectrum_item = probability_spectrum[idx]
-        #     if probability < spectrum_item:
-        #         selected_idx = idx
-        #         break
-
-        # return group_handles[np.random.randint(total_replicas)][CLIENT_KEY_OUTBOUND_HANDLE]
-
-        # return group_handles[selected_idx][CLIENT_KEY_OUTBOUND_HANDLE]
-
     def _update_perf_stats(self, msg_id):
-        # msg_id, response_enqueue_time = msg_id
         end_time = datetime.now()
-        # self.response_prop_lats.append((end_time - response_enqueue_time).total_seconds())
-        # self.inflight_requests_lock.acquire()
         begin_time = self.inflight_requests[msg_id][0]
-        # self.inflight_requests_lock.release()
         latency = (end_time - begin_time).total_seconds()
         self.latencies.append(latency)
         self.total_num_complete += 1
@@ -373,35 +338,25 @@ class Predictor(object):
             self.init_stats()
             mean_prop_lat = np.mean(self.response_prop_lats)
             p99_prop_lat = np.mean(self.response_prop_lats)
-            # print("Inbound Propagation Latency - P99: {p99}, MEAN: {mean}".format(p99=p99_prop_lat, mean=mean_prop_lat))
             self.response_prop_lats = []
             
     def _resnet_feats_continuation(self, msg_ids):
         ksvm_replica_group_handles = self.clients[KERNEL_SVM_MODEL_NAME]
         model_pred_lats = self.stats["model_pred_lats"][RESNET_152_MODEL_NAME]
-        ksvm_handle = self._weighted_select_handle(ksvm_replica_group_handles)
-        # ksvm_handle.send((msg_id, datetime.now()))
-        for msg_id, pred_lat in msg_ids:
-            model_pred_lats.append(pred_lat)
-            # ksvm_handle = self._weighted_select_handle(ksvm_replica_group_handles)
-            ksvm_handle.send((msg_id, datetime.now()))
-        # ksvm_handle.send(msg_id[0])
+        for msg_id in msg_ids:
+            ksvm_handle = self._weighted_select_handle(ksvm_replica_group_handles)
+            ksvm_handle.send(msg_id)
 
     def _inception_feats_continuation(self, msg_ids):
         log_reg_replica_group_handles = self.clients[LOG_REG_MODEL_NAME]
         model_pred_lats = self.stats["model_pred_lats"][INCEPTION_FEATS_MODEL_NAME]
-        log_reg_handle = self._weighted_select_handle(log_reg_replica_group_handles)
-        for msg_id, pred_lat in msg_ids:
-            model_pred_lats.append(pred_lat)
-            # log_reg_handle = self._weighted_select_handle(log_reg_replica_group_handles)
-            log_reg_handle.send((msg_id, datetime.now()))
-        # log_reg_handle.send(msg_id[0])
+        for msg_id in msg_ids:
+            log_reg_handle = self._weighted_select_handle(log_reg_replica_group_handles)
+            log_reg_handle.send(msg_id)
 
     def _ksvm_continuation(self, msg_ids):
-        # _, completed_dict, lock = self.inflight_requests[msg_id[0]]
         model_pred_lats = self.stats["model_pred_lats"][KERNEL_SVM_MODEL_NAME]
-        for msg_id, pred_lat in msg_ids:
-            model_pred_lats.append(pred_lat)
+        for msg_id in msg_ids:
             _, completed_dict, lock = self.inflight_requests[msg_id]
             lock.acquire()
             if LOG_REG_MODEL_NAME in completed_dict:
@@ -412,10 +367,8 @@ class Predictor(object):
                 lock.release()
 
     def _log_reg_continuation(self, msg_ids):
-        # _, completed_dict, lock = self.inflight_requests[msg_id[0]]
         model_pred_lats = self.stats["model_pred_lats"][LOG_REG_MODEL_NAME]
-        for msg_id, pred_lat in msg_ids:
-            model_pred_lats.append(pred_lat)
+        for msg_id in msg_ids:
             _, completed_dict, lock = self.inflight_requests[msg_id]
             lock.acquire()
             if KERNEL_SVM_MODEL_NAME in completed_dict:
@@ -492,6 +445,7 @@ class DriverBenchmarker(object):
 
             request_delay = arrival_process[msg_id] * .001
             time.sleep(request_delay)
+            # time.sleep(.00200)
 
             msg_id += 1
 

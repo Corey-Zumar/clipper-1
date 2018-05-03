@@ -102,7 +102,6 @@ class GRPCClient:
         return prediction_service_pb2.beta_create_PredictionService_stub(address.get_channel())
 
     def _manage_requests(self):
-        thread_enqueue_latencies = []
         while self.active:
             data_available = self.outbound_handle.poll(REQUEST_PIPE_POLLING_TIMEOUT_SECONDS)
             if not data_available:
@@ -115,10 +114,8 @@ class GRPCClient:
             with self.queue_size_val.get_lock():
                 self.queue_size_val.value += len(outbound_msgs)
 
-            curr_time = datetime.now()
-            for msg_id, send_time in outbound_msgs:
-                self.request_queue.put((msg_id, send_time))
-                thread_enqueue_latencies.append((curr_time - send_time).total_seconds())
+            for msg_id in outbound_msgs:
+                self.request_queue.put(msg_id)
 
     def _manage_responses(self):
         while self.active:
@@ -140,49 +137,19 @@ class GRPCClient:
         queue_sizes = []
         queueing_lats = []
         while self.active:
-            outbound_msg_id, send_time = self.request_queue.get(block=True)
+            outbound_msg_id = self.request_queue.get(block=True)
 
             with self.queue_size_val.get_lock():
                 self.queue_size_val.value -= 1
 
-            queueing_lats.append((datetime.now() - send_time).total_seconds())
-
-            queue_sizes.append(self.request_queue.qsize())
             item_idx = np.random.randint(len(self.inputs))
             input_item = self.inputs[item_idx]
             
-            begin = datetime.now()
             response = self.clients[replica_num].Predict(input_item, REQUEST_TIME_OUT_SECONDS)
-            end = datetime.now()
 
-            pred_lat = (end - begin).total_seconds()
-            pred_lats.append(pred_lat)
-
-            # self.response_queue.put((outbound_msg_id, end))
-            self.response_queue.put((outbound_msg_id, pred_lat))
-            # self.response_queue.put(outbound_msg_id)
-
-            if len(queueing_lats) > 500:
-                p99 = np.percentile(queueing_lats, 99)
-                mean = np.mean(queueing_lats)
-                queueing_lats = []
-
-                if self.model_name == RESNET_152_MODEL_NAME:
-                    print("Replica queueing delay -  P99: {}, Mean: {}".format(p99, mean))
-
-            # if len(queue_sizes) > 200:
-            #     mean_queue_size = np.mean(queue_sizes)
-            #     # print(self.model_name, self.replica_addrs[0], mean_queue_size)
-            #     queue_sizes = []
+            self.response_queue.put(outbound_msg_id)
 
             num_enqueued += 1
-
-            # if num_enqueued >= 200 and self.model_name == INCEPTION_FEATS_MODEL_NAME:
-            #     trial_end_time = datetime.now()
-            #     print(np.mean(pred_lats), np.percentile(pred_lats, 99))
-            #     pred_lats = []
-            #     num_enqueued = 0
-            #     trial_start_time = trial_end_time
 
     def _get_input_gen_fn(self):
         if self.model_name == INCEPTION_FEATS_MODEL_NAME:

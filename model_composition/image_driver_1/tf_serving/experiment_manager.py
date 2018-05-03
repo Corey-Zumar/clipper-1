@@ -3,7 +3,7 @@ import os
 import argparse
 import subprocess as sp
 
-from config_creator import HIERARCHY_SUBDIR_MEAN_PROVISION, HIERARCHY_SUBDIR_PEAK_PROVISION
+from tf_serving_utils.config_utils.config_creator import HIERARCHY_SUBDIR_MEAN_PROVISION, HIERARCHY_SUBDIR_PEAK_PROVISION
 
 def run_exps(tagged_dirs):
     for tagged_dir in tagged_dirs:
