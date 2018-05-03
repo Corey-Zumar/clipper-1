@@ -6,10 +6,11 @@ import time
 import base64
 import logging
 import json
+import copy
 
 from threading import Thread, Lock
 from datetime import datetime
-from multiprocessing import Process, Pipe 
+from multiprocessing import Process, Pipe, Value 
 from concurrent.futures import ThreadPoolExecutor
 
 from tf_serving_utils import GRPCClient, ReplicaAddress, REQUEST_PIPE_POLLING_TIMEOUT_SECONDS
@@ -56,9 +57,10 @@ LOG_REG_OUTPUT_KEY = "outputs"
 CLIENT_KEY_OUTBOUND_HANDLE = "outbound_handle"
 CLIENT_KEY_INBOUND_HANDLE = "inbound_handle"
 CLIENT_KEY_REPLICA_GROUP_SIZE = "replica_group_size"
+CLIENT_KEY_QUEUE_SIZE = "queue_size_val"
 
 # We will assign at most 5 replicas to a single client process
-REPLICA_GROUP_SIZE = 1
+REPLICA_GROUP_SIZE = 10
 
 ########## Client Setup ##########
 
@@ -91,7 +93,11 @@ class ExperimentConfig:
         self.node_configs = node_configs 
         self.client_configs = client_configs
 
-def load_experiment_config(config_path):
+def load_experiment_config(config_path, 
+                           resnet_extras, 
+                           inception_extras,
+                           ksvm_extras,
+                           log_reg_extras):
     with open(config_path, "r") as f:
         experiment_config_json = json.load(f)
 
@@ -100,9 +106,12 @@ def load_experiment_config(config_path):
     with open(nodes_path, "r") as f:
         nodes_json = json.load(f)
 
-    tagged_machines = nodes_json[TAGGED_CONFIG_KEY_TAGGED_MACHINES]
-    
-    # tagged_machines = experiment_config_json[TAGGED_CONFIG_KEY_TAGGED_MACHINES]
+    # Machines that are actually available and will be used for client creation (up to the limits required by the experiment)
+    client_tagged_machines = nodes_json[TAGGED_CONFIG_KEY_TAGGED_MACHINES]
+    # Machines provisioned for the experiment (the number of "experiment_tagged_machines" sets the limit for client creation
+    # from "client_tagged_machines"
+    experiment_tagged_machines = experiment_config_json[TAGGED_CONFIG_KEY_TAGGED_MACHINES]
+
     experiment_config_params = experiment_config_json[TAGGED_CONFIG_KEY_EXPERIMENT_CONFIG]
 
     num_trials = experiment_config_params[CONFIG_KEY_NUM_TRIALS]
@@ -115,7 +124,7 @@ def load_experiment_config(config_path):
 
     client_model_configs = {}
     all_node_configs = []
-    for tagged_machine in tagged_machines:
+    for tagged_machine in client_tagged_machines:
         config_path = tagged_machine[TAGGED_CONFIG_KEY_CONFIG_PATH]
         host = tagged_machine[TAGGED_CONFIG_KEY_MACHINE_ADDRESS]
 
@@ -132,8 +141,30 @@ def load_experiment_config(config_path):
                 new_config = ClientConfig(model_name, host, port)
                 client_model_configs[model_name].append(new_config)
 
+    for tagged_machine in experiment_tagged_machines:
+        config_path = tagged_machine[TAGGED_CONFIG_KEY_CONFIG_PATH]
+
         machine_node_configs = load_server_configs(config_path)
-        all_node_configs.append(machine_node_configs)
+        all_node_configs += machine_node_configs
+
+    def add_extras(model_name, extras):
+        if not extras:
+            return
+
+        for extra in extras:
+            host, port = extra.split(":")
+            new_config = ClientConfig(model_name, host, port)
+            client_model_configs[model_name].append(new_config)
+
+            for machine_node_config in all_node_configs:
+                if machine_node_config.name == model_name:
+                    all_node_configs.append(copy.copy(machine_node_config))
+                    break
+
+    add_extras(RESNET_152_MODEL_NAME, resnet_extras)
+    add_extras(INCEPTION_FEATS_MODEL_NAME, inception_extras)
+    add_extras(KERNEL_SVM_MODEL_NAME, ksvm_extras)
+    add_extras(LOG_REG_MODEL_NAME, log_reg_extras)
 
     experiment_config = ExperimentConfig(num_trials=num_trials, 
                                          trial_length=trial_length, 
@@ -156,8 +187,8 @@ def create_clients(configs):
         keyed on model names
     """
 
-    def launch_client(model_name, replica_addrs, outbound_handle, inbound_handle):
-        client = GRPCClient(model_name, replica_addrs, outbound_handle, inbound_handle)
+    def launch_client(model_name, replica_addrs, outbound_handle, inbound_handle, queue_size_val):
+        client = GRPCClient(model_name, replica_addrs, outbound_handle, inbound_handle, queue_size_val)
         client.start()
         time.sleep(60 * 60 * 24)
 
@@ -171,18 +202,24 @@ def create_clients(configs):
             outbound_parent_handle, outbound_child_handle = Pipe()
             inbound_parent_handle, inbound_child_handle = Pipe()
 
+            # Initialize a multiprocess value that will store, as an unsigned long,
+            # the size of the client's request queue
+            queue_size_val = Value('L') 
+
             client_proc = Process(target=launch_client, 
                                   args=(model_name, 
                                         replica_group_addrs, 
                                         outbound_child_handle, 
-                                        inbound_child_handle))
+                                        inbound_child_handle,
+                                        queue_size_val))
 
             client_proc.start()
 
             new_handles = { 
                                 CLIENT_KEY_OUTBOUND_HANDLE : outbound_parent_handle,
                                 CLIENT_KEY_INBOUND_HANDLE : inbound_parent_handle,
-                                CLIENT_KEY_REPLICA_GROUP_SIZE : len(replica_group_addrs)
+                                CLIENT_KEY_REPLICA_GROUP_SIZE : len(replica_group_addrs),
+                                CLIENT_KEY_QUEUE_SIZE : queue_size_val
                            }
 
             if model_name not in client_handles:
@@ -221,10 +258,15 @@ class Predictor(object):
             "p99_lats": [],
             "all_lats": [],
             "mean_lats": []}
+
+        self.stats["model_pred_lats"] = { KERNEL_SVM_MODEL_NAME : [], LOG_REG_MODEL_NAME : [],
+                                          RESNET_152_MODEL_NAME : [],  INCEPTION_FEATS_MODEL_NAME : [] }
         self.total_num_complete = 0
 
         self.ingest_start_time = datetime.now()
         self.num_enqueued = 0
+
+        self.response_prop_lats = []
 
     def init_stats(self):
         self.latencies = []
@@ -248,10 +290,10 @@ class Predictor(object):
     def predict(self, msg_id):
         # t0 = datetime.now()
 
-        self.inflight_requests_lock.acquire()
+        # self.inflight_requests_lock.acquire()
         send_time = datetime.now()
         self.inflight_requests[msg_id] = (send_time, {}, Lock())
-        self.inflight_requests_lock.release()
+        # self.inflight_requests_lock.release()
 
         resnet_replica_group_handles = self.clients[RESNET_152_MODEL_NAME]
         inception_replica_group_handles = self.clients[INCEPTION_FEATS_MODEL_NAME]
@@ -263,8 +305,8 @@ class Predictor(object):
 
         # t2 = datetime.now()
 
-        resnet_handle.send(msg_id)
-        inception_handle.send(msg_id)
+        resnet_handle.send((msg_id, datetime.now()))
+        inception_handle.send((msg_id, datetime.now()))
 
         # t3 = datetime.now()
 
@@ -279,29 +321,49 @@ class Predictor(object):
             self.ingest_start_time = end_time
 
     def _weighted_select_handle(self, group_handles):
-        group_sizes = []
-        for handle_item in group_handles:
-            replica_group_size = handle_item[CLIENT_KEY_REPLICA_GROUP_SIZE]
-            group_sizes.append(replica_group_size)
+        min_size = sys.maxint
+        min_handle_idx = None
 
-        total_replicas = sum(group_sizes)
-        probability_spectrum = np.cumsum([float(size) / total_replicas for size in group_sizes])
-        probability = np.random.rand()
+        for i in range(len(group_handles)):
+            handle_item = group_handles[i]
+            # If this is too slow, try the power of two choices
+            queue_size_val = handle_item[CLIENT_KEY_QUEUE_SIZE]
+            with queue_size_val.get_lock():
+                queue_size = int(queue_size_val.value)
+
+            if queue_size < min_size:
+                min_size = queue_size 
+                min_handle_idx = i
+
+        return group_handles[min_handle_idx][CLIENT_KEY_OUTBOUND_HANDLE]
         
-        selected_idx = None
-        for idx in range(len(probability_spectrum)):
-            spectrum_item = probability_spectrum[idx]
-            if probability < spectrum_item:
-                selected_idx = idx
-                break
+        # group_sizes = []
+        # for handle_item in group_handles:
+        #     replica_group_size = handle_item[CLIENT_KEY_REPLICA_GROUP_SIZE]
+        #     group_sizes.append(replica_group_size)
+        #
+        # total_replicas = sum(group_sizes)
+        # probability_spectrum = np.cumsum([float(size) / total_replicas for size in group_sizes])
+        # probability = np.random.rand()
+        #
+        # selected_idx = None
+        # for idx in range(len(probability_spectrum)):
+        #     spectrum_item = probability_spectrum[idx]
+        #     if probability < spectrum_item:
+        #         selected_idx = idx
+        #         break
 
-        return group_handles[selected_idx][CLIENT_KEY_OUTBOUND_HANDLE]
+        # return group_handles[np.random.randint(total_replicas)][CLIENT_KEY_OUTBOUND_HANDLE]
+
+        # return group_handles[selected_idx][CLIENT_KEY_OUTBOUND_HANDLE]
 
     def _update_perf_stats(self, msg_id):
+        # msg_id, response_enqueue_time = msg_id
         end_time = datetime.now()
-        self.inflight_requests_lock.acquire()
+        # self.response_prop_lats.append((end_time - response_enqueue_time).total_seconds())
+        # self.inflight_requests_lock.acquire()
         begin_time = self.inflight_requests[msg_id][0]
-        self.inflight_requests_lock.release()
+        # self.inflight_requests_lock.release()
         latency = (end_time - begin_time).total_seconds()
         self.latencies.append(latency)
         self.total_num_complete += 1
@@ -309,36 +371,59 @@ class Predictor(object):
         if self.batch_num_complete % self.trial_length == 0:
             self.print_stats()
             self.init_stats()
+            mean_prop_lat = np.mean(self.response_prop_lats)
+            p99_prop_lat = np.mean(self.response_prop_lats)
+            # print("Inbound Propagation Latency - P99: {p99}, MEAN: {mean}".format(p99=p99_prop_lat, mean=mean_prop_lat))
+            self.response_prop_lats = []
             
-    def _resnet_feats_continuation(self, msg_id):
+    def _resnet_feats_continuation(self, msg_ids):
         ksvm_replica_group_handles = self.clients[KERNEL_SVM_MODEL_NAME]
+        model_pred_lats = self.stats["model_pred_lats"][RESNET_152_MODEL_NAME]
         ksvm_handle = self._weighted_select_handle(ksvm_replica_group_handles)
-        ksvm_handle.send(msg_id)
+        # ksvm_handle.send((msg_id, datetime.now()))
+        for msg_id, pred_lat in msg_ids:
+            model_pred_lats.append(pred_lat)
+            # ksvm_handle = self._weighted_select_handle(ksvm_replica_group_handles)
+            ksvm_handle.send((msg_id, datetime.now()))
+        # ksvm_handle.send(msg_id[0])
 
-    def _inception_feats_continuation(self, msg_id):
+    def _inception_feats_continuation(self, msg_ids):
         log_reg_replica_group_handles = self.clients[LOG_REG_MODEL_NAME]
+        model_pred_lats = self.stats["model_pred_lats"][INCEPTION_FEATS_MODEL_NAME]
         log_reg_handle = self._weighted_select_handle(log_reg_replica_group_handles)
-        log_reg_handle.send(msg_id)
+        for msg_id, pred_lat in msg_ids:
+            model_pred_lats.append(pred_lat)
+            # log_reg_handle = self._weighted_select_handle(log_reg_replica_group_handles)
+            log_reg_handle.send((msg_id, datetime.now()))
+        # log_reg_handle.send(msg_id[0])
 
-    def _ksvm_continuation(self, msg_id):
-        _, completed_dict, lock = self.inflight_requests[msg_id]
-        lock.acquire()
-        if LOG_REG_MODEL_NAME in completed_dict:
-            lock.release()
-            self._update_perf_stats(msg_id)
-        else:
-            completed_dict[KERNEL_SVM_MODEL_NAME] = True
-            lock.release()
+    def _ksvm_continuation(self, msg_ids):
+        # _, completed_dict, lock = self.inflight_requests[msg_id[0]]
+        model_pred_lats = self.stats["model_pred_lats"][KERNEL_SVM_MODEL_NAME]
+        for msg_id, pred_lat in msg_ids:
+            model_pred_lats.append(pred_lat)
+            _, completed_dict, lock = self.inflight_requests[msg_id]
+            lock.acquire()
+            if LOG_REG_MODEL_NAME in completed_dict:
+                lock.release()
+                self._update_perf_stats(msg_id)
+            else:
+                completed_dict[KERNEL_SVM_MODEL_NAME] = True
+                lock.release()
 
-    def _log_reg_continuation(self, msg_id):
-        _, completed_dict, lock = self.inflight_requests[msg_id]
-        lock.acquire()
-        if KERNEL_SVM_MODEL_NAME in completed_dict:
-            lock.release()
-            self._update_perf_stats(msg_id)
-        else:
-            completed_dict[LOG_REG_MODEL_NAME] = True
-            lock.release()
+    def _log_reg_continuation(self, msg_ids):
+        # _, completed_dict, lock = self.inflight_requests[msg_id[0]]
+        model_pred_lats = self.stats["model_pred_lats"][LOG_REG_MODEL_NAME]
+        for msg_id, pred_lat in msg_ids:
+            model_pred_lats.append(pred_lat)
+            _, completed_dict, lock = self.inflight_requests[msg_id]
+            lock.acquire()
+            if KERNEL_SVM_MODEL_NAME in completed_dict:
+                lock.release()
+                self._update_perf_stats(msg_id)
+            else:
+                completed_dict[LOG_REG_MODEL_NAME] = True
+                lock.release()
 
     def _run_response_service(self, inbound_handle, model_name):
         try:
@@ -361,8 +446,11 @@ class Predictor(object):
                     inbound_msg_id = inbound_handle.recv()
                     inbound_msg_ids.append(inbound_msg_id)
 
-                for msg_id in inbound_msg_ids:
-                    self.continuation_executor.submit(continuation_fn, msg_id)
+                # self.continuation_executor.submit(continuation_fn, inbound_msg_ids)
+                continuation_fn(inbound_msg_ids)
+
+                 # for msg_id in inbound_msg_ids:
+                 #    self.continuation_executor.submit(continuation_fn, msg_id)
 
         except Exception as e:
             print("Error in response service: {}".format(e))
@@ -381,15 +469,31 @@ class DriverBenchmarker(object):
         logger.info("Starting predictions")
         predictor = Predictor(trial_length=self.trial_length, clients=clients)
 
-        for msg_id in range(len(arrival_process)):
-            predictor.predict(msg_id)
+        num_queries_sent = 0
 
-            if len(predictor.stats["thrus"]) >= num_trials:
-                break
+        last_catchup_time = datetime.now()
+        last_catchup_msg_id = 0
+
+        msg_id = 0
+        while msg_id < len(arrival_process):
+        # for msg_id in range(len(arrival_process)):
+            # if False:  
+            if msg_id % 1000 == 0:  
+                curr_time = datetime.now()
+                elapsed_time = (curr_time - last_catchup_time).total_seconds()
+                expected_num_queries = int(426 * elapsed_time)
+                last_catchup_msg_id += expected_num_queries
+                while msg_id < min(last_catchup_msg_id, len(arrival_process) - 1):
+                    predictor.predict(msg_id)
+                    msg_id += 1
+                last_catchup_time = datetime.now()
+            else:
+                predictor.predict(msg_id)
 
             request_delay = arrival_process[msg_id] * .001
-            # time.sleep(request_delay)
-            time.sleep(.001)
+            time.sleep(request_delay)
+
+            msg_id += 1
 
         return predictor.stats
 
@@ -397,10 +501,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set up and benchmark models for Clipper image driver 1')
     parser.add_argument('-w', '--warmup', action='store_true')
     parser.add_argument('-e', '--experiment_config_path', type=str)
+    parser.add_argument('-r', '--resnet_extras', type=str, nargs='+', help="Addresses of extra resnet replicas to add, in host:port format")
+    parser.add_argument('-i', '--inception_extras', type=str, nargs='+', help="Addresses of extra inception replicas to add, in host:port format")
+    parser.add_argument('-k', '--ksvm_extras', type=str, nargs='+', help="Addresses of extra kernel svm replicas to add, in host:port format")
+    parser.add_argument('-l', '--log_reg_extras', type=str, nargs='+', help="Addresses of extra log reg replicas to add, in host:port format")
 
     args = parser.parse_args()
 
-    experiment_config = load_experiment_config(args.experiment_config_path)
+    experiment_config = load_experiment_config(args.experiment_config_path, 
+                                               args.resnet_extras, 
+                                               args.inception_extras,
+                                               args.ksvm_extras,
+                                               args.log_reg_extras)
 
     if args.warmup:
         benchmarker = DriverBenchmarker(trial_length=experiment_config.trial_length, 
