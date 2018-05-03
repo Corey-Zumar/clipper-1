@@ -1,0 +1,712 @@
+{
+    "client_metrics": [
+        {
+            "thrus": [], 
+            "p99_lats": [], 
+            "all_lats": [], 
+            "mean_lats": []
+        }
+    ], 
+    "node_configs": [
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 4, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30, 
+                13, 
+                29, 
+                12, 
+                28
+            ], 
+            "gpus": [
+                3, 
+                2, 
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501, 
+                9502, 
+                9503
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 4, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30, 
+                13, 
+                29, 
+                12, 
+                28
+            ], 
+            "gpus": [
+                3, 
+                2, 
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501, 
+                9502, 
+                9503
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 4, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30, 
+                13, 
+                29, 
+                12, 
+                28
+            ], 
+            "gpus": [
+                3, 
+                2, 
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501, 
+                9502, 
+                9503
+            ]
+        }, 
+        {
+            "name": "inception", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/inception_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30
+            ], 
+            "gpus": [
+                3, 
+                2
+            ], 
+            "ports": [
+                9508, 
+                9509
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                13, 
+                29, 
+                12, 
+                28
+            ], 
+            "gpus": [
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                13, 
+                29, 
+                12, 
+                28
+            ], 
+            "gpus": [
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501
+            ]
+        }, 
+        {
+            "name": "inception", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/inception_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30
+            ], 
+            "gpus": [
+                3, 
+                2
+            ], 
+            "ports": [
+                9508, 
+                9509
+            ]
+        }, 
+        {
+            "name": "ksvm", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 1, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 0, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/kernel_svm_tfserve", 
+            "allocated_cpus": [
+                13, 
+                29
+            ], 
+            "gpus": [], 
+            "ports": [
+                9516
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                12, 
+                28, 
+                11, 
+                27
+            ], 
+            "gpus": [
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501
+            ]
+        }, 
+        {
+            "name": "inception", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/inception_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30
+            ], 
+            "gpus": [
+                3, 
+                2
+            ], 
+            "ports": [
+                9508, 
+                9509
+            ]
+        }, 
+        {
+            "name": "log_reg", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 1, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 0, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/log_reg_tfserve", 
+            "allocated_cpus": [
+                10, 
+                26
+            ], 
+            "gpus": [], 
+            "ports": [
+                9524
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                13, 
+                29, 
+                12, 
+                28
+            ], 
+            "gpus": [
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501
+            ]
+        }, 
+        {
+            "name": "inception", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/inception_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30
+            ], 
+            "gpus": [
+                3, 
+                2
+            ], 
+            "ports": [
+                9508, 
+                9509
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 4, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30, 
+                13, 
+                29, 
+                12, 
+                28
+            ], 
+            "gpus": [
+                3, 
+                2, 
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501, 
+                9502, 
+                9503
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 4, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30, 
+                13, 
+                29, 
+                12, 
+                28
+            ], 
+            "gpus": [
+                3, 
+                2, 
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501, 
+                9502, 
+                9503
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30
+            ], 
+            "gpus": [
+                3, 
+                2
+            ], 
+            "ports": [
+                9500, 
+                9501
+            ]
+        }, 
+        {
+            "name": "inception", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/inception_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30
+            ], 
+            "gpus": [
+                3, 
+                2
+            ], 
+            "ports": [
+                9508, 
+                9509
+            ]
+        }, 
+        {
+            "name": "ksvm", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 1, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 0, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/kernel_svm_tfserve", 
+            "allocated_cpus": [
+                13, 
+                29
+            ], 
+            "gpus": [], 
+            "ports": [
+                9516
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                12, 
+                28, 
+                11, 
+                27
+            ], 
+            "gpus": [
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501
+            ]
+        }, 
+        {
+            "name": "inception", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/inception_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30
+            ], 
+            "gpus": [
+                3, 
+                2
+            ], 
+            "ports": [
+                9508, 
+                9509
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                13, 
+                29, 
+                12, 
+                28
+            ], 
+            "gpus": [
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                13, 
+                29, 
+                12, 
+                28
+            ], 
+            "gpus": [
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501
+            ]
+        }, 
+        {
+            "name": "inception", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/inception_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30
+            ], 
+            "gpus": [
+                3, 
+                2
+            ], 
+            "ports": [
+                9508, 
+                9509
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 4, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30, 
+                13, 
+                29, 
+                12, 
+                28
+            ], 
+            "gpus": [
+                3, 
+                2, 
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501, 
+                9502, 
+                9503
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 4, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30, 
+                13, 
+                29, 
+                12, 
+                28
+            ], 
+            "gpus": [
+                3, 
+                2, 
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501, 
+                9502, 
+                9503
+            ]
+        }, 
+        {
+            "name": "resnet", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 4, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/resnet_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30, 
+                13, 
+                29, 
+                12, 
+                28
+            ], 
+            "gpus": [
+                3, 
+                2, 
+                1, 
+                0
+            ], 
+            "ports": [
+                9500, 
+                9501, 
+                9502, 
+                9503
+            ]
+        }, 
+        {
+            "name": "inception", 
+            "cpus_per_replica": 2, 
+            "input_type": "floats", 
+            "batch_size": 1, 
+            "num_replicas": 2, 
+            "instance_type": "m4.16xlarge", 
+            "gpus_per_replica": 1, 
+            "model_base_path": "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/exported_tf_models/inception_tfserve", 
+            "allocated_cpus": [
+                15, 
+                31, 
+                14, 
+                30
+            ], 
+            "gpus": [
+                3, 
+                2
+            ], 
+            "ports": [
+                9508, 
+                9509
+            ]
+        }
+    ], 
+    "arrival_process": {
+        "mean_thru": 425.8938628098163, 
+        "peak_thru": 468.0, 
+        "hash": "6c528c45389e07f825a88b7aa840b38c127862e5fc66fd7ca62ddec2e5ff6b80", 
+        "filename": "CONFIGS_COST/tagged/500ms_cv0.1/mean_provision/lambda_426/426_0.1.deltas"
+    }
+}
