@@ -301,7 +301,7 @@ class Predictor(object):
         inception_handle.send(msg_id)
 
         self.num_enqueued += 1
-        if self.num_enqueued > 1000:
+        if self.num_enqueued > 100:
             trial_end_time = datetime.now()
             ingest_rate = float(self.num_enqueued) / (trial_end_time - self.ingest_start_time).total_seconds()
             # print("INGEST RATE: {} qps".format(ingest_rate))
@@ -413,7 +413,7 @@ class DriverBenchmarker(object):
         self.trial_length = trial_length
         self.configs = configs
 
-    def run(self, num_trials, arrival_process):
+    def run(self, lambda_val, num_trials, arrival_process):
         logger.info("Creating clients!")
         clients = create_clients(self.configs)
 
@@ -434,7 +434,7 @@ class DriverBenchmarker(object):
             if msg_id % 1000 == 0:  
                 curr_time = datetime.now()
                 elapsed_time = (curr_time - last_catchup_time).total_seconds()
-                expected_num_queries = int(426 * elapsed_time)
+                expected_num_queries = int(lambda_val * elapsed_time)
                 last_catchup_msg_id += expected_num_queries
                 while msg_id < min(last_catchup_msg_id, len(arrival_process) - 1):
                     predictor.predict(msg_id)
@@ -482,7 +482,9 @@ if __name__ == "__main__":
         
         benchmarker = DriverBenchmarker(trial_length=experiment_config.trial_length, 
                                         configs=experiment_config.client_configs)
-        stats = benchmarker.run(experiment_config.num_trials, arrival_process)
+        stats = benchmarker.run(experiment_config.lambda_val, 
+                                experiment_config.num_trials, 
+                                arrival_process)
         all_stats = [stats]
 
         # Save Results
