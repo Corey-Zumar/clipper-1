@@ -94,6 +94,8 @@ class SPDClient:
         self.inflight_msgs = inflight_msgs
         self.inflight_msgs_lock = inflight_msgs_lock
 
+        self.fixed_batch_size = fixed_batch_size
+
         if fixed_batch_size:
             # Send 100000 queries at a rate of 1000 qps
             self.arrival_process_seconds = [.001 for _ in range(100000)]
@@ -213,7 +215,7 @@ class SPDClient:
                 dequeue_time = datetime.now()
                 while len(inputs) < self.batch_size and len(self.request_queue) > 0:
                     inp_item, msg_id, send_time = self.request_queue.popleft()
-                    if (dequeue_time - send_time).total_seconds() * 1000 > self.slo_millis:
+                    if (dequeue_time - send_time).total_seconds() * 1000 > self.slo_millis and not self.fixed_batch_size:
                         expiration_ids.append(msg_id)
                     else:
                         msg_ids.append(msg_id)
