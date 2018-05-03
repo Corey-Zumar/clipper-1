@@ -327,7 +327,7 @@ def create_configs_find_lambda(arrival_procs_path,
                                    cv,
                                    peak_thru,
                                    mean_thru,
-                                   target_thru,
+                                   target_thruput,
                                    slo_millis,
                                    batch_size)
 
@@ -341,7 +341,7 @@ def create_configs_find_lambda(arrival_procs_path,
                                    cv,
                                    peak_thru,
                                    mean_thru,
-                                   target_thru,
+                                   target_thruput,
                                    slo_millis,
                                    batch_size)
 

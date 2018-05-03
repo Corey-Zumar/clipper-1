@@ -16,7 +16,7 @@ def run_exps(tagged_dirs):
 
         cmds = []
         for reps_dir in reps_dirs:
-            tagged_config_paths = [os.path.join(reps_dir, fname) for fname in os.listdir(reps_dir) if "tagged" in fname]
+            tagged_config_paths = [os.path.join(reps_dir, fname) for fname in os.listdir(reps_dir) if "tagged" in fname and fname.endswith("json")]
             assert len(tagged_config_paths) == 1
             config_path = tagged_config_paths[0]
 

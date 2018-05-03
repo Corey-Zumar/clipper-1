@@ -322,7 +322,8 @@ class DriverBenchmarker:
                               arrival_process)
 
         while True:
-            if len(stats_manager.stats["per_message_lats"]) < .98 * len(arrival_process):
+            # if len(stats_manager.stats["per_message_lats"]) < .98 * len(arrival_process):
+            if len(stats_manager.stats["per_message_lats"]) < 15000: 
                 time.sleep(QUEUE_RATE_MEASUREMENT_WINDOW_SECONDS * 2)
             else:
                 break
