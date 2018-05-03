@@ -96,7 +96,7 @@ def load_experiment_config(config_path):
         experiment_config_json = json.load(f)
 
     # Temporary hack
-    nodes_path = "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/CONFIGS_COST/tagged/1000ms_cv1.0/peak_provision/lambda_425/machine_tagged_config.json"
+    nodes_path = "/home/ubuntu/clipper/model_composition/image_driver_1/tf_serving/CONFIGS_COST/tagged/500ms_cv0.1/mean_provision/lambda_426/machine_tagged_config.json"
     with open(nodes_path, "r") as f:
         nodes_json = json.load(f)
 
