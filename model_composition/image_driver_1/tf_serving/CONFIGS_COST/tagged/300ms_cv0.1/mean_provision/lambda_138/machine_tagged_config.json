@@ -1,0 +1,37 @@
+{
+    "tagged_machines": [
+        {
+            "machine_address": "172.32.73.8", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv0.1/mean_provision/lambda_138/machine_3"
+        }, 
+        {
+            "machine_address": "172.32.37.33", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv0.1/mean_provision/lambda_138/machine_1"
+        }, 
+        {
+            "machine_address": "172.32.5.161", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv0.1/mean_provision/lambda_138/machine_0"
+        }, 
+        {
+            "machine_address": "172.32.118.171", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv0.1/mean_provision/lambda_138/machine_4"
+        }, 
+        {
+            "machine_address": "172.32.43.88", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv0.1/mean_provision/lambda_138/machine_2"
+        }
+    ], 
+    "experiment_config": {
+        "process_path": "CONFIGS_COST/tagged/300ms_cv0.1/mean_provision/lambda_138/138_0.1.deltas", 
+        "ksvm": 1, 
+        "resnet": 13, 
+        "log_reg": 1, 
+        "slo_millis": 300, 
+        "num_trials": 30, 
+        "trial_length": 690, 
+        "inception": 5, 
+        "cv": 0.1, 
+        "num_clients": 1, 
+        "lambda": 138
+    }
+}

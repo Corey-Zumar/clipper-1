@@ -1,0 +1,61 @@
+{
+    "tagged_machines": [
+        {
+            "machine_address": "172.32.200.173", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv4.0/mean_provision/lambda_315/machine_8"
+        }, 
+        {
+            "machine_address": "172.32.168.35", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv4.0/mean_provision/lambda_315/machine_6"
+        }, 
+        {
+            "machine_address": "172.32.158.39", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv4.0/mean_provision/lambda_315/machine_5"
+        }, 
+        {
+            "machine_address": "172.32.5.161", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv4.0/mean_provision/lambda_315/machine_0"
+        }, 
+        {
+            "machine_address": "172.32.118.171", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv4.0/mean_provision/lambda_315/machine_4"
+        }, 
+        {
+            "machine_address": "172.32.213.212", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv4.0/mean_provision/lambda_315/machine_10"
+        }, 
+        {
+            "machine_address": "172.32.188.110", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv4.0/mean_provision/lambda_315/machine_7"
+        }, 
+        {
+            "machine_address": "172.32.37.33", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv4.0/mean_provision/lambda_315/machine_1"
+        }, 
+        {
+            "machine_address": "172.32.73.8", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv4.0/mean_provision/lambda_315/machine_3"
+        }, 
+        {
+            "machine_address": "172.32.43.88", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv4.0/mean_provision/lambda_315/machine_2"
+        }, 
+        {
+            "machine_address": "172.32.204.132", 
+            "config_path": "CONFIGS_COST/tagged/300ms_cv4.0/mean_provision/lambda_315/machine_9"
+        }
+    ], 
+    "experiment_config": {
+        "process_path": "CONFIGS_COST/tagged/300ms_cv4.0/mean_provision/lambda_315/315_4.0.deltas", 
+        "ksvm": 2, 
+        "resnet": 30, 
+        "log_reg": 1, 
+        "slo_millis": 300, 
+        "num_trials": 30, 
+        "trial_length": 1575, 
+        "inception": 11, 
+        "cv": 4.0, 
+        "num_clients": 1, 
+        "lambda": 315
+    }
+}
