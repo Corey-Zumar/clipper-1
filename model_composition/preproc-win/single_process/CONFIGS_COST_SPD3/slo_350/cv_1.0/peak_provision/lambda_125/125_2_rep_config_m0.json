@@ -1,0 +1,21 @@
+{
+    "process_path": "CONFIGS_COST_SPD3/slo_350/cv_1.0/peak_provision/lambda_125/125.deltas", 
+    "batch_size": 20, 
+    "gpu_affinities": [
+        "0 1 2"
+    ], 
+    "num_trials": 30, 
+    "cpu_affinities": [
+        "0 1 2 16 17 18"
+    ], 
+    "trial_length": 625, 
+    "replica_nums": [
+        0
+    ], 
+    "slo_millis": 350, 
+    "cv": 1.0, 
+    "process_mean_thru": 124.21556629870278, 
+    "max_estimated_thru": 200.66933195314868, 
+    "process_peak_thru": 197.14285714285714, 
+    "lambda": 125
+}

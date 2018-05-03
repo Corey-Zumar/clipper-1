@@ -1,0 +1,10 @@
+[
+    {
+        "machine_address": "172.31.0.246:9500", 
+        "config_path": "CONFIGS_COST_SPD3/tagged/500ms_cv4.0/mean_provision/lambda_114/114_2_rep_config_m0.json"
+    }, 
+    {
+        "machine_address": "172.31.0.83:9500", 
+        "config_path": "CONFIGS_COST_SPD3/tagged/500ms_cv4.0/mean_provision/lambda_114/114_2_rep_config_m1.json"
+    }
+]
