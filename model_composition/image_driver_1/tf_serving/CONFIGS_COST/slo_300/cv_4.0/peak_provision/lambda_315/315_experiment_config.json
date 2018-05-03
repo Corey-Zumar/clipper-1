@@ -1,0 +1,1 @@
+{"process_path": "CONFIGS_COST/slo_300/cv_4.0/peak_provision/lambda_315/315_4.0.deltas", "ksvm": 3, "resnet": 52, "log_reg": 1, "slo_millis": 300, "num_trials": 30, "trial_length": 1575, "inception": 18, "cv": 4.0, "num_clients": 1, "lambda": 315}

@@ -218,17 +218,18 @@ def populate_configs_directory(hierarchy_path,
             num_required_replicas, _ = required_replica_config[key]
 
             # Only assign one replica of CPU-bound models to each machine; this avoids PCPU contention issues
-            if num_configured_replicas < num_required_replicas and not (key in [PROFILE_KEY_KSVM, PROFILE_KEY_LOG_REG] and num_configured_replicas > 0 and curr_machine_num < 6):
+            if num_configured_replicas < num_required_replicas: 
                 required_additional_gpus = GPUS_PER_REPLICA[key]
                 required_additional_pcpus = PCPUS_PER_REPLICA[key]
 
                 if required_additional_gpus <= remaining_machine_gpus and required_additional_pcpus <= remaining_machine_pcpus:
-                    curr_total_replica_config[key] += 1
-                    curr_machine_replica_config[key] += 1
-                        
-                    remaining_machine_gpus -= required_additional_gpus
-                    remaining_machine_pcpus -= required_additional_pcpus
-                    added_new_replica = True
+                    if not (key in [PROFILE_KEY_KSVM, PROFILE_KEY_LOG_REG] and curr_machine_replica_config[key] > 0):
+                        curr_total_replica_config[key] += 1
+                        curr_machine_replica_config[key] += 1
+                            
+                        remaining_machine_gpus -= required_additional_gpus
+                        remaining_machine_pcpus -= required_additional_pcpus
+                        added_new_replica = True
 
         if not added_new_replica:
             # The fact that we did not add a a replica means that either:
@@ -359,7 +360,9 @@ def create_configs_find_min_cost(arrival_procs_path,
         lambda_proc = arrival_procs[lambda_val]
         lambda_fpath = fpaths[lambda_val]
 
-        mean_thru = bench_utils.calculate_mean_throughput(lambda_proc)
+        # ACCEPT LAMBDA VALUE AT FACE VALUE
+        mean_thru = lambda_val
+        # mean_thru = bench_utils.calculate_mean_throughput(lambda_proc)
         peak_thru = bench_utils.calculate_peak_throughput(lambda_proc, slo_millis)
 
         mean_replica_config, mean_pipeline_thru = find_replica_configuration(parsed_profiles, mean_thru)
