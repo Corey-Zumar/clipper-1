@@ -440,7 +440,6 @@ class PredictionResponse:
                          self.num_outputs)
         header_idx += BYTES_PER_INT
         for output, output_type, batch_id in self.outputs:
-            print(output, len(output), output_type, batch_id)
             struct.pack_into("<I", PredictionResponse.header_buffer,
                              header_idx, len(output))
             header_idx += BYTES_PER_INT 
