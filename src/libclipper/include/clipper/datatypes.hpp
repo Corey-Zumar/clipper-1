@@ -391,5 +391,16 @@ struct hash<clipper::VersionedModelId> {
     return seed;
   }
 };
+template <>
+struct hash<std::pair<clipper::QueryId, clipper::VersionedModelId>> {
+  typedef std::size_t result_type;
+  std::size_t operator()(const std::pair<clipper::QueryId, clipper::VersionedModelId> &key) const {
+    std::size_t seed = 0;
+    boost::hash_combine(seed, std::to_string(key.first));
+    boost::hash_combine(seed, key.second.get_name());
+    boost::hash_combine(seed, key.second.get_id());
+    return seed;
+  }
+};
 }
 #endif  // CLIPPER_LIB_DATATYPES_H

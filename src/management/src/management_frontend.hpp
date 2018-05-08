@@ -460,15 +460,10 @@ class RequestHandler {
     }
 
     // Confirm that the user supplied only one model_name
-    if (model_names.size() != 1) {
+    if (model_names.size() <= 0) {
       std::stringstream ss;
-      if (model_names.size() == 0) {
-        ss << "Please provide the name of the model with which you want" << app_name
-           << " to be linked";
-      } else {
-        ss << "Applications must be linked with at most one model. ";
-        ss << "Attempted to add links to " << model_names.size() << " models.";
-      }
+      ss << "Please provide the name of the model with which you want" << app_name
+         << " to be linked";
       std::string error_msg = ss.str();
       clipper::log_error(LOGGING_TAG_MANAGEMENT_FRONTEND, error_msg);
       throw std::invalid_argument(error_msg);
@@ -484,13 +479,6 @@ class RequestHandler {
       if (std::find(existing_linked_models.begin(), existing_linked_models.end(), new_model_name) !=
           existing_linked_models.end()) {
         return "Success!";
-      } else {
-        // We guarantee that there is only one existing model
-        std::string existing_model_name = existing_linked_models[0];
-        std::stringstream ss;
-        ss << "A model with name " << existing_model_name << " is already linked to " << app_name
-           << ".";
-        throw std::invalid_argument(ss.str());
       }
     }
 

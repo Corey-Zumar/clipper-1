@@ -223,22 +223,32 @@ class ServerImpl {
       std::chrono::time_point<std::chrono::system_clock> create_time =
           std::chrono::system_clock::now();
 
-      task_executor_.schedule_prediction(
-          PredictTask{std::get<0>(request), versioned_models.front(), 1.0, query_id,
-                      latency_slo_micros},
-          [this, app_metrics, request_id, client_id, create_time](Output output) mutable {
-            std::chrono::time_point<std::chrono::system_clock> end =
-                std::chrono::system_clock::now();
-            long duration_micros =
-                std::chrono::duration_cast<std::chrono::microseconds>(end - create_time).count();
+      std::shared_ptr<std::atomic<size_t>> remaining_predictions =
+          std::make_shared<std::atomic<size_t>>(versioned_models.size());
 
-            app_metrics.latency_->insert(duration_micros);
-            // app_metrics.latency_list_->insert(duration_micros);
-            app_metrics.num_predictions_->increment(1);
-            app_metrics.throughput_->mark(1);
+      for (auto& vm : versioned_models) {
+        task_executor_.schedule_prediction(
+            PredictTask{std::get<0>(request), vm, 1.0, query_id, latency_slo_micros},
+            [this, app_metrics, request_id, client_id, create_time,
+             remaining_predictions](Output output) mutable {
+              std::chrono::time_point<std::chrono::system_clock> end =
+                  std::chrono::system_clock::now();
+              long duration_micros =
+                  std::chrono::duration_cast<std::chrono::microseconds>(end - create_time).count();
 
-            rpc_service_->send_response(std::make_tuple(std::move(output), request_id, client_id));
-          });
+              remaining_predictions->fetch_sub(1);
+
+              if (remaining_predictions->load() <= 0) {
+                app_metrics.latency_->insert(duration_micros);
+                // app_metrics.latency_list_->insert(duration_micros);
+                app_metrics.num_predictions_->increment(1);
+                app_metrics.throughput_->mark(1);
+
+                rpc_service_->send_response(
+                    std::make_tuple(std::move(output), request_id, client_id));
+              }
+            });
+      }
     };
 
     rpc_service_->add_application(name, predict_fn);

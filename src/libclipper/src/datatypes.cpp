@@ -366,7 +366,7 @@ rpc::PredictionResponse rpc::PredictionResponse::deserialize_prediction_response
 //       default_explanation_(std::move(default_explanation)) {}
 
 PredictTask::PredictTask(InputVector input, VersionedModelId model, float utility, QueryId query_id,
-                         long latency_slo_micros) 
+                         long latency_slo_micros)
     : input_(input),
       model_(model),
       utility_(utility),

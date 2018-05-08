@@ -408,9 +408,9 @@ class TaskExecutor {
       std::shared_ptr<ContainerQueue> &selected_queue = container_queues[queue_idx];
 
       {
+        std::pair<QueryId, VersionedModelId> key = std::make_pair(task.query_id_, task.model_);
         std::unique_lock<std::mutex> l(prediction_callback_map_mutex_);
-        prediction_callback_map_.emplace(
-            std::make_pair(task.query_id_, std::move(task_completion_callback)));
+        prediction_callback_map_.emplace(std::make_pair(key, std::move(task_completion_callback)));
       }
       // bool cached = cache_->fetch(task.model_, task.query_id_,
       //                             std::move(task_completion_callback));
@@ -457,7 +457,8 @@ class TaskExecutor {
   std::unordered_map<VersionedModelId, ModelMetrics> model_metrics_;
   static constexpr int INITIAL_MODEL_QUEUES_MAP_SIZE = 100;
 
-  std::unordered_map<QueryId, std::function<void(Output)>> prediction_callback_map_;
+  std::unordered_map<std::pair<QueryId, VersionedModelId>, std::function<void(Output)>>
+      prediction_callback_map_;
   std::mutex prediction_callback_map_mutex_;
   std::atomic_bool use_full_batches_{false};
 
@@ -586,10 +587,11 @@ class TaskExecutor {
         processing_container->latency_hist_.insert(task_latency_micros);
       }
 
-      auto search = prediction_callback_map_.find(completed_msg.query_id_);
+      std::pair<QueryId, VersionedModelId> key = std::make_pair(completed_msg.query_id_, cur_model);
+      auto search = prediction_callback_map_.find(key);
       if (search != prediction_callback_map_.end()) {
         search->second(Output{output_data, {completed_msg.model_}});
-        prediction_callback_map_.erase(completed_msg.query_id_);
+        prediction_callback_map_.erase(key);
       }
 
       boost::optional<ModelMetrics> cur_model_metric;

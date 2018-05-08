@@ -224,12 +224,15 @@ void RPCService::receive_message(socket_t &socket) {
   socket.recv(&msg_header_length, 0);
   socket.recv(&msg_output_header, 0);
 
-  uint64_t *output_header = static_cast<uint64_t *>(msg_output_header.data());
-  uint64_t num_outputs = output_header[0];
+  uint32_t *output_header = static_cast<uint32_t *>(msg_output_header.data());
+  uint32_t num_outputs = output_header[0];
   output_header += 1;
 
-  uint64_t output_data_size =
-      static_cast<uint64_t>(std::accumulate(output_header, output_header + num_outputs, 0));
+  uint32_t output_data_size = 0;
+  for (uint32_t i = 0; i < (num_outputs * 3); i += 3) {
+    uint32_t output_size = output_header[i];
+    output_data_size += output_size;
+  }
 
   std::shared_ptr<void> output_data(malloc(output_data_size), free);
   uint8_t *output_data_raw = static_cast<uint8_t *>(output_data.get());
@@ -237,18 +240,21 @@ void RPCService::receive_message(socket_t &socket) {
   std::unordered_map<uint32_t, std::shared_ptr<OutputData>> outputs;
   outputs.reserve(num_outputs);
 
-  uint64_t curr_start = 0;
-  for (uint64_t i = 0; i < (num_outputs * 3); i += 3) {
-    uint64_t output_size = output_header[i];
+  uint32_t curr_start = 0;
+  for (uint32_t i = 0; i < (num_outputs * 3); i += 3) {
+    uint32_t output_size = output_header[i];
     DataType output_type = static_cast<DataType>(output_header[i + 1]);
     uint32_t output_batch_id = output_header[i + 2];
 
     socket.recv(output_data_raw + curr_start, output_size, 0);
-    outputs.emplace(output_batch_id, OutputData::create_output(output_type, output_data, curr_start,
-                                                               curr_start + output_size));
+
+    char *char_raw = static_cast<char *>(output_data.get());
+
+    auto new_output =
+        OutputData::create_output(output_type, output_data, curr_start, curr_start + output_size);
+    outputs.emplace(output_batch_id, std::move(new_output));
 
     curr_start += output_size;
-    output_data_raw += output_size;
   }
 
   log_info(LOGGING_TAG_RPC, "response received");

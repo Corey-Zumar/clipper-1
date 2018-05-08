@@ -11,10 +11,9 @@ class MMCContainer(rpc.ModelContainerBase):
 
     def predict(self, inputs):
         time.sleep(1)
-        print(inputs)
         outputs = {}
         for model_name in inputs:
-            outputs[model_name] = [self.prediction] * len(inputs[model_name])
+            outputs[model_name] = [str(self.prediction)] * len(inputs[model_name])
 
         return outputs 
 

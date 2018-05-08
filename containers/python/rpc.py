@@ -400,7 +400,6 @@ class PredictionResponse:
             struct.pack("<I", MESSAGE_TYPE_CONTAINER_CONTENT),
             flags=zmq.SNDMORE)
         socket.send(self.msg_id, flags=zmq.SNDMORE)
-        print("HEADER LENGTH: {}".format(header_length_bytes))
         socket.send(struct.pack("<Q", header_length_bytes), flags=zmq.SNDMORE)
         socket.send(output_header, flags=zmq.SNDMORE)
         for idx in range(self.num_outputs):
@@ -408,9 +407,9 @@ class PredictionResponse:
             if idx == self.num_outputs - 1:
                 # Don't use the `SNDMORE` flag if
                 # this is the last output being sent
-                socket.send(output_item)
+                socket.send_string(output_item)
             else:
-                socket.send(output_item, flags=zmq.SNDMORE)
+                socket.send_string(output_item, flags=zmq.SNDMORE)
 
     def _expand_buffer_if_necessary(self, size):
         """
@@ -434,16 +433,17 @@ class PredictionResponse:
             element and the header length as the second
             element
         """
-        header_length = BYTES_PER_LONG * ((3 * len(self.outputs)) + 1)
+        header_length = BYTES_PER_INT * ((3 * len(self.outputs)) + 1)
         self._expand_buffer_if_necessary(header_length)
         header_idx = 0
-        struct.pack_into("<Q", PredictionResponse.header_buffer, header_idx,
+        struct.pack_into("<I", PredictionResponse.header_buffer, header_idx,
                          self.num_outputs)
-        header_idx += BYTES_PER_LONG
+        header_idx += BYTES_PER_INT
         for output, output_type, batch_id in self.outputs:
-            struct.pack_into("<Q", PredictionResponse.header_buffer,
+            print(output, len(output), output_type, batch_id)
+            struct.pack_into("<I", PredictionResponse.header_buffer,
                              header_idx, len(output))
-            header_idx += BYTES_PER_LONG
+            header_idx += BYTES_PER_INT 
             struct.pack_into("<I", PredictionResponse.header_buffer,
                              header_idx, output_type)
             header_idx += BYTES_PER_INT
