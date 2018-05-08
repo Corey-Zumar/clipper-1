@@ -248,8 +248,6 @@ void RPCService::receive_message(socket_t &socket) {
 
     socket.recv(output_data_raw + curr_start, output_size, 0);
 
-    char *char_raw = static_cast<char *>(output_data.get());
-
     auto new_output =
         OutputData::create_output(output_type, output_data, curr_start, curr_start + output_size);
     outputs.emplace(output_batch_id, std::move(new_output));
