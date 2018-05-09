@@ -4,24 +4,31 @@ import os
 import sys
 import numpy as np
 import time
+import torch
 
 from torchvision import models, transforms
 from torch.autograd import Variable
 from PIL import Image
 from datetime import datetime
 
-MODEL_NAME_ALEXNET = "m_alexnet"
-MODEL_NAME_RESNET152 = "m_resnet152"
+MODEL_NAME_ALEXNET = "m_alexnet:1"
+MODEL_NAME_RESNET152 = "m_resnet:1"
+MODEL_NAME_ENSEMBLE = "m_ensemble:1"
+
+INCEPTION_WIDTH = 299
+INCEPTION_HEIGHT = 299
+INCEPTION_CHANNELS = 3
 
 class TorchMMCContainer(rpc.ModelContainerBase):
     def __init__(self, gpu_num):
         self.gpu_num = gpu_num
 
 	self.alexnet_model = models.alexnet(pretrained=True)
-        self.resnet_model = models.alexnet(pretrained=True)
+        self.resnet_model = models.resnet152(pretrained=True)
 
         if torch.cuda.is_available():
-            self.model.cuda(gpu_num)
+            self.alexnet_model.cuda(gpu_num)
+            self.resnet_model.cuda(gpu_num)
 
         normalize = transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
@@ -36,7 +43,6 @@ class TorchMMCContainer(rpc.ModelContainerBase):
         ])		
 
     def predict(self, inputs):
-        time.sleep(1)
         outputs = {}
 
         if MODEL_NAME_ALEXNET in inputs:
@@ -50,11 +56,18 @@ class TorchMMCContainer(rpc.ModelContainerBase):
         if MODEL_NAME_RESNET152 in inputs:
             res152_inputs = inputs[MODEL_NAME_RESNET152]
             res152_inputs = self._preprocess(res152_inputs)
-            res152_outputs = self._predict(self.res152_model,
+            res152_outputs = self._predict(self.resnet_model,
                                            res152_inputs)
 
             outputs[MODEL_NAME_RESNET152] = res152_outputs
 
+        if MODEL_NAME_ENSEMBLE in inputs:
+            ensemble_inputs = inputs[MODEL_NAME_ENSEMBLE]
+            ensemble_inputs = self._preprocess(ensemble_inputs)
+            alexnet_outputs = self._predict(self.alexnet_model, ensemble_inputs)
+            res152_outputs = self._predict(self.resnet_model, ensemble_inputs)
+
+            outputs[MODEL_NAME_ENSEMBLE] = alexnet_outputs
 
         return outputs
 

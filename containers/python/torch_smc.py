@@ -4,24 +4,27 @@ import os
 import sys
 import numpy as np
 import time
+import torch
 
 from torchvision import models, transforms
 from torch.autograd import Variable
 from PIL import Image
 from datetime import datetime
 
-MODEL_NAME_ALEXNET = "m_alexnet"
-MODEL_NAME_RESNET152 = "m_resnet152"
+INCEPTION_WIDTH = 299
+INCEPTION_HEIGHT = 299
+INCEPTION_CHANNELS = 3
 
 class TorchMMCContainer(rpc.ModelContainerBase):
     def __init__(self, gpu_num):
         self.gpu_num = gpu_num
 
 	self.alexnet_model = models.alexnet(pretrained=True)
-        self.resnet_model = models.alexnet(pretrained=True)
+        self.resnet_model = models.resnet152(pretrained=True)
 
         if torch.cuda.is_available():
-            self.model.cuda(gpu_num)
+            self.alexnet_model.cuda(gpu_num)
+            self.resnet_model.cuda(gpu_num)
 
         normalize = transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
@@ -36,7 +39,6 @@ class TorchMMCContainer(rpc.ModelContainerBase):
         ])		
 
     def predict(self, inputs):
-        time.sleep(1)
         outputs = {}
 
         assert len(inputs.keys()) == 1
@@ -51,7 +53,7 @@ class TorchMMCContainer(rpc.ModelContainerBase):
         alexnet_outputs = self._predict(self.alexnet_model,
                                         preprocessed_inputs)
 
-        res152_outputs = self._predict(self.res152_model,
+        res152_outputs = self._predict(self.resnet_model,
                                        preprocessed_inputs)
 
         outputs[inputs_key] = res152_outputs

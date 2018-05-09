@@ -66,11 +66,12 @@ class Client:
         # right here
         self.request_lock.acquire()
         future = Future()
-        self.outstanding_requests[self.request_id] = future
+        request_id = self.request_id
+        self.outstanding_requests[request_id] = future
         self.request_queue.put((self.request_id, app_name, input_item))
         self.request_id += 1
         self.request_lock.release()
-        return future
+        return future, request_id
 
     def _run_recv(self):
         global active
@@ -139,7 +140,7 @@ class Client:
         future = self.outstanding_requests[request_id]
         del self.outstanding_requests[request_id]
         self.request_lock.release()
-        self.futures_executor.submit(lambda future, output: future.set_result(output), future, output)
+        self.futures_executor.submit(lambda future, output: future.set_result((request_id, output)), future, output)
 
     def _send_requests(self, socket):
         if self.request_queue.empty():

@@ -81,8 +81,8 @@ void ActiveContainers::add_container(ContainerId container_id,
                      container_id, connection_id);
   boost::unique_lock<boost::shared_mutex> l{m_};
 
-  // Set a default batch size of 30
-  int batch_size = 30;
+  // Set a default batch size of 50
+  int batch_size = 50;
   // auto batch_size_search = batch_sizes_.find(model);
   // if (batch_size_search != batch_sizes_.end()) {
   //   batch_size = batch_size_search->second;
