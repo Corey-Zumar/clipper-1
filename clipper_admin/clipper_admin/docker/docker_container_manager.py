@@ -206,21 +206,21 @@ class DockerContainerManager(ContainerManager):
 
     def _add_replica(self, name, version, input_type, image):
 
-        containers = self.docker_client.containers.list(
-            filters={
-                "label": CLIPPER_QUERY_FRONTEND_CONTAINER_LABEL
-            })
-        if len(containers) < 1:
-            logger.warning("No Clipper query frontend found.")
-            raise ClipperException(
-                "No Clipper query frontend to attach model container to")
-        query_frontend_hostname = containers[0].name
+        # containers = self.docker_client.containers.list(
+        #     filters={
+        #         "label": CLIPPER_QUERY_FRONTEND_CONTAINER_LABEL
+        #     })
+        # if len(containers) < 1:
+        #     logger.warning("No Clipper query frontend found.")
+        #     raise ClipperException(
+        #         "No Clipper query frontend to attach model container to")
+        # query_frontend_hostname = containers[0].name
         env_vars = {
             "CLIPPER_MODEL_NAME": name,
             "CLIPPER_MODEL_VERSION": version,
             # NOTE: assumes this container being launched on same machine
             # in same docker network as the query frontend
-            "CLIPPER_IP": query_frontend_hostname,
+            "CLIPPER_IP": "smongle",
             "CLIPPER_INPUT_TYPE": input_type,
         }
 
@@ -235,11 +235,12 @@ class DockerContainerManager(ContainerManager):
             name=model_container_name,
             environment=env_vars,
             labels=labels,
+            extra_hosts={"smongle" : "172.18.0.1"},
             **self.extra_container_kwargs)
 
         # Metric Section
-        add_to_metric_config(model_container_name,
-                             CLIPPER_INTERNAL_METRIC_PORT)
+        # add_to_metric_config(model_container_name,
+        #                      CLIPPER_INTERNAL_METRIC_PORT)
 
         # Return model_container_name so we can check if it's up and running later
         return model_container_name
