@@ -43,7 +43,7 @@ class ClipperManagerTestCaseShort(unittest.TestCase):
 
     def setUp(self):
         self.clipper_conn = create_docker_connection(
-            cleanup=True, start_clipper=True)
+            cleanup=True, start_clipper=False)
 
     def test_register_model_correct(self):
         input_type = "doubles"
