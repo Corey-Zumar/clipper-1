@@ -363,7 +363,7 @@ class RequestHandler {
 
               std::string final_content =
                   get_batch_prediction_response_content(all_content);
-              log_error("CONTENT", final_content);
+              clipper::log_error("CONTENT", final_content);
               respond_http(final_content, "200 OK", response);
             })
             .onError([response](const std::exception& e) {
