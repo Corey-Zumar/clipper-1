@@ -375,12 +375,14 @@ class RequestHandler {
       } catch (const json_parse_error& e) {
         std::string error_msg =
             json_error_msg(e.what(), PREDICTION_JSON_SCHEMA);
+        clipper::log_error("ERR", error_msg);
         std::string json_error_response = get_prediction_error_response_content(
             PREDICTION_ERROR_NAME_JSON, error_msg);
         respond_http(json_error_response, "400 Bad Request", response);
       } catch (const json_semantic_error& e) {
         std::string error_msg =
             json_error_msg(e.what(), PREDICTION_JSON_SCHEMA);
+        clipper::log_error("ERR", error_msg);
         std::string json_error_response = get_prediction_error_response_content(
             PREDICTION_ERROR_NAME_JSON, error_msg);
         respond_http(json_error_response, "400 Bad Request", response);
@@ -388,16 +390,19 @@ class RequestHandler {
         // This invalid argument exception is most likely the propagation of an
         // exception thrown
         // when Rapidjson attempts to parse an invalid json schema
+        clipper::log_error("ERR", e.what());
         std::string json_error_response = get_prediction_error_response_content(
             PREDICTION_ERROR_NAME_JSON, e.what());
         respond_http(json_error_response, "400 Bad Request", response);
       } catch (const clipper::PredictError& e) {
         std::string error_msg = e.what();
+        clipper::log_error("ERR", e.what());
         std::string json_error_response = get_prediction_error_response_content(
             PREDICTION_ERROR_NAME_QUERY_PROCESSING, error_msg);
         respond_http(json_error_response, "400 Bad Request", response);
       } catch (const version_id_error& e) {
         std::string error_msg = e.what();
+        clipper::log_error("ERR", e.what());
         respond_http(error_msg, "400 Bad Request", response);
       }
     };
