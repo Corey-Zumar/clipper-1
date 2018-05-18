@@ -122,19 +122,19 @@ class Logger {
 };
 
 template <class... Strings>
-void Logger::log_info(const std::string tag, Strings... messages) const {
-  const std::string tag_string = get_formatted_tag(tag, LogLevel::Info);
-  std::stringstream ss;
-  concatenate_messages(ss, LogLevel::Info, tag_string.length(), true,
-                       messages...);
-  spdlogger_->info((tag_string + ss.str()).data());
+// void Logger::log_info(const std::string tag, Strings... messages) const {
+//   const std::string tag_string = get_formatted_tag(tag, LogLevel::Info);
+//   std::stringstream ss;
+//   concatenate_messages(ss, LogLevel::Info, tag_string.length(), true,
+//                        messages...);
+//   spdlogger_->info((tag_string + ss.str()).data());
 }
 
 template <class... Args>
 void Logger::log_info_formatted(const std::string tag, const char *message,
                                 Args... args) const {
-  const std::string tag_string = get_formatted_tag(tag, LogLevel::Info);
-  spdlogger_->info((tag_string + message).data(), args...);
+  // const std::string tag_string = get_formatted_tag(tag, LogLevel::Info);
+  // spdlogger_->info((tag_string + message).data(), args...);
 }
 
 template <class... Strings>
